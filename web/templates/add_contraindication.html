@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Add Contraindication{% endblock %}
+
+{% block content %}
+<h2>Add Contraindication</h2>
+
+<form method="POST" style="max-width: 800px;">
+    <div class="form-group">
+        <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
+        <input type="text" id="practice_sanskrit" name="practice_sanskrit" 
+               placeholder="e.g., Shavasana" autocomplete="off">
+        <div id="autocomplete-results" style="position: relative;"></div>
+    </div>
+    
+    <div class="form-group">
+        <label for="practice_english">Practice Name (English) *</label>
+        <input type="text" id="practice_english" name="practice_english" required
+               placeholder="e.g., Corpse pose">
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <div class="form-group">
+            <label for="kosa">Kosa *</label>
+            <select id="kosa" name="kosa" required>
+                <option value="">Select Kosa</option>
+                <option value="Annamaya_Kosa">Annamaya Kosa</option>
+                <option value="Pranamaya_Kosa">Pranamaya Kosa</option>
+                <option value="Manomaya_Kosa">Manomaya Kosa</option>
+                <option value="Vijnanamaya_Kosa">Vijnanamaya Kosa</option>
+                <option value="Anandamaya_Kosa">Anandamaya Kosa</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="sub_category">Sub-Category</label>
+            <input type="text" id="sub_category" name="sub_category">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="reason">Reason for Contraindication</label>
+        <textarea id="reason" name="reason" 
+                  placeholder="Why is this practice contraindicated?"></textarea>
+    </div>
+    
+    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1.5rem;">
+        <h4 style="margin-bottom: 1rem;">For Which Diseases *</h4>
+        <p style="color: #666; margin-bottom: 1rem;">Select which disease(s) this contraindication applies to:</p>
+        
+        {% for disease in diseases %}
+        <div style="margin-bottom: 0.5rem;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" name="diseases" value="{{ disease.id }}" 
+                       style="margin-right: 0.5rem;">
+                {{ disease.name }}
+            </label>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn">Add Contraindication</button>
+        <a href="/" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+// Autocomplete functionality for Sanskrit name
+let autocompleteTimeout;
+const sanskritInput = document.getElementById('practice_sanskrit');
+const autocompleteDiv = document.getElementById('autocomplete-results');
+
+sanskritInput.addEventListener('input', function() {
+    clearTimeout(autocompleteTimeout);
+    const query = this.value.trim();
+    
+    if (query.length < 1) {
+        autocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    autocompleteTimeout = setTimeout(() => {
+        fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                displayAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+function displayAutocompleteResults(practices) {
+    if (practices.length === 0) {
+        autocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    autocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
+        practices.map(p => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" onclick="selectPractice(${p.id})">
+                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectPractice(id) {
+    fetch(`/api/practice/search?q=` + document.getElementById('practice_sanskrit').value)
+        .then(response => response.json())
+        .then(data => {
+            const practice = data.find(p => p.id === id);
+            if (practice) {
+                document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
+                document.getElementById('practice_english').value = practice.practice_english;
+                document.getElementById('kosa').value = practice.kosa;
+                document.getElementById('sub_category').value = practice.sub_category || '';
+                autocompleteDiv.innerHTML = '';
+            }
+        });
+}
+
+// Close autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#practice_sanskrit') && !e.target.closest('#autocomplete-results')) {
+        autocompleteDiv.innerHTML = '';
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+</style>
+{% endblock %}

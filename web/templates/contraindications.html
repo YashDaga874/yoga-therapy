@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Contraindications{% endblock %}
+
+{% block content %}
+<style>
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+    background-color: #f8f9fa;
+}
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>Contraindications by Disease</h2>
+    <a href="/contraindication/add" class="btn">Add Contraindication</a>
+</div>
+
+{% if disease_contraindications %}
+    {% for disease, contraindications in disease_contraindications.items() %}
+    <div style="margin-bottom: 3rem; padding: 1.5rem; background: #fff; border-radius: 8px; border: 1px solid #ddd;">
+        <h3 style="margin-bottom: 1rem; color: #667eea;">{{ disease.name }}</h3>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Practice (Sanskrit)</th>
+                    <th>Practice (English)</th>
+                    <th>Kosa</th>
+                    <th>Sub-Category</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contra in contraindications %}
+                <tr class="clickable-row" onclick="window.location.href='/contraindication/{{ contra.id }}/edit'">
+                    <td>{{ contra.practice_sanskrit or '-' }}</td>
+                    <td><strong>{{ contra.practice_english }}</strong></td>
+                    <td>{{ contra.kosa.replace('_', ' ') }}</td>
+                    <td>{{ contra.sub_category or '-' }}</td>
+                    <td>{{ contra.reason or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+{% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p>No contraindications defined yet.</p>
+        <p style="margin-top: 1rem;">
+            <a href="/contraindication/add" class="btn">Add First Contraindication</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Citations{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>Citations & References</h2>
+    <a href="/citation/add" class="btn">Add Citation</a>
+</div>
+
+{% if citations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Citation</th>
+                <th>Type</th>
+                <th>Used by Practices</th>
+                <th>Full Reference</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for citation in citations %}
+            <tr>
+                <td><strong>{{ citation.citation_text }}</strong></td>
+                <td>{{ citation.citation_type }}</td>
+                <td>{{ citation.practices|length }} practice(s)</td>
+                <td>{{ citation.full_reference or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p>No citations added yet.</p>
+        <p style="margin-top: 1rem;">
+            <a href="/citation/add" class="btn">Add First Citation</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

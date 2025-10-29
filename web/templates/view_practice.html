@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}{{ practice.practice_english }}{% endblock %}
+
+{% block content %}
+<div class="practice-header">
+    <div class="practice-title-section">
+        {% if practice.practice_sanskrit %}
+        <h1 class="practice-title">{{ practice.practice_sanskrit }}</h1>
+        <h2 class="practice-english">{{ practice.practice_english }}</h2>
+        {% else %}
+        <h1 class="practice-title">{{ practice.practice_english }}</h1>
+        {% endif %}
+    </div>
+    
+    <div class="practice-actions">
+        <a href="/practices" class="btn btn-outline">
+            <i class="icon">←</i> Back to Practices
+        </a>
+        <a href="/practice/{{ practice.id }}/edit" class="btn btn-primary">
+            <i class="icon">✏️</i> Edit Practice
+        </a>
+        <form method="POST" action="/practice/{{ practice.id }}/delete" style="display: inline;" 
+              onsubmit="return confirm('Are you sure you want to delete {{ practice.practice_english }}?')">
+            <button type="submit" class="btn" style="background: #dc3545; color: white;">
+                <i class="icon">🗑️</i> Delete Practice
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="practice-content">
+    <div class="practice-main">
+        <div class="practice-info-grid">
+            <div class="info-card">
+                <h3>Classification</h3>
+                <div class="info-item">
+                    <span class="label">Kosa:</span>
+                    <span class="value">{{ practice.kosa.replace('_', ' ') }}</span>
+                </div>
+                {% if practice.sub_category %}
+                <div class="info-item">
+                    <span class="label">Sub-Category:</span>
+                    <span class="value">{{ practice.sub_category }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="info-card">
+                <h3>Practice Details</h3>
+                {% if practice.rounds %}
+                <div class="info-item">
+                    <span class="label">Rounds:</span>
+                    <span class="value">{{ practice.rounds }}</span>
+                </div>
+                {% endif %}
+                {% if practice.time_minutes %}
+                <div class="info-item">
+                    <span class="label">Duration:</span>
+                    <span class="value">{{ practice.time_minutes }} minutes</span>
+                </div>
+                {% endif %}
+                {% if practice.strokes_per_min %}
+                <div class="info-item">
+                    <span class="label">Strokes/Min:</span>
+                    <span class="value">{{ practice.strokes_per_min }}</span>
+                </div>
+                {% endif %}
+                {% if practice.strokes_per_cycle %}
+                <div class="info-item">
+                    <span class="label">Strokes/Cycle:</span>
+                    <span class="value">{{ practice.strokes_per_cycle }}</span>
+                </div>
+                {% endif %}
+                {% if practice.rest_between_cycles_sec %}
+                <div class="info-item">
+                    <span class="label">Rest Between Cycles:</span>
+                    <span class="value">{{ practice.rest_between_cycles_sec }} seconds</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if practice.description %}
+        <div class="content-section">
+            <h3>Description</h3>
+            <p class="content-text">{{ practice.description }}</p>
+        </div>
+        {% endif %}
+
+        {% if practice.how_to_do %}
+        <div class="content-section">
+            <h3>How to Perform This Practice</h3>
+            <div class="instruction-text">{{ practice.how_to_do|replace('\n', '<br>')|safe }}</div>
+        </div>
+        {% endif %}
+
+        {% if practice.variations %}
+        <div class="content-section">
+            <h3>Variations</h3>
+            <div class="variations-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Variation</th>
+                            <th>Reference Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set variations = (practice.variations|from_json) if practice.variations else [] %}
+                        {% for var in variations %}
+                        <tr>
+                            <td class="variation-text">{{ var.text if var is mapping else var }}</td>
+                            <td class="variation-ref">{{ var.referred_in if var is mapping else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="content-section">
+            <h3>Associated Diseases</h3>
+            <div class="disease-tags">
+                {% for disease in practice.diseases %}
+                <span class="disease-tag">{{ disease.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if practice.photo_path or practice.video_path %}
+    <div class="practice-media">
+        {% if practice.photo_path %}
+        <div class="media-section">
+            <h3>Visual Reference</h3>
+            <div class="media-container">
+                <img src="{{ practice.photo_path }}" alt="{{ practice.practice_english }}" class="practice-image">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if practice.video_path %}
+        <div class="media-section">
+            <h3>Video Demonstration</h3>
+            <div class="media-container">
+                <video controls class="practice-video">
+                    <source src="{{ practice.video_path }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.practice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.practice-title-section {
+    flex: 1;
+}
+
+.practice-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
+}
+
+.practice-english {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: #667eea;
+    margin: 0;
+    font-style: italic;
+}
+
+.practice-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #6c757d;
+    border: 2px solid #dee2e6;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.btn-primary {
+    background: #495057;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #343a40;
+}
+
+.practice-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3rem;
+    margin-top: 2rem;
+}
+
+.practice-main {
+    min-width: 0;
+}
+
+.practice-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.info-card h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.label {
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.value {
+    font-weight: 600;
+    color: #2c3e50;
+    text-align: right;
+}
+
+.content-section {
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.content-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+.content-text {
+    color: #495057;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.instruction-text {
+    color: #495057;
+    line-height: 1.7;
+    font-size: 1rem;
+    white-space: pre-line;
+}
+
+.variations-table {
+    overflow-x: auto;
+}
+
+.variations-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.variations-table th {
+    background: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 2px solid #e9ecef;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.variations-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+}
+
+.variation-text {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.variation-ref {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.disease-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.disease-tag {
+    background: #667eea;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.practice-media {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.media-section {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.media-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+.media-container {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.practice-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 400px;
+    object-fit: cover;
+}
+
+.practice-video {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 300px;
+}
+
+.icon {
+    margin-right: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .practice-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .practice-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .practice-info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .practice-title {
+        font-size: 2rem;
+    }
+    
+    .practice-sanskrit {
+        font-size: 1.2rem;
+    }
+}
+</style>
+{% endblock %}

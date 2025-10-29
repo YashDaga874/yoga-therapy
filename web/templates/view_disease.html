@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{{ disease.name }}{% endblock %}
+
+{% block content %}
+<style>
+.disease-header {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.disease-title-section {
+    margin-bottom: 1.5rem;
+}
+
+.disease-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
+}
+
+.disease-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #495057;
+    border: 2px solid #adb5bd;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.btn-primary {
+    background: #495057;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #343a40;
+}
+
+.icon {
+    margin-right: 0.5rem;
+}
+</style>
+
+<div class="disease-header">
+    <div class="disease-title-section">
+        <h1 class="disease-title">{{ disease.name }}</h1>
+    </div>
+    
+    <div class="disease-actions">
+        <a href="/diseases" class="btn-outline">
+            <i class="icon">←</i> Back to Diseases
+        </a>
+        <a href="/disease/{{ disease.id }}/edit" class="btn-primary">
+            <i class="icon">✏️</i> Edit Disease
+        </a>
+        <form method="POST" action="/disease/{{ disease.id }}/delete" style="display: inline;" 
+              onsubmit="return confirm('Are you sure you want to delete {{ disease.name }}?')">
+            <button type="submit" class="btn" style="background: #dc3545; color: white;">
+                <i class="icon">🗑️</i> Delete Disease
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if disease.description %}
+<p style="color: #666; margin: 1rem 0;">{{ disease.description }}</p>
+{% endif %}
+
+{% if module %}
+<div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin: 2rem 0;">
+    <h4 style="margin-bottom: 0.5rem;">Module Information</h4>
+    <p><strong>Developed by:</strong> {{ module.developed_by }}</p>
+    {% if module.module_description %}
+    <p><strong>Description:</strong> {{ module.module_description }}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<h3 style="margin-top: 2rem;">Practices by Kosa</h3>
+
+{% if practices_by_kosa %}
+    {% for kosa, practices in practices_by_kosa.items() %}
+    <div style="margin: 2rem 0; padding: 1.5rem; border: 1px solid #ddd; border-radius: 8px;">
+        <h4 style="color: #667eea; margin-bottom: 1rem;">{{ kosa.replace('_', ' ') }}</h4>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Practice</th>
+                    <th>Sub-Category</th>
+                    <th>Rounds</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for practice in practices %}
+                <tr>
+                    <td>
+                        {% if practice.practice_sanskrit %}
+                            <strong>{{ practice.practice_sanskrit }}</strong><br>
+                        {% endif %}
+                        {{ practice.practice_english }}
+                        {% if practice.citation %}
+                            <br><span style="font-size: 0.9em; color: #666;">
+                                [{{ practice.citation.citation_text }}]
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>{{ practice.sub_category or '-' }}</td>
+                    <td>{{ practice.rounds or '-' }}</td>
+                    <td>{{ practice.time_minutes or '-' }} min</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+{% else %}
+    <p style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        No practices found for this disease. <a href="/practice/add">Add practices</a>
+    </p>
+{% endif %}
+
+<h3 style="margin-top: 2rem;">Contraindications</h3>
+
+{% if contraindications %}
+    <table>
+        <thead>
+            <tr>
+                <th>Practice</th>
+                <th>Kosa</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for contra in contraindications %}
+            <tr>
+                <td>{{ contra.practice_english }}</td>
+                <td>{{ contra.kosa }}</td>
+                <td>{{ contra.reason or 'Not specified' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+        No contraindications defined for this disease. <a href="/contraindication/add">Add contraindication</a>
+    </p>
+{% endif %}
+{% endblock %}

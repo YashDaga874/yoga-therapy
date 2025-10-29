@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Practices{% endblock %}
+
+{% block content %}
+<style>
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+    background-color: #f8f9fa;
+}
+
+.practice-english-sub {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.disease-tag-small {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin: 0.1rem;
+}
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>Yoga Practices Database</h2>
+    <a href="/practice/add" class="btn">Add New Practice</a>
+</div>
+
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+    <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Practices:</label>
+            <input type="text" name="search" value="{{ search_term }}" 
+                   placeholder="Search by name..." 
+                   style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
+        </div>
+        
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Filter by Kosa:</label>
+            <select name="kosa" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
+                <option value="">All Koshas</option>
+                {% for kosa in koshas %}
+                    <option value="{{ kosa }}" {% if current_kosa == kosa %}selected{% endif %}>
+                        {{ kosa.replace('_', ' ') }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; align-items: end;">
+            <button type="submit" class="btn">Filter</button>
+        </div>
+    </form>
+</div>
+
+{% if practices %}
+    <table>
+        <thead>
+            <tr>
+                <th>Practice Name</th>
+                <th>Kosa</th>
+                <th>Sub-Category</th>
+                <th>Used in Diseases</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for practice in practices %}
+            <tr class="clickable-row" onclick="window.location.href='/practice/{{ practice.id }}'">
+                <td>
+                    {% if practice.practice_sanskrit %}
+                        <strong>{{ practice.practice_sanskrit }}</strong><br>
+                        <span class="practice-english-sub">{{ practice.practice_english }}</span>
+                    {% else %}
+                        <strong>{{ practice.practice_english }}</strong>
+                    {% endif %}
+                </td>
+                <td>{{ practice.kosa.replace('_', ' ') }}</td>
+                <td>{{ practice.sub_category or '-' }}</td>
+                <td>
+                    {% for disease in practice.diseases %}
+                        <span class="disease-tag-small">{{ disease.name }}</span>{% if not loop.last %} {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p>No practices found matching your criteria.</p>
+    </div>
+{% endif %}
+{% endblock %}

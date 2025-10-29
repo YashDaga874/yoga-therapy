@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Welcome to the Yoga Therapy Management System</h2>
+
+<p style="font-size: 1.1rem; color: #666; margin: 1rem 0 2rem 0;">
+    This system helps manage yoga therapy practices based on the Pancha Kosha (Five Sheaths) framework. 
+    Researchers can input diseases, practices, contraindications, and citations to build comprehensive 
+    treatment protocols.
+</p>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ disease_count }}</h3>
+        <p>Diseases/Conditions</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>{{ practice_count }}</h3>
+        <p>Yoga Practices</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>{{ citation_count }}</h3>
+        <p>Research Citations</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>{{ contraindication_count }}</h3>
+        <p>Contraindications</p>
+    </div>
+</div>
+
+<div style="margin-top: 3rem;">
+    <h3 style="margin-bottom: 1rem;">Quick Actions</h3>
+    
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="/disease/add" class="btn">Add New Disease</a>
+        <a href="/practice/add" class="btn">Add New Practice</a>
+        <a href="/contraindication/add" class="btn">Add Contraindication</a>
+    </div>
+</div>
+
+<div style="margin-top: 3rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+    <h3 style="margin-bottom: 1rem;">How It Works</h3>
+    
+    <p style="margin-bottom: 1rem;">
+        The system organizes yoga practices across five koshas (sheaths): Annamaya Kosa (physical), 
+        Pranamaya Kosa (energy), Manomaya Kosa (mental), Vijnanamaya Kosa (wisdom), and Anandamaya Kosa (bliss). 
+    </p>
+    
+    <p style="margin-bottom: 1rem;">
+        When multiple diseases are combined, the system intelligently merges practices from each disease 
+        while removing duplicates and applying contraindications. This ensures safe and comprehensive 
+        treatment protocols for patients with multiple conditions.
+    </p>
+    
+    <p>
+        All practices are linked to research citations, maintaining scientific rigor and traceability 
+        for academic and clinical use.
+    </p>
+</div>
+{% endblock %}

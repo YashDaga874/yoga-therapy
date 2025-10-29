@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Diseases{% endblock %}
+
+{% block content %}
+<style>
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+    background-color: #f8f9fa;
+}
+
+.practice-english-sub {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.disease-tag-small {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin: 0.1rem;
+}
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>Diseases & Conditions</h2>
+    <a href="/disease/add" class="btn">Add New Disease</a>
+</div>
+
+{% if diseases %}
+    <table>
+        <thead>
+            <tr>
+                <th>Disease Name</th>
+                <th>Number of Practices</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for disease in diseases %}
+            <tr class="clickable-row" onclick="window.location.href='/disease/{{ disease.id }}'">
+                <td><strong>{{ disease.name }}</strong></td>
+                <td>{{ disease.practices|length }} practices</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p>No diseases found in the database.</p>
+        <p style="margin-top: 1rem;">
+            <a href="/disease/add" class="btn">Add Your First Disease</a>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

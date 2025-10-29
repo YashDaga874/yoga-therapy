@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Add Citation{% endblock %}
+
+{% block content %}
+<h2>Add Citation</h2>
+
+<form method="POST" style="max-width: 800px;">
+    <div class="form-group">
+        <label for="citation_text">Citation Text *</label>
+        <input type="text" id="citation_text" name="citation_text" required
+               placeholder="e.g., Dr Naveen GH et al., 2013">
+    </div>
+    
+    <div class="form-group">
+        <label for="citation_type">Type</label>
+        <select id="citation_type" name="citation_type">
+            <option value="research_paper">Research Paper</option>
+            <option value="book">Book</option>
+            <option value="study">Study</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="full_reference">Full Reference</label>
+        <textarea id="full_reference" name="full_reference" 
+                  placeholder="Complete bibliographic information"></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="url">URL</label>
+        <input type="url" id="url" name="url" 
+               placeholder="https://doi.org/...">
+    </div>
+    
+    <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn">Add Citation</button>
+        <a href="/citations" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

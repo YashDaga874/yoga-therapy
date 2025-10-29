@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Add Disease{% endblock %}
+
+{% block content %}
+<h2>Add New Disease/Condition</h2>
+
+<form method="POST" style="max-width: 800px;">
+    <div class="form-group">
+        <label for="name">Disease Name *</label>
+        <input type="text" id="name" name="name" required placeholder="e.g., Depression, GAD, Anxiety">
+    </div>
+    
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" placeholder="Brief description of the condition"></textarea>
+    </div>
+    
+    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 1.5rem;">
+        <h4 style="margin-bottom: 1rem;">Module Information</h4>
+        
+        <div class="form-group">
+            <label for="developed_by">Developed By (Citation) *</label>
+            <input type="text" id="developed_by" name="developed_by" 
+                   placeholder="e.g., Dr Naveen GH et al., 2013" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="module_description">Module Description</label>
+            <textarea id="module_description" name="module_description" 
+                      placeholder="Additional information about this therapy module"></textarea>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn">Add Disease</button>
+        <a href="/" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
