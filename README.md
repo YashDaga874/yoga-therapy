@@ -1,5 +1,65 @@
 # Yoga Therapy Recommendation System
 
+> Quick start for new users is below. A detailed, research-focused guide follows after that.
+
+## Quick Start (5–10 minutes)
+
+Prerequisites:
+- Python 3.10+
+- Git
+
+Setup:
+```bash
+git clone https://github.com/<YOUR_USERNAME>/yoga-therapy.git
+cd yoga-therapy
+
+# Create and activate a virtual environment
+python -m venv venv
+# Windows
+venv\Scripts\Activate
+# macOS/Linux
+# source venv/bin/activate
+
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Initialize database with sample data:
+```bash
+python utils/import_data.py
+```
+
+Run the web app:
+```bash
+python web/app.py
+```
+Open http://127.0.0.1:5000 in your browser.
+
+Run tests/demo (optional):
+```bash
+python test_system.py
+```
+
+Use the API (optional, with server running):
+```bash
+# JSON recommendations
+curl -X POST http://127.0.0.1:5000/api/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{"diseases":["Depression","GAD"]}'
+
+# Text summary
+curl -X POST http://127.0.0.1:5000/api/summary \
+  -H "Content-Type: application/json" \
+  -d '{"diseases":["Depression","GAD"]}'
+```
+
+Troubleshooting:
+- Activate the venv and run from the repo root if you see import errors.
+- If port 5000 is busy, Flask prints the actual port—use that.
+- If the database is missing/empty, re-run `python utils/import_data.py`.
+
+---
+
 ## Understanding What This System Does
 
 Welcome to your Yoga Therapy Recommendation System. This is a research-grade database and recommendation engine designed specifically for managing yoga therapy protocols based on the Pancha Kosha (Five Sheaths) framework. Let me explain what this system accomplishes and why it's architected the way it is.
@@ -112,24 +172,3 @@ Database errors typically occur during the import process if the JSON structure 
 
 Web interface issues often stem from the Flask server not running or running on a different port than expected. Make sure you see the "Running on http://127.0.0.1:5000" message before trying to access the web interface. If the port is already in use, Flask will assign a different port, so check the console output to see which address to use.
 
-## Moving Forward with Your BTP Project
-
-You now have a complete, working system that addresses all your core requirements. The database structure is in place, practices are organized by the five koshas, duplicate removal and contraindication logic are working, citations are properly tracked, and non-coders can manage the data through the web interface. The system is also architected to accommodate future enhancements like CVR integration without requiring major restructuring.
-
-Your next concrete steps involve putting the system into active use for your research. Start by working with your research team to identify which diseases you'll focus on beyond the Depression and Anxiety modules you already have. Create a prioritized list and begin systematic data entry through the web interface.
-
-As you enter data, maintain detailed documentation about your sources and decision-making process. This documentation will be crucial when you write up your BTP report or any publications that emerge from this research. The citation tracking in your system supports this documentation process.
-
-Coordinate with the team building your RAG chatbot to plan the integration. Share the API documentation (which is embedded in the Flask routes as comments) and work together to design the communication flow. Start with simple test cases to verify the integration works before moving to more complex scenarios.
-
-Consider running pilot tests with actual clinicians once you have a reasonable amount of data entered. Getting feedback from potential users will help you identify any gaps in the data or usability issues with the interface. This iterative improvement process will strengthen your final system.
-
-Remember that this system is a living research tool. The value grows with the comprehensiveness and accuracy of the data it contains. Consistent, careful data entry over the course of your project will result in a resource that can benefit clinical yoga therapy practice and potentially serve as a foundation for further research beyond your BTP.
-
-## Questions and Support
-
-If you encounter issues not covered in this guide or have questions about extending the system, the codebase includes extensive comments explaining the logic behind important decisions. Reading through the code comments, particularly in the recommendation engine, will help you understand the system's inner workings.
-
-The architecture is designed to be learnable and modifiable by someone with basic Python knowledge. As you become more familiar with the system, you'll find it straightforward to add features or modify behavior to better suit your specific research needs.
-
-Good luck with your BTP project. You're building something genuinely useful that bridges traditional yoga therapy wisdom with modern data management and AI-assisted clinical decision support.
