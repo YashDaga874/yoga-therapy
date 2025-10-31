@@ -1,0 +1,894 @@
+{% extends "base.html" %}
+
+{% block title %}Edit RCT Entry{% endblock %}
+
+{% block content %}
+<style>
+.form-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #495057;
+    border-bottom: 2px solid #495057;
+    padding-bottom: 0.5rem;
+}
+
+.symptom-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 2fr 1.5fr auto;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    align-items: center;
+}
+
+.remove-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.remove-btn:hover {
+    background: #c82333;
+}
+
+.practice-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr auto;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    align-items: center;
+    position: relative;
+}
+
+.datalist-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.gender-checkbox-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.gender-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+</style>
+
+<h2>Edit RCT Entry</h2>
+
+<form method="POST" style="max-width: 1400px;">
+    <!-- Data Enrolled Section -->
+    <div class="form-section">
+        <h3>Data Collection Information</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
+            <div class="form-group">
+                <label for="data_enrolled_date">Data Enrolled Date *</label>
+                <input type="date" id="data_enrolled_date" name="data_enrolled_date" 
+                       value="{{ rct.data_enrolled_date }}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="database_journal">Database/Journal *</label>
+                <select id="database_journal" name="database_journal" required>
+                    <option value="">Select Database/Journal</option>
+                    <option value="PubMed" {% if rct.database_journal == 'PubMed' %}selected{% endif %}>PubMed</option>
+                    <option value="Embase" {% if rct.database_journal == 'Embase' %}selected{% endif %}>Embase</option>
+                    <option value="Cochrane" {% if rct.database_journal == 'Cochrane' %}selected{% endif %}>Cochrane</option>
+                    <option value="Scopus" {% if rct.database_journal == 'Scopus' %}selected{% endif %}>Scopus</option>
+                    <option value="Web of Science" {% if rct.database_journal == 'Web of Science' %}selected{% endif %}>Web of Science</option>
+                    <option value="Other" {% if rct.database_journal == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="keywords">Keywords, Boolean, Filters Used</label>
+                <textarea id="keywords" name="keywords" rows="3" 
+                          placeholder="Enter keywords, boolean operators, and filters used">{{ rct.keywords or '' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Basic Information Section -->
+    <div class="form-section">
+        <h3>Basic Information</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+                <label for="doi">DOI</label>
+                <input type="text" id="doi" name="doi" value="{{ rct.doi or '' }}" placeholder="e.g., 10.1234/example">
+            </div>
+            
+            <div class="form-group">
+                <label for="pmic_nmic">PMIC/NMIC</label>
+                <input type="text" id="pmic_nmic" name="pmic_nmic" value="{{ rct.pmic_nmic or '' }}" placeholder="Enter PMIC/NMIC or 'Not Available'">
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="title">Title *</label>
+            <input type="text" id="title" name="title" value="{{ rct.title or '' }}" required style="width: 100%;">
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+                <label for="parenthetical_citation">Parenthetical Citation</label>
+                <input type="text" id="parenthetical_citation" name="parenthetical_citation" 
+                       value="{{ rct.parenthetical_citation or '' }}" placeholder="e.g., (Author et al., 2023)">
+            </div>
+            
+            <div class="form-group">
+                <label for="citation_full">Full Citation</label>
+                <textarea id="citation_full" name="citation_full" rows="2" placeholder="Full bibliographic citation">{{ rct.citation_full or '' }}</textarea>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="citation_link">Paper Link (URL)</label>
+            <input type="url" id="citation_link" name="citation_link" value="{{ rct.citation_link or '' }}" 
+                   style="width: 100%;" placeholder="https://example.com/paper">
+        </div>
+        
+        <div class="form-group">
+            <label for="study_type">Study Type *</label>
+            <select id="study_type" name="study_type" required>
+                <option value="">Select Study Type</option>
+                <option value="RCT" {% if rct.study_type == 'RCT' %}selected{% endif %}>RCT (Randomized Controlled Trial)</option>
+                <option value="Clinical Trial" {% if rct.study_type == 'Clinical Trial' %}selected{% endif %}>Clinical Trial</option>
+                <option value="Others" {% if rct.study_type == 'Others' %}selected{% endif %}>Others</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Symptoms Section -->
+    <div class="form-section">
+        <h3>Symptoms/Disease Names with P-Values</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Add symptoms or disease names with their p-values. P-value <= 0.05 is considered significant.
+        </p>
+        <div id="symptoms-container">
+            <!-- Symptoms will be added here dynamically -->
+        </div>
+        <button type="button" id="add-symptom" class="btn btn-secondary" style="margin-top: 1rem;">+ Add Symptom</button>
+        <input type="hidden" id="symptom_count" name="symptom_count" value="0">
+    </div>
+
+    <!-- Disease Type Section -->
+    <div class="form-section">
+        <h3>Type of Disease</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Type or select diseases from the database. You can add multiple diseases.
+        </p>
+        <div id="diseases-container">
+            <!-- Diseases will be added here dynamically -->
+        </div>
+        <button type="button" id="add-disease" class="btn btn-secondary" style="margin-top: 1rem;">+ Add Disease</button>
+        <input type="hidden" id="disease_count" name="disease_count" value="0">
+        <datalist id="disease-list">
+            {% for disease in diseases %}
+            <option value="{{ disease.name }}">
+            {% endfor %}
+        </datalist>
+    </div>
+
+    <!-- Demographics Section -->
+    <div class="form-section">
+        <h3>Demographics</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+                <label for="participant_type">Type of People</label>
+                <input type="text" id="participant_type" name="participant_type" 
+                       value="{{ rct.participant_type or '' }}" placeholder="e.g., teacher, army, nurse, elderly">
+            </div>
+            
+            <div class="form-group">
+                <label for="age_mean">Age Mean</label>
+                <input type="number" id="age_mean" name="age_mean" step="0.1" 
+                       value="{{ rct.age_mean or '' }}" placeholder="e.g., 45.5">
+            </div>
+            
+            <div class="form-group">
+                <label for="age_std_dev">Age Standard Deviation</label>
+                <input type="number" id="age_std_dev" name="age_std_dev" step="0.1" 
+                       value="{{ rct.age_std_dev or '' }}" placeholder="e.g., 10.2">
+            </div>
+        </div>
+        
+        <div id="age_range_display" style="padding: 0.75rem; background: #e9ecef; border-radius: 4px; margin-bottom: 1.5rem;">
+            <strong>Calculated Age Range:</strong> <span id="age_range">{{ rct.age_range_calculated or 'Enter mean and std dev to calculate' }}</span>
+        </div>
+        
+        <div class="form-group">
+            <label>Gender *</label>
+            <div class="gender-checkbox-group">
+                <label class="gender-checkbox">
+                    <input type="checkbox" id="gender_male_checkbox" name="gender_selected" value="male"
+                           {% if rct.gender_male > 0 %}checked{% endif %}>
+                    Male
+                </label>
+                <label class="gender-checkbox">
+                    <input type="checkbox" id="gender_female_checkbox" name="gender_selected" value="female"
+                           {% if rct.gender_female > 0 %}checked{% endif %}>
+                    Female
+                </label>
+                <label class="gender-checkbox">
+                    <input type="checkbox" id="gender_not_mentioned_checkbox" name="gender_selected" value="not_mentioned"
+                           {% if rct.gender_not_mentioned > 0 %}checked{% endif %}>
+                    Not Mentioned
+                </label>
+            </div>
+        </div>
+        
+        <div id="gender_counts" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
+            <!-- Gender count fields will appear here based on selection -->
+        </div>
+        <input type="hidden" id="gender_male" name="gender_male" value="{{ rct.gender_male or 0 }}">
+        <input type="hidden" id="gender_female" name="gender_female" value="{{ rct.gender_female or 0 }}">
+        <input type="hidden" id="gender_not_mentioned" name="gender_not_mentioned" value="{{ rct.gender_not_mentioned or 0 }}">
+    </div>
+
+    <!-- Intervention Section -->
+    <div class="form-section">
+        <h3>Intervention</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Add practices or categories used in the intervention. You can specify either a specific practice OR just a category. Category will auto-fill if the practice exists in our database.
+        </p>
+        <div id="practices-container">
+            <!-- Practices will be added here dynamically -->
+        </div>
+        <button type="button" id="add-practice" class="btn btn-secondary" style="margin-top: 1rem;">+ Add Practice/Category</button>
+        <input type="hidden" id="practice_count" name="practice_count" value="0">
+        <datalist id="practice-list">
+            {% for practice in practices %}
+            <option value="{{ practice.practice_sanskrit or practice.practice_english }}" 
+                    data-segment="{{ practice.practice_segment }}" 
+                    data-english="{{ practice.practice_english }}">
+            {% endfor %}
+        </datalist>
+    </div>
+
+    <!-- Duration Section -->
+    <div class="form-section">
+        <h3>Study Duration</h3>
+        <div style="display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 1.5rem;">
+            <div class="form-group">
+                <label for="duration_type">Duration Type *</label>
+                <select id="duration_type" name="duration_type" required>
+                    <option value="">Select Type</option>
+                    <option value="days" {% if rct.duration_type == 'days' %}selected{% endif %}>Days</option>
+                    <option value="weeks" {% if rct.duration_type == 'weeks' %}selected{% endif %}>Weeks</option>
+                    <option value="months" {% if rct.duration_type == 'months' %}selected{% endif %}>Months</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="duration_value">Duration Value</label>
+                <input type="number" id="duration_value" name="duration_value" min="1" 
+                       value="{{ rct.duration_value or '' }}" placeholder="e.g., 12">
+            </div>
+            
+            <div class="form-group">
+                <label for="frequency_per_duration">Frequency</label>
+                <input type="text" id="frequency_per_duration" name="frequency_per_duration" 
+                       value="{{ rct.frequency_per_duration or '' }}" placeholder="e.g., 3 times per week">
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="form-section">
+        <h3>Results</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+                <label for="results">Results</label>
+                <textarea id="results" name="results" rows="4" placeholder="Enter results">{{ rct.results or '' }}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="conclusion">Conclusion</label>
+                <textarea id="conclusion" name="conclusion" rows="4" 
+                          placeholder="A line or so summarizing the conclusion">{{ rct.conclusion or '' }}</textarea>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="remarks">Remarks</label>
+            <textarea id="remarks" name="remarks" rows="4"
+                      placeholder="Optional: Report if any contraindication or special case is observed.">{{ rct.remarks or '' }}</textarea>
+            <small style="color: #666;">Optional: This can be used to extract contraindications</small>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" class="btn">Update RCT Entry</button>
+        <a href="/rct/{{ rct.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+let symptomCount = 0;
+let diseaseCount = 0;
+let practiceCount = 0;
+
+// Scale options for symptoms
+const scaleOptions = [
+    'HAM-D', 'HAMD', 'Hamilton Depression Rating Scale',
+    'GAD-7', 'GAD7', 'Generalized Anxiety Disorder 7',
+    'BDI', 'Beck Depression Inventory',
+    'BAI', 'Beck Anxiety Inventory',
+    'PSS', 'Perceived Stress Scale',
+    'PHQ-9', 'PHQ9', 'Patient Health Questionnaire',
+    'PSS-10', 'PSS10',
+    'SF-36', 'SF36', 'Short Form 36',
+    'QOL', 'Quality of Life',
+    'PSQI', 'Pittsburgh Sleep Quality Index',
+    'ISI', 'Insomnia Severity Index',
+    'Y-BOCS', 'Yale-Brown Obsessive Compulsive Scale',
+    'PANSS', 'Positive and Negative Syndrome Scale',
+    'Other'
+];
+
+// Load existing symptoms
+{% if rct.symptoms %}
+{% for symptom in rct.symptoms %}
+symptomCount++;
+const container = document.getElementById('symptoms-container');
+const div = document.createElement('div');
+div.className = 'symptom-row';
+div.id = `symptom-row-${symptomCount}`;
+
+const scaleSelect = scaleOptions.map(scale => {
+    const selected = scale === '{{ symptom.scale or '' }}' ? 'selected' : '';
+    return `<option value="${scale}" ${selected}>${scale}</option>`;
+}).join('');
+
+div.innerHTML = `
+    <input type="text" name="symptom_name_${symptomCount}" value="{{ symptom.symptom_name }}" placeholder="Symptom/Disease Name" required>
+    <select name="p_operator_${symptomCount}" required id="p_operator_${symptomCount}">
+        <option value="<" {% if symptom.p_value_operator == '<' %}selected{% endif %}>&lt;</option>
+        <option value="<=" {% if symptom.p_value_operator == '<=' %}selected{% endif %}>&lt;=</option>
+        <option value=">" {% if symptom.p_value_operator == '>' %}selected{% endif %}>&gt;</option>
+        <option value=">=" {% if symptom.p_value_operator == '>=' %}selected{% endif %}>&gt;=</option>
+        <option value="=" {% if symptom.p_value_operator == '=' %}selected{% endif %}>=</option>
+    </select>
+    <input type="number" name="p_value_${symptomCount}" step="0.0001" value="{{ symptom.p_value }}" placeholder="P-value" required id="p_value_${symptomCount}">
+    <select name="scale_${symptomCount}" required>
+        <option value="">Select Scale</option>
+        ${scaleSelect}
+    </select>
+    <span id="significance_${symptomCount}" style="padding: 0.5rem; background: #e9ecef; border-radius: 4px; display: flex; align-items: center;">
+        {% if symptom.is_significant %}
+        <strong style="color: green;">Status: Significant</strong>
+        {% else %}
+        <strong style="color: red;">Status: Not Significant</strong>
+        {% endif %}
+    </span>
+    <button type="button" class="remove-btn" onclick="removeSymptom(${symptomCount})">Remove</button>
+`;
+
+// Add event listener to calculate significance for existing symptoms
+const pValueInput = div.querySelector(`#p_value_${symptomCount}`);
+const pOperatorSelect = div.querySelector(`#p_operator_${symptomCount}`);
+const significanceSpan = div.querySelector(`#significance_${symptomCount}`);
+
+function updateSignificance() {
+    const pValue = parseFloat(pValueInput.value);
+    const operator = pOperatorSelect.value;
+    
+    if (!isNaN(pValue)) {
+        let isSignificant = false;
+        if (operator === '<' || operator === '<=') {
+            isSignificant = pValue <= 0.05;
+        } else if (operator === '>') {
+            isSignificant = pValue < 0.05;
+        } else if (operator === '>=' || operator === '=') {
+            isSignificant = pValue <= 0.05;
+        }
+        
+        if (isSignificant) {
+            significanceSpan.innerHTML = '<strong style="color: green;">Status: Significant</strong>';
+            significanceSpan.style.background = '#d4edda';
+        } else {
+            significanceSpan.innerHTML = '<strong style="color: red;">Status: Not Significant</strong>';
+            significanceSpan.style.background = '#f8d7da';
+        }
+    } else {
+        significanceSpan.innerHTML = 'Status: -';
+        significanceSpan.style.background = '#e9ecef';
+    }
+}
+
+pValueInput.addEventListener('input', updateSignificance);
+pOperatorSelect.addEventListener('change', updateSignificance);
+
+container.appendChild(div);
+document.getElementById('symptom_count').value = symptomCount;
+{% endfor %}
+{% endif %}
+
+// Add symptom
+document.getElementById('add-symptom').addEventListener('click', function() {
+    symptomCount++;
+    const container = document.getElementById('symptoms-container');
+    const div = document.createElement('div');
+    div.className = 'symptom-row';
+    div.id = `symptom-row-${symptomCount}`;
+    
+    const scaleSelect = scaleOptions.map(scale => `<option value="${scale}">${scale}</option>`).join('');
+    
+    div.innerHTML = `
+        <input type="text" name="symptom_name_${symptomCount}" placeholder="Symptom/Disease Name" required>
+        <select name="p_operator_${symptomCount}" required id="p_operator_${symptomCount}">
+            <option value="<">&lt;</option>
+            <option value="<=">&lt;=</option>
+            <option value=">">&gt;</option>
+            <option value=">=">&gt;=</option>
+            <option value="=">=</option>
+        </select>
+        <input type="number" name="p_value_${symptomCount}" step="0.0001" placeholder="P-value" required id="p_value_${symptomCount}">
+        <select name="scale_${symptomCount}" required>
+            <option value="">Select Scale</option>
+            ${scaleSelect}
+        </select>
+        <span id="significance_${symptomCount}" style="padding: 0.5rem; background: #e9ecef; border-radius: 4px; display: flex; align-items: center;">
+            Status: -
+        </span>
+        <button type="button" class="remove-btn" onclick="removeSymptom(${symptomCount})">Remove</button>
+    `;
+    
+    // Add event listener to calculate significance
+    const pValueInput = div.querySelector(`#p_value_${symptomCount}`);
+    const pOperatorSelect = div.querySelector(`#p_operator_${symptomCount}`);
+    const significanceSpan = div.querySelector(`#significance_${symptomCount}`);
+    
+    function updateSignificance() {
+        const pValue = parseFloat(pValueInput.value);
+        const operator = pOperatorSelect.value;
+        
+        if (!isNaN(pValue)) {
+            let isSignificant = false;
+            if (operator === '<' || operator === '<=') {
+                isSignificant = pValue <= 0.05;
+            } else if (operator === '>') {
+                isSignificant = pValue < 0.05;
+            } else if (operator === '>=' || operator === '=') {
+                isSignificant = pValue <= 0.05;
+            }
+            
+            if (isSignificant) {
+                significanceSpan.innerHTML = '<strong style="color: green;">Status: Significant</strong>';
+                significanceSpan.style.background = '#d4edda';
+            } else {
+                significanceSpan.innerHTML = '<strong style="color: red;">Status: Not Significant</strong>';
+                significanceSpan.style.background = '#f8d7da';
+            }
+        } else {
+            significanceSpan.innerHTML = 'Status: -';
+            significanceSpan.style.background = '#e9ecef';
+        }
+    }
+    
+    pValueInput.addEventListener('input', updateSignificance);
+    pOperatorSelect.addEventListener('change', updateSignificance);
+    
+    container.appendChild(div);
+    document.getElementById('symptom_count').value = symptomCount;
+});
+
+function removeSymptom(index) {
+    const row = document.getElementById(`symptom-row-${index}`);
+    if (row) {
+        row.remove();
+        symptomCount--;
+        document.getElementById('symptom_count').value = symptomCount;
+    }
+}
+
+// Load existing diseases
+{% if rct.diseases %}
+{% for disease in rct.diseases %}
+diseaseCount++;
+const diseaseContainer = document.getElementById('diseases-container');
+const diseaseDiv = document.createElement('div');
+diseaseDiv.className = 'practice-row';
+diseaseDiv.id = `disease-row-${diseaseCount}`;
+
+diseaseDiv.innerHTML = `
+    <div style="position: relative;">
+        <input type="text" class="datalist-input" 
+               id="disease_${diseaseCount}" name="disease_${diseaseCount}" 
+               value="{{ disease.name }}" placeholder="Type or select disease (optional)"
+               autocomplete="off">
+        <div id="disease-autocomplete-${diseaseCount}" style="position: absolute; width: 100%; z-index: 1000;"></div>
+    </div>
+    <button type="button" class="remove-btn" onclick="removeDisease(${diseaseCount})">Remove</button>
+`;
+
+diseaseContainer.appendChild(diseaseDiv);
+document.getElementById('disease_count').value = diseaseCount;
+
+// Setup autocomplete for this disease input
+setupDiseaseAutocompleteForRow(diseaseCount);
+{% endfor %}
+{% endif %}
+
+// Add disease
+document.getElementById('add-disease').addEventListener('click', function() {
+    diseaseCount++;
+    const container = document.getElementById('diseases-container');
+    const div = document.createElement('div');
+    div.className = 'practice-row';
+    div.id = `disease-row-${diseaseCount}`;
+    
+    div.innerHTML = `
+        <div style="position: relative;">
+            <input type="text" class="datalist-input" 
+                   id="disease_${diseaseCount}" name="disease_${diseaseCount}" 
+                   placeholder="Type or select disease" required autocomplete="off">
+            <div id="disease-autocomplete-${diseaseCount}" style="position: absolute; width: 100%; z-index: 1000;"></div>
+        </div>
+        <button type="button" class="remove-btn" onclick="removeDisease(${diseaseCount})">Remove</button>
+    `;
+    
+    container.appendChild(div);
+    document.getElementById('disease_count').value = diseaseCount;
+    
+    // Setup autocomplete for this disease input
+    setupDiseaseAutocompleteForRow(diseaseCount);
+});
+
+function removeDisease(index) {
+    const row = document.getElementById(`disease-row-${index}`);
+    if (row) {
+        row.remove();
+        diseaseCount--;
+        document.getElementById('disease_count').value = diseaseCount;
+    }
+}
+
+// Setup autocomplete for a specific disease row
+function setupDiseaseAutocompleteForRow(rowIndex) {
+    const diseaseInput = document.getElementById(`disease_${rowIndex}`);
+    const autocompleteDiv = document.getElementById(`disease-autocomplete-${rowIndex}`);
+    let timeout;
+    
+    diseaseInput.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const query = this.value.trim();
+        
+        if (query.length < 1) {
+            autocompleteDiv.innerHTML = '';
+            return;
+        }
+        
+        timeout = setTimeout(() => {
+            fetch(`/api/disease/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayDiseaseAutocompleteResultsForRow(data, rowIndex);
+                });
+        }, 300);
+    });
+    
+    // Close autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest(`#disease_${rowIndex}`) && !e.target.closest(`#disease-autocomplete-${rowIndex}`)) {
+            autocompleteDiv.innerHTML = '';
+        }
+    });
+}
+
+function displayDiseaseAutocompleteResultsForRow(diseases, rowIndex) {
+    const autocompleteDiv = document.getElementById(`disease-autocomplete-${rowIndex}`);
+    
+    if (diseases.length === 0) {
+        autocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    autocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        diseases.map((d, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectDiseaseForRow('${d.name}', ${rowIndex})">
+                <strong>${d.name}</strong>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectDiseaseForRow(name, rowIndex) {
+    const diseaseInput = document.getElementById(`disease_${rowIndex}`);
+    const autocompleteDiv = document.getElementById(`disease-autocomplete-${rowIndex}`);
+    
+    diseaseInput.value = name;
+    autocompleteDiv.innerHTML = '';
+}
+
+// Load existing practices
+{% if rct.intervention_practices %}
+{% set practices_json = (rct.intervention_practices|from_json) if rct.intervention_practices else [] %}
+{% for practice in practices_json %}
+practiceCount++;
+const practiceContainer = document.getElementById('practices-container');
+const practiceDiv = document.createElement('div');
+practiceDiv.className = 'practice-row';
+practiceDiv.id = `practice-row-${practiceCount}`;
+
+practiceDiv.innerHTML = `
+    <div style="position: relative;">
+        <input type="text" class="datalist-input" 
+               id="practice_name_${practiceCount}" name="practice_name_${practiceCount}" 
+               value="{{ practice.name }}" placeholder="Type or select practice (optional)"
+               autocomplete="off">
+        <div id="practice-autocomplete-${practiceCount}" style="position: absolute; width: 100%; z-index: 1000;"></div>
+    </div>
+    <select name="practice_category_${practiceCount}" id="practice_category_${practiceCount}">
+        <option value="">Select Category</option>
+        <option value="Preparatory Practice" {% if practice.category == 'Preparatory Practice' %}selected{% endif %}>Preparatory Practice</option>
+        <option value="Breathing Practice" {% if practice.category == 'Breathing Practice' %}selected{% endif %}>Breathing Practice</option>
+        <option value="Suryanamaskara" {% if practice.category == 'Suryanamaskara' %}selected{% endif %}>Suryanamaskara</option>
+        <option value="Yogasana" {% if practice.category == 'Yogasana' %}selected{% endif %}>Yogasana</option>
+        <option value="Pranayama" {% if practice.category == 'Pranayama' %}selected{% endif %}>Pranayama</option>
+        <option value="Meditation" {% if practice.category == 'Meditation' %}selected{% endif %}>Meditation</option>
+        <option value="Additional Practices" {% if practice.category == 'Additional Practices' %}selected{% endif %}>Additional Practices</option>
+        <option value="Kriya (Cleansing Techniques)" {% if practice.category == 'Kriya (Cleansing Techniques)' %}selected{% endif %}>Kriya (Cleansing Techniques)</option>
+        <option value="Yogic Counselling" {% if practice.category == 'Yogic Counselling' %}selected{% endif %}>Yogic Counselling</option>
+    </select>
+    <button type="button" class="remove-btn" onclick="removePractice(${practiceCount})">Remove</button>
+`;
+
+practiceContainer.appendChild(practiceDiv);
+document.getElementById('practice_count').value = practiceCount;
+
+// Setup autocomplete for this practice input
+setupPracticeAutocompleteForRow(practiceCount);
+{% endfor %}
+{% endif %}
+
+// Add practice
+document.getElementById('add-practice').addEventListener('click', function() {
+    practiceCount++;
+    const container = document.getElementById('practices-container');
+    const div = document.createElement('div');
+    div.className = 'practice-row';
+    div.id = `practice-row-${practiceCount}`;
+    
+    div.innerHTML = `
+        <div style="position: relative;">
+            <input type="text" class="datalist-input" 
+                   id="practice_name_${practiceCount}" name="practice_name_${practiceCount}" 
+                   placeholder="Type or select practice (optional)"
+                   autocomplete="off">
+            <div id="practice-autocomplete-${practiceCount}" style="position: absolute; width: 100%; z-index: 1000;"></div>
+        </div>
+        <select name="practice_category_${practiceCount}" id="practice_category_${practiceCount}" required>
+            <option value="">Select Category *</option>
+            <option value="Preparatory Practice">Preparatory Practice</option>
+            <option value="Breathing Practice">Breathing Practice</option>
+            <option value="Suryanamaskara">Suryanamaskara</option>
+            <option value="Yogasana">Yogasana</option>
+            <option value="Pranayama">Pranayama</option>
+            <option value="Meditation">Meditation</option>
+            <option value="Additional Practices">Additional Practices</option>
+            <option value="Kriya (Cleansing Techniques)">Kriya (Cleansing Techniques)</option>
+            <option value="Yogic Counselling">Yogic Counselling</option>
+        </select>
+        <button type="button" class="remove-btn" onclick="removePractice(${practiceCount})">Remove</button>
+    `;
+    
+    container.appendChild(div);
+    document.getElementById('practice_count').value = practiceCount;
+    
+    // Setup autocomplete for this practice input
+    setupPracticeAutocompleteForRow(practiceCount);
+});
+
+function autofillCategory(index) {
+    const practiceInput = document.getElementById(`practice_name_${index}`);
+    const categorySelect = document.getElementById(`practice_category_${index}`);
+    
+    // Try to find the practice in current practices
+    if (window.currentPracticesMap && window.currentPracticesMap[index]) {
+        const practices = window.currentPracticesMap[index];
+        const match = practices.find(p => 
+            (p.practice_sanskrit && p.practice_sanskrit === practiceInput.value) ||
+            (p.practice_english === practiceInput.value)
+        );
+        
+        if (match) {
+            categorySelect.value = match.practice_segment;
+        }
+    }
+}
+
+// Setup autocomplete for a specific practice row
+function setupPracticeAutocompleteForRow(rowIndex) {
+    const practiceInput = document.getElementById(`practice_name_${rowIndex}`);
+    const autocompleteDiv = document.getElementById(`practice-autocomplete-${rowIndex}`);
+    let timeout;
+    
+    // Initialize current practices map if not exists
+    if (!window.currentPracticesMap) {
+        window.currentPracticesMap = {};
+    }
+    
+    practiceInput.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const query = this.value.trim();
+        
+        if (query.length < 1) {
+            autocompleteDiv.innerHTML = '';
+            return;
+        }
+        
+        timeout = setTimeout(() => {
+            // Get selected diseases to filter practices
+            const selectedDiseases = getAllSelectedDiseases();
+            let url = `/api/practice/search?q=${encodeURIComponent(query)}`;
+            
+            // Use first selected disease for filtering (if any)
+            if (selectedDiseases.length > 0) {
+                url += `&disease=${encodeURIComponent(selectedDiseases[0])}`;
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    window.currentPracticesMap[rowIndex] = data;
+                    displayPracticeAutocompleteResults(data, rowIndex);
+                });
+        }, 300);
+    });
+    
+    // Close autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest(`#practice_name_${rowIndex}`) && !e.target.closest(`#practice-autocomplete-${rowIndex}`)) {
+            autocompleteDiv.innerHTML = '';
+        }
+    });
+}
+
+// Get all currently selected diseases
+function getAllSelectedDiseases() {
+    const diseases = [];
+    for (let i = 1; i <= diseaseCount; i++) {
+        const diseaseInput = document.getElementById(`disease_${i}`);
+        if (diseaseInput && diseaseInput.value.trim()) {
+            diseases.push(diseaseInput.value.trim());
+        }
+    }
+    return diseases;
+}
+
+function displayPracticeAutocompleteResults(practices, rowIndex) {
+    const autocompleteDiv = document.getElementById(`practice-autocomplete-${rowIndex}`);
+    
+    if (practices.length === 0) {
+        autocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    autocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        practices.map((p, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectPracticeForRow('${(p.practice_sanskrit || p.practice_english).replace(/'/g, "\\'")}', ${rowIndex})">
+                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectPracticeForRow(name, rowIndex) {
+    const practiceInput = document.getElementById(`practice_name_${rowIndex}`);
+    const autocompleteDiv = document.getElementById(`practice-autocomplete-${rowIndex}`);
+    
+    practiceInput.value = name;
+    autocompleteDiv.innerHTML = '';
+    
+    // Autofill category
+    autofillCategory(rowIndex);
+}
+
+function removePractice(index) {
+    const row = document.getElementById(`practice-row-${index}`);
+    if (row) {
+        row.remove();
+        practiceCount--;
+        document.getElementById('practice_count').value = practiceCount;
+    }
+}
+
+// Gender checkboxes
+const genderCheckboxes = document.querySelectorAll('input[name="gender_selected"]');
+const genderCountsDiv = document.getElementById('gender_counts');
+const genderMaleHidden = document.getElementById('gender_male');
+const genderFemaleHidden = document.getElementById('gender_female');
+const genderNotMentionedHidden = document.getElementById('gender_not_mentioned');
+
+// Initialize gender fields
+updateGenderFields();
+
+genderCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', updateGenderFields);
+});
+
+function updateGenderFields() {
+    genderCountsDiv.innerHTML = '';
+    
+    genderCheckboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            const div = document.createElement('div');
+            const label = checkbox.value.charAt(0).toUpperCase() + checkbox.value.slice(1).replace('_', ' ');
+            const currentValue = checkbox.value === 'male' ? {{ rct.gender_male or 0 }} : 
+                                 (checkbox.value === 'female' ? {{ rct.gender_female or 0 }} : {{ rct.gender_not_mentioned or 0 }});
+            
+            div.className = 'form-group';
+            div.innerHTML = `
+                <label>${label} Count *</label>
+                <input type="number" id="gender_${checkbox.value}_input" min="0" 
+                       value="${currentValue}"
+                       placeholder="Enter count" required 
+                       oninput="updateGenderHidden('${checkbox.value}', this.value)">
+            `;
+            genderCountsDiv.appendChild(div);
+        }
+    });
+}
+
+function updateGenderHidden(gender, value) {
+    const hiddenField = document.getElementById(`gender_${gender}`);
+    if (hiddenField) {
+        hiddenField.value = value || 0;
+    }
+}
+
+// Age range calculation
+function updateAgeRange() {
+    const mean = parseFloat(document.getElementById('age_mean').value);
+    const stdDev = parseFloat(document.getElementById('age_std_dev').value);
+    const ageRangeSpan = document.getElementById('age_range');
+    
+    if (!isNaN(mean) && !isNaN(stdDev)) {
+        const lower = Math.max(0, mean - stdDev);
+        const upper = mean + stdDev;
+        ageRangeSpan.textContent = `${lower.toFixed(1)} - ${upper.toFixed(1)}`;
+    } else {
+        ageRangeSpan.textContent = 'Enter mean and std dev to calculate';
+    }
+}
+
+document.getElementById('age_mean').addEventListener('input', updateAgeRange);
+document.getElementById('age_std_dev').addEventListener('input', updateAgeRange);
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+</style>
+
+{% endblock %}
+

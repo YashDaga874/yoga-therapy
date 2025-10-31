@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}RCT Database{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>RCT Database</h2>
+    <a href="/rct/add" class="btn">Add New RCT Entry</a>
+</div>
+
+<!-- Filter Section for Disease + Practice RCT Count -->
+<div class="filter-section" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+    <h3 style="margin-top: 0; margin-bottom: 1rem; color: #495057;">Check RCT Count for Disease + Practice</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+        <div class="form-group" style="margin-bottom: 0; position: relative;">
+            <label for="filter_disease" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Disease</label>
+            <input type="text" id="filter_disease" name="filter_disease" 
+                   placeholder="Type or select disease" style="width: 100%; padding: 0.75rem;" autocomplete="off">
+            <div id="disease-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0; position: relative;">
+            <label for="filter_practice" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Practice</label>
+            <input type="text" id="filter_practice" name="filter_practice" 
+                   placeholder="Type or select practice" style="width: 100%; padding: 0.75rem;" autocomplete="off">
+            <div id="practice-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
+        </div>
+        
+        <button type="button" class="btn" onclick="checkRctCount()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Check Count</button>
+    </div>
+    
+    <div id="rct_count_result" style="margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none;"></div>
+</div>
+
+<script>
+function checkRctCount() {
+    const diseaseName = document.getElementById('filter_disease').value.trim();
+    const practiceName = document.getElementById('filter_practice').value.trim();
+    const resultDiv = document.getElementById('rct_count_result');
+    
+    if (!diseaseName || !practiceName) {
+        resultDiv.innerHTML = '<p style="color: #dc3545; margin: 0;">Please select both disease and practice.</p>';
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = '#f8d7da';
+        return;
+    }
+    
+    // Show loading
+    resultDiv.innerHTML = '<p style="margin: 0; color: #495057;">Checking...</p>';
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = '#e9ecef';
+    
+    // Fetch RCT count
+    fetch(`/api/rct-count?disease=${encodeURIComponent(diseaseName)}&practice=${encodeURIComponent(practiceName)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = `<p style="color: #dc3545; margin: 0;">${data.error}</p>`;
+                resultDiv.style.background = '#f8d7da';
+            } else {
+                const count = data.count || 0;
+                const reliability = count >= 3 ? 'High' : count >= 1 ? 'Moderate' : 'Low';
+                const color = count >= 3 ? '#28a745' : count >= 1 ? '#ffc107' : '#dc3545';
+                
+                resultDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <strong style="color: #495057;">RCT Count for ${diseaseName} + ${practiceName}:</strong>
+                            <span style="font-size: 1.5rem; font-weight: bold; color: ${color}; margin-left: 1rem;">${count}</span>
+                        </div>
+                        <span style="background: ${color}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: bold;">
+                            ${reliability} Reliability
+                        </span>
+                    </div>
+                    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
+                        ${count} paper(s) recommend this practice for ${diseaseName}
+                    </p>
+                `;
+                resultDiv.style.background = '#d4edda';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<p style="color: #dc3545; margin: 0;">Error checking count. Please try again.</p>';
+            resultDiv.style.background = '#f8d7da';
+        });
+}
+
+// Autocomplete for Disease
+let diseaseTimeout;
+let currentDiseases = [];
+let selectedDiseaseIndex = -1;
+const diseaseInput = document.getElementById('filter_disease');
+const diseaseAutocompleteDiv = document.getElementById('disease-autocomplete');
+
+diseaseInput.addEventListener('input', function() {
+    clearTimeout(diseaseTimeout);
+    const query = this.value.trim();
+    selectedDiseaseIndex = -1;
+    
+    if (query.length < 1) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        currentDiseases = [];
+        return;
+    }
+    
+    diseaseTimeout = setTimeout(() => {
+        fetch(`/api/disease/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                currentDiseases = data;
+                displayDiseaseAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+diseaseInput.addEventListener('keydown', function(e) {
+    if (diseaseAutocompleteDiv.innerHTML === '') return;
+    
+    const items = diseaseAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedDiseaseIndex = Math.min(selectedDiseaseIndex + 1, items.length - 1);
+            updateDiseaseSelection();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedDiseaseIndex = Math.max(selectedDiseaseIndex - 1, -1);
+            updateDiseaseSelection();
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (selectedDiseaseIndex >= 0 && selectedDiseaseIndex < items.length) {
+                diseaseInput.value = currentDiseases[selectedDiseaseIndex].name;
+                diseaseAutocompleteDiv.innerHTML = '';
+                currentDiseases = [];
+                selectedDiseaseIndex = -1;
+            }
+            break;
+        case 'Escape':
+            diseaseAutocompleteDiv.innerHTML = '';
+            currentDiseases = [];
+            selectedDiseaseIndex = -1;
+            break;
+    }
+});
+
+function updateDiseaseSelection() {
+    const items = diseaseAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === selectedDiseaseIndex) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function displayDiseaseAutocompleteResults(diseases) {
+    if (diseases.length === 0) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    diseaseAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        diseases.map((d, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectDisease('${d.name}')" data-index="${index}">
+                <strong>${d.name}</strong>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectDisease(name) {
+    diseaseInput.value = name;
+    diseaseAutocompleteDiv.innerHTML = '';
+    currentDiseases = [];
+    selectedDiseaseIndex = -1;
+    // Clear practice input when disease changes
+    practiceInput.value = '';
+    practiceAutocompleteDiv.innerHTML = '';
+    currentPractices = [];
+}
+
+// Autocomplete for Practice
+let practiceTimeout;
+let currentPractices = [];
+let selectedPracticeIndex = -1;
+const practiceInput = document.getElementById('filter_practice');
+const practiceAutocompleteDiv = document.getElementById('practice-autocomplete');
+
+practiceInput.addEventListener('input', function() {
+    clearTimeout(practiceTimeout);
+    const query = this.value.trim();
+    selectedPracticeIndex = -1;
+    
+    if (query.length < 1) {
+        practiceAutocompleteDiv.innerHTML = '';
+        currentPractices = [];
+        return;
+    }
+    
+    practiceTimeout = setTimeout(() => {
+        // Get selected disease to filter practices
+        const selectedDisease = diseaseInput.value.trim();
+        let url = `/api/practice/search?q=${encodeURIComponent(query)}`;
+        if (selectedDisease) {
+            url += `&disease=${encodeURIComponent(selectedDisease)}`;
+        }
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                currentPractices = data;
+                displayPracticeAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+practiceInput.addEventListener('keydown', function(e) {
+    if (practiceAutocompleteDiv.innerHTML === '') return;
+    
+    const items = practiceAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedPracticeIndex = Math.min(selectedPracticeIndex + 1, items.length - 1);
+            updatePracticeSelection();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedPracticeIndex = Math.max(selectedPracticeIndex - 1, -1);
+            updatePracticeSelection();
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (selectedPracticeIndex >= 0 && selectedPracticeIndex < items.length) {
+                practiceInput.value = currentPractices[selectedPracticeIndex].practice_sanskrit || currentPractices[selectedPracticeIndex].practice_english;
+                practiceAutocompleteDiv.innerHTML = '';
+                currentPractices = [];
+                selectedPracticeIndex = -1;
+            }
+            break;
+        case 'Escape':
+            practiceAutocompleteDiv.innerHTML = '';
+            currentPractices = [];
+            selectedPracticeIndex = -1;
+            break;
+    }
+});
+
+function updatePracticeSelection() {
+    const items = practiceAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === selectedPracticeIndex) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function displayPracticeAutocompleteResults(practices) {
+    if (practices.length === 0) {
+        practiceAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    practiceAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        practices.map((p, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectPractice('${(p.practice_sanskrit || p.practice_english).replace(/'/g, "\\'")}')" data-index="${index}">
+                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectPractice(name) {
+    practiceInput.value = name;
+    practiceAutocompleteDiv.innerHTML = '';
+    currentPractices = [];
+    selectedPracticeIndex = -1;
+}
+
+// Close autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#filter_disease') && !e.target.closest('#disease-autocomplete')) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        currentDiseases = [];
+        selectedDiseaseIndex = -1;
+    }
+    if (!e.target.closest('#filter_practice') && !e.target.closest('#practice-autocomplete')) {
+        practiceAutocompleteDiv.innerHTML = '';
+        currentPractices = [];
+        selectedPracticeIndex = -1;
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+</style>
+
+{% if rcts %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Citation</th>
+            <th>DOI</th>
+            <th>Study Type</th>
+            <th>Diseases</th>
+            <th>Date Enrolled</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for rct in rcts %}
+        <tr>
+            <td>
+                {% if rct.citation_link %}
+                <a href="{{ rct.citation_link }}" target="_blank" style="color: #667eea;">
+                    {{ rct.parenthetical_citation[:60] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 60 %}...{% endif %}
+                </a>
+                {% else %}
+                    {{ rct.parenthetical_citation[:60] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 60 %}...{% endif %}
+                {% endif %}
+            </td>
+            <td>{{ rct.doi or '-' }}</td>
+            <td>{{ rct.study_type or '-' }}</td>
+            <td>
+                {% if rct.diseases %}
+                    {% for disease in rct.diseases %}
+                        <span class="disease-tag-small">{{ disease.name }}</span>
+                    {% endfor %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>{{ rct.data_enrolled_date or '-' }}</td>
+            <td>
+                <a href="/rct/{{ rct.id }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; margin-right: 0.5rem;">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="padding: 2rem; text-align: center; background: #f8f9fa; border-radius: 8px;">
+    <p style="color: #666; margin-bottom: 1rem;">No RCT entries found.</p>
+    <a href="/rct/add" class="btn">Add First RCT Entry</a>
+</div>
+{% endif %}
+
+<style>
+.disease-tag-small {
+    display: inline-block;
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin: 0.1rem;
+}
+</style>
+{% endblock %}
+

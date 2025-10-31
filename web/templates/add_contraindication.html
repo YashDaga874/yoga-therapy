@@ -48,6 +48,36 @@
                   placeholder="Why is this practice contraindicated?"></textarea>
     </div>
     
+    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Source Information</h3>
+    
+    <div class="form-group">
+        <label for="source_type">Type of Source *</label>
+        <select id="source_type" name="source_type" required>
+            <option value="">Select Source Type</option>
+            <option value="book">Book</option>
+            <option value="paper">Research Paper</option>
+            <option value="ancient_text">Ancient Text</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="source_name">Name of Source / Link *</label>
+        <input type="text" id="source_name" name="source_name" required
+               placeholder="Book name, paper title, or link">
+    </div>
+    
+    <div class="form-group" id="page-number-group" style="display: none;">
+        <label for="page_number">Page Number / Range</label>
+        <input type="text" id="page_number" name="page_number" 
+               placeholder="e.g., 45 or 45-47">
+    </div>
+    
+    <div class="form-group" id="apa-citation-group" style="display: none;">
+        <label for="apa_citation">APA Citation</label>
+        <textarea id="apa_citation" name="apa_citation" 
+                  placeholder="Full APA citation format"></textarea>
+    </div>
+    
     <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1.5rem;">
         <h4 style="margin-bottom: 1rem;">For Which Diseases *</h4>
         <p style="color: #666; margin-bottom: 1rem;">Select which disease(s) this contraindication applies to:</p>
@@ -117,7 +147,7 @@ function selectPractice(id) {
             if (practice) {
                 document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
                 document.getElementById('practice_english').value = practice.practice_english;
-                document.getElementById('kosa').value = practice.kosa;
+                document.getElementById('practice_segment').value = practice.practice_segment;
                 document.getElementById('sub_category').value = practice.sub_category || '';
                 autocompleteDiv.innerHTML = '';
             }
@@ -128,6 +158,24 @@ function selectPractice(id) {
 document.addEventListener('click', function(e) {
     if (!e.target.closest('#practice_sanskrit') && !e.target.closest('#autocomplete-results')) {
         autocompleteDiv.innerHTML = '';
+    }
+});
+
+// Toggle page number and APA citation fields based on source type
+document.getElementById('source_type').addEventListener('change', function() {
+    const sourceType = this.value;
+    const pageNumberGroup = document.getElementById('page-number-group');
+    const apaCitationGroup = document.getElementById('apa-citation-group');
+    
+    if (sourceType === 'book') {
+        pageNumberGroup.style.display = 'block';
+        apaCitationGroup.style.display = 'block';
+    } else if (sourceType === 'paper') {
+        pageNumberGroup.style.display = 'none';
+        apaCitationGroup.style.display = 'block';
+    } else {
+        pageNumberGroup.style.display = 'none';
+        apaCitationGroup.style.display = 'none';
     }
 });
 </script>

@@ -38,9 +38,12 @@
     <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Practices:</label>
-            <input type="text" name="search" value="{{ search_term }}" 
-                   placeholder="Search by name..." 
-                   style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
+            <div style="position: relative;">
+                <input type="text" id="practice-search" name="search" value="{{ search_term }}" 
+                       placeholder="Type to search..." autocomplete="off"
+                       style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
+                <div id="practice-search-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
+            </div>
         </div>
         
         <div style="flex: 1; min-width: 200px;">
@@ -68,7 +71,8 @@
                 <th>Practice Name</th>
                 <th>Segment</th>
                 <th>Sub-Category</th>
-                <th>Used in Diseases</th>
+                <th>Positive impact diseases</th>
+                <th>RCT Count</th>
             </tr>
         </thead>
         <tbody>
@@ -89,6 +93,11 @@
                         <span class="disease-tag-small">{{ disease.name }}</span>{% if not loop.last %} {% endif %}
                     {% endfor %}
                 </td>
+                <td style="text-align: center;">
+                    <span style="background: #667eea; color: white; padding: 0.3rem 0.7rem; border-radius: 12px; font-weight: bold;">
+                        {{ practice.rct_count or 0 }}
+                    </span>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -98,4 +107,106 @@
         <p>No practices found matching your criteria.</p>
     </div>
 {% endif %}
+
+<script>
+// Autocomplete for practice search
+let searchTimeout;
+const searchInput = document.getElementById('practice-search');
+const searchAutocompleteDiv = document.getElementById('practice-search-autocomplete');
+let searchSelectedIndex = -1;
+let searchCurrentPractices = [];
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    searchSelectedIndex = -1;
+    
+    if (query.length < 1) {
+        searchAutocompleteDiv.innerHTML = '';
+        searchCurrentPractices = [];
+        return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+        fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                searchCurrentPractices = data;
+                displayPracticeSearchAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (searchSelectedIndex < searchCurrentPractices.length - 1) {
+            searchSelectedIndex++;
+            updateSearchHighlight();
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (searchSelectedIndex > 0) {
+            searchSelectedIndex--;
+            updateSearchHighlight();
+        }
+    } else if (e.key === 'Enter' && searchSelectedIndex >= 0) {
+        e.preventDefault();
+        selectPracticeSearch(searchSelectedIndex);
+    }
+});
+
+function displayPracticeSearchAutocompleteResults(practices) {
+    if (practices.length === 0) {
+        searchAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    searchAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        practices.map((p, index) => `
+            <div class="autocomplete-item" data-index="${index}" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectPracticeSearch(${index})"
+                 onmouseover="searchSelectedIndex = ${index}; updateSearchHighlight();">
+                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+    updateSearchHighlight();
+}
+
+function updateSearchHighlight() {
+    const items = searchAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === searchSelectedIndex) {
+            item.style.background = '#f0f0f0';
+        } else {
+            item.style.background = 'white';
+        }
+    });
+}
+
+function selectPracticeSearch(index) {
+    if (index >= 0 && index < searchCurrentPractices.length) {
+        const practice = searchCurrentPractices[index];
+        searchInput.value = practice.practice_sanskrit || practice.practice_english;
+        searchAutocompleteDiv.innerHTML = '';
+        // Submit the form
+        searchInput.form.submit();
+    }
+}
+
+// Close autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#practice-search') && !e.target.closest('#practice-search-autocomplete')) {
+        searchAutocompleteDiv.innerHTML = '';
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0 !important;
+}
+</style>
 {% endblock %}

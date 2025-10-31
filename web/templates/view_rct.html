@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}View RCT Entry{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>RCT Entry Details</h2>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/rcts" class="btn btn-secondary">← Back to RCT Database</a>
+        <a href="/rct/{{ rct.id }}/edit" class="btn">Edit</a>
+        <form method="POST" action="/rct/{{ rct.id }}/delete" style="display: inline;" 
+              onsubmit="return confirm('Are you sure you want to delete this RCT entry?')">
+            <button type="submit" class="btn" style="background: #dc3545; color: white;">Delete</button>
+        </form>
+    </div>
+</div>
+
+<div class="practice-content">
+    <!-- Data Collection Section -->
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Data Collection Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">Data Enrolled Date:</span>
+                <span class="value">{{ rct.data_enrolled_date or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Database/Journal:</span>
+                <span class="value">{{ rct.database_journal or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Keywords, Boolean, Filters:</span>
+                <span class="value">{{ rct.keywords or 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Basic Information -->
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Basic Information</h3>
+        <div class="info-grid">
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Title:</span>
+                <span class="value">{{ rct.title or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">DOI:</span>
+                <span class="value">{{ rct.doi or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">PMIC/NMIC:</span>
+                <span class="value">{{ rct.pmic_nmic or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Parenthetical Citation:</span>
+                <span class="value">{{ rct.parenthetical_citation or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Full Citation:</span>
+                <span class="value">{{ rct.citation_full or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Study Type:</span>
+                <span class="value">{{ rct.study_type or 'N/A' }}</span>
+            </div>
+            {% if rct.citation_link %}
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Paper Link:</span>
+                <span class="value"><a href="{{ rct.citation_link }}" target="_blank" style="color: #667eea;">View Paper →</a></span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Symptoms Section -->
+    {% if rct.symptoms %}
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Symptoms/Disease Names with P-Values</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Symptom/Disease Name</th>
+                    <th>P-Value</th>
+                    <th>Scale</th>
+                    <th>Significance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for symptom in rct.symptoms %}
+                <tr>
+                    <td>{{ symptom.symptom_name }}</td>
+                    <td>{{ symptom.p_value_operator }}{{ symptom.p_value }}</td>
+                    <td>{{ symptom.scale or '-' }}</td>
+                    <td>
+                        {% if symptom.is_significant %}
+                            <span style="color: green; font-weight: bold;">Significant</span>
+                        {% else %}
+                            <span style="color: red; font-weight: bold;">Not Significant</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Diseases Section -->
+    {% if rct.diseases %}
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Diseases</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% for disease in rct.diseases %}
+                <span class="disease-tag">{{ disease.name }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Demographics -->
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Demographics</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">Type of People:</span>
+                <span class="value">{{ rct.participant_type or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Age Mean:</span>
+                <span class="value">{{ rct.age_mean or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Age Std Dev:</span>
+                <span class="value">{{ rct.age_std_dev or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Calculated Age Range:</span>
+                <span class="value">{{ rct.age_range_calculated or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Gender - Male:</span>
+                <span class="value">{{ rct.gender_male or 0 }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Gender - Female:</span>
+                <span class="value">{{ rct.gender_female or 0 }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Gender - Not Mentioned:</span>
+                <span class="value">{{ rct.gender_not_mentioned or 0 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Intervention -->
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Intervention</h3>
+        {% if rct.intervention_practices %}
+            {% set practices = (rct.intervention_practices|from_json) if rct.intervention_practices else [] %}
+            {% if practices %}
+            <table class="data-table" style="margin-bottom: 1rem;">
+                <thead>
+                    <tr>
+                        <th>Practice</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for practice in practices %}
+                    <tr>
+                        <td>{{ practice.name }}</td>
+                        <td>{{ practice.category }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        {% endif %}
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">Duration Type:</span>
+                <span class="value">{{ rct.duration_type or 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Duration Value:</span>
+                <span class="value">{{ rct.duration_value or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Frequency:</span>
+                <span class="value">{{ rct.frequency_per_duration or 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="info-card" style="margin-bottom: 2rem;">
+        <h3>Results</h3>
+        <div class="info-grid">
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Results:</span>
+                <span class="value">{{ rct.results or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Conclusion:</span>
+                <span class="value">{{ rct.conclusion or 'N/A' }}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="label">Remarks:</span>
+                <span class="value">{{ rct.remarks or 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.value {
+    color: #666;
+}
+
+.disease-tag {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+

@@ -6,6 +6,12 @@ It can handle the sample JSON format provided and populate all tables.
 """
 
 import json
+import sys
+import os
+
+# Add parent directory to path so we can import database module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database.models import (
     Disease, Practice, Citation, Contraindication, Module,
     create_database, get_session
@@ -25,6 +31,48 @@ class DataImporter:
         
         # Cache to avoid duplicate citations
         self.citation_cache = {}
+    
+    def _map_to_practice_segment(self, kosa_name, category):
+        """
+        Map kosa name and category to practice_segment
+        
+        Args:
+            kosa_name: Name of the kosa (e.g., "Annamaya_Kosa")
+            category: Category/subcategory name (e.g., "Loosening_Practice", "Asana")
+        
+        Returns:
+            practice_segment string
+        """
+        # Map categories to practice segments
+        category_mapping = {
+            'Loosening_Practice': 'Preparatory Practice',
+            'surya_namaskar': 'Suryanamaskara',
+            'relaxation': 'Yogasana',
+            'Asana': 'Yogasana',
+            'final_relaxation': 'Yogasana',
+            'kriya_practices': 'Kriya (Cleansing Techniques)',
+            'pranayama_practices': 'Pranayama',
+            'meditation_practices': 'Meditation',
+        }
+        
+        # Check if category is directly mapped
+        if category in category_mapping:
+            return category_mapping[category]
+        
+        # Check if subcategory of Asana
+        if category in ['standing_asana', 'sitting_asana', 'prone_asana', 'supine_asana']:
+            return 'Yogasana'
+        
+        # Default mapping based on kosa
+        kosa_mapping = {
+            'Annamaya_Kosa': 'Preparatory Practice',
+            'Pranamaya_Kosa': 'Pranayama',
+            'Manomaya_Kosa': 'Meditation',
+            'Vijnanamaya_Kosa': 'Meditation',
+            'Anandamaya_Kosa': 'Yogasana',
+        }
+        
+        return kosa_mapping.get(kosa_name, 'Preparatory Practice')
     
     def import_from_json(self, json_data):
         """
@@ -143,12 +191,30 @@ class DataImporter:
     def _create_practice(self, disease, kosa, sub_category, practice_data, citation):
         """
         Create a practice entry and link it to the disease
+        
+        Args:
+            disease: Disease object
+            kosa: Kosa name (used to determine practice_segment)
+            sub_category: Sub-category name
+            practice_data: Dictionary containing practice information
+            citation: Citation object (optional)
         """
+        # Map to practice_segment
+        practice_segment = self._map_to_practice_segment(kosa, sub_category)
+        
+        # Get practice names - use sub_category from practice_data if provided, otherwise use parameter
+        final_sub_category = practice_data.get('sub_category', sub_category)
+        
+        # Use practice_sanskrit as practice_english if not provided
+        practice_english = practice_data.get('practice_english')
+        if not practice_english:
+            practice_english = practice_data.get('practice_sanskrit', 'Unknown Practice')
+        
         # Check if this exact practice already exists
         existing_practice = self.session.query(Practice).filter_by(
-            practice_english=practice_data.get('practice_english'),
-            kosa=kosa,
-            sub_category=sub_category
+            practice_english=practice_english,
+            practice_segment=practice_segment,
+            sub_category=final_sub_category
         ).first()
         
         if existing_practice:
@@ -160,9 +226,9 @@ class DataImporter:
         # Create new practice
         practice = Practice(
             practice_sanskrit=practice_data.get('practice_sanskrit'),
-            practice_english=practice_data.get('practice_english'),
-            kosa=kosa,
-            sub_category=sub_category,
+            practice_english=practice_english,
+            practice_segment=practice_segment,
+            sub_category=final_sub_category,
             rounds=practice_data.get('rounds'),
             time_minutes=practice_data.get('time_minutes'),
             strokes_per_min=practice_data.get('strokes_per_min'),
@@ -228,13 +294,22 @@ class DataImporter:
             for row in reader:
                 disease = self._get_or_create_disease(row['disease_name'])
                 
+                # Map kosa to practice_segment if needed
+                practice_segment = row.get('practice_segment', row.get('kosa', ''))
+                if not practice_segment or practice_segment in ['Annamaya_Kosa', 'Pranamaya_Kosa', 'Manomaya_Kosa']:
+                    # Try to map from kosa
+                    kosa_name = row.get('kosa', '')
+                    practice_segment = self._map_to_practice_segment(kosa_name, row.get('sub_category', ''))
+                
                 contraindication = Contraindication(
-                    disease_id=disease.id,
                     practice_english=row['practice_english'],
-                    kosa=row['kosa'],
+                    practice_segment=practice_segment,
                     sub_category=row.get('sub_category', ''),
                     reason=row.get('reason', '')
                 )
+                
+                # Link to disease
+                contraindication.diseases.append(disease)
                 
                 self.session.add(contraindication)
         
@@ -258,55 +333,65 @@ def import_sample_data():
                 "Annamaya_Kosa": {
                     "Loosening_Practice": [
                         {
-                            "practice_sanskrit": "Griva shakti vikasaka-l",
-                            "practice_english": "Neck sideward movement",
+                            "practice_sanskrit": "Griva shakti vikasaka-I",
+                            "practice_english": "Griva shakti vikasaka-I",
+                            "sub_category": "Neck sideward movement",
                             "rounds": 5,
                             "time_minutes": 1
                         },
                         {
-                            "practice_sanskrit": "Griva shakti vikasaka-ll",
-                            "practice_english": "Neck forward and backward bending",
+                            "practice_sanskrit": "Griva shakti vikasaka-II",
+                            "practice_english": "Griva shakti vikasaka-II",
+                            "sub_category": "Neck forward and backward bending",
                             "rounds": 5,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Manibandha shakti vikasaka",
-                            "practice_english": "Wrist movement",
+                            "practice_english": "Manibandha shakti vikasaka",
+                            "sub_category": "Wrist movement",
                             "rounds": 10,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Kaphoni shakti vikasaka",
-                            "practice_english": "Elbow flexion and stretching",
+                            "practice_english": "Kaphoni shakti vikasaka",
+                            "sub_category": "Elbow flexion and stretching",
                             "rounds": 3,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Bhuja valli shakti vikasaka",
-                            "practice_english": "Arms movement",
+                            "practice_english": "Bhuja valli shakti vikasaka",
+                            "sub_category": "Arms movement",
                             "rounds": 3,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Janu shakti vikasaka",
-                            "practice_english": "Knee stretching",
+                            "practice_english": "Janu shakti vikasaka",
+                            "sub_category": "Knee stretching",
                             "rounds": 5,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Gulpha, pada pristha, pada tala shakti vikasaka",
-                            "practice_english": "Ankle rotation (clockwise and anticlockwise)",
+                            "practice_english": "Gulpha, pada pristha, pada tala shakti vikasaka",
+                            "sub_category": "Ankle rotation (clockwise and anticlockwise)",
                             "rounds": 5,
                             "time_minutes": 1
                         },
                         {
                             "practice_sanskrit": "Kati shakti vikasaka",
-                            "practice_english": "Twisting",
+                            "practice_english": "Kati shakti vikasaka",
+                            "sub_category": "Twisting",
                             "rounds": 10,
                             "time_minutes": 1
                         },
                         {
+                            "practice_sanskrit": "Jogging",
                             "practice_english": "Jogging",
+                            "sub_category": "Jogging",
                             "variations": [
                                 "Slow jogging",
                                 "Forward jogging",
@@ -318,20 +403,23 @@ def import_sample_data():
                         },
                         {
                             "practice_sanskrit": "Mukha Dhauti",
-                            "practice_english": "Cleaning through single blast breath",
+                            "practice_english": "Mukha Dhauti",
+                            "sub_category": "Cleaning through single blast breath",
                             "rounds": 5,
                             "time_minutes": 15
                         }
                     ],
                     "surya_namaskar": [{
                         "practice_sanskrit": "Surya namaskar",
-                        "practice_english": "Sun salutation—12 steps",
+                        "practice_english": "Surya namaskar",
+                        "sub_category": "Sun salutation—12 steps",
                         "rounds": 3,
                         "time_minutes": 15
                     }],
                     "relaxation": [{
                         "practice_sanskrit": "Shavasana (with chanting of 'A')",
-                        "practice_english": "Relaxation in corpse pose",
+                        "practice_english": "Shavasana (with chanting of 'A')",
+                        "sub_category": "Relaxation in corpse pose",
                         "rounds": 1,
                         "time_minutes": 2
                     }],
@@ -339,7 +427,8 @@ def import_sample_data():
                         "standing_asana": [
                             {
                                 "practice_sanskrit": "Ardha chakrasana",
-                                "practice_english": "Backward bending pose",
+                                "practice_english": "Ardha chakrasana",
+                                "sub_category": "Backward bending pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             }
@@ -347,13 +436,15 @@ def import_sample_data():
                         "sitting_asana": [
                             {
                                 "practice_sanskrit": "Ardha ustrasana",
-                                "practice_english": "Camel pose",
+                                "practice_english": "Ardha ustrasana",
+                                "sub_category": "Camel pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             },
                             {
                                 "practice_sanskrit": "Paschimottanasana",
-                                "practice_english": "Seated forward bending pose",
+                                "practice_english": "Paschimottanasana",
+                                "sub_category": "Seated forward bending pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             }
@@ -361,7 +452,8 @@ def import_sample_data():
                         "prone_asana": [
                             {
                                 "practice_sanskrit": "Bhujangasana",
-                                "practice_english": "Serpent pose",
+                                "practice_english": "Bhujangasana",
+                                "sub_category": "Serpent pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             }
@@ -369,19 +461,22 @@ def import_sample_data():
                         "supine_asana": [
                             {
                                 "practice_sanskrit": "Pawanamuktasana",
-                                "practice_english": "Wind releasing pose",
+                                "practice_english": "Pawanamuktasana",
+                                "sub_category": "Wind releasing pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             },
                             {
                                 "practice_sanskrit": "Viparitakarani mudra",
-                                "practice_english": "Legs-up-the-wall pose",
+                                "practice_english": "Viparitakarani mudra",
+                                "sub_category": "Legs-up-the-wall pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             },
                             {
                                 "practice_sanskrit": "Setu bandhasana",
-                                "practice_english": "Bridge pose",
+                                "practice_english": "Setu bandhasana",
+                                "sub_category": "Bridge pose",
                                 "rounds": 5,
                                 "time_minutes": 2
                             }
@@ -389,14 +484,16 @@ def import_sample_data():
                     },
                     "final_relaxation": [{
                         "practice_sanskrit": "Shavasana",
-                        "practice_english": "Relaxation in corpse pose/Yoga nidra",
+                        "practice_english": "Shavasana",
+                        "sub_category": "Relaxation in corpse pose/Yoga nidra",
                         "rounds": 1,
                         "time_minutes": 4
                     }],
                     "kriya_practices": [
                         {
                             "practice_sanskrit": "Kapalabhati",
-                            "practice_english": "Breath of fire/Skull shining breath",
+                            "practice_english": "Kapalabhati",
+                            "sub_category": "Breath of fire/Skull shining breath",
                             "rounds": 2,
                             "strokes_per_min": 40,
                             "time_minutes": 2
@@ -407,19 +504,22 @@ def import_sample_data():
                     "pranayama_practices": [
                         {
                             "practice_sanskrit": "Surya anuloma viloma",
-                            "practice_english": "Right nostril breathing",
+                            "practice_english": "Surya anuloma viloma",
+                            "sub_category": "Right nostril breathing",
                             "rounds": 21,
                             "time_minutes": 3
                         },
                         {
                             "practice_sanskrit": "Ujjayi",
-                            "practice_english": "Victorious breath",
+                            "practice_english": "Ujjayi",
+                            "sub_category": "Victorious breath",
                             "rounds": 9,
                             "time_minutes": 2
                         },
                         {
                             "practice_sanskrit": "Bhastrika",
-                            "practice_english": "Bellows' breathing",
+                            "practice_english": "Bhastrika",
+                            "sub_category": "Bellows' breathing",
                             "rounds": 3,
                             "strokes_per_cycle": 20,
                             "rest_between_cycles_sec": 30,
@@ -430,7 +530,8 @@ def import_sample_data():
                 "Manomaya_Kosa": {
                     "meditation_practices": [{
                         "practice_sanskrit": "Nadanusandhana",
-                        "practice_english": "Sound resonance",
+                        "practice_english": "Nadanusandhana",
+                        "sub_category": "Sound resonance",
                         "Steps": ["AA kara", "UU kara", "MM kara", "AUM kara"],
                         "rounds": 9,
                         "time_minutes": 5

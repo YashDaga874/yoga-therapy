@@ -79,31 +79,31 @@ def add_sample_practices(session, disease, disease_name):
     session.add(citation)
     session.flush()  # Get the ID
     
-    # Add practices for different koshas
+    # Add practices for different segments
     practices = [
         {
-            "practice_english": f"Breathing Exercise for {disease_name}",
+            "practice_english": f"Pranayama for {disease_name}",
             "practice_sanskrit": f"Pranayama for {disease_name}",
-            "kosa": "Pranamaya_Kosa",
-            "sub_category": "breathing_exercise",
+            "practice_segment": "Breathing Practice",
+            "sub_category": f"Breathing Exercise for {disease_name}",
             "rounds": 5,
             "time_minutes": 10.0,
             "description": f"Calming breathing exercise for {disease_name}"
         },
         {
-            "practice_english": f"Relaxation Pose for {disease_name}",
+            "practice_english": f"Shavasana for {disease_name}",
             "practice_sanskrit": f"Shavasana for {disease_name}",
-            "kosa": "Annamaya_Kosa",
-            "sub_category": "relaxation",
+            "practice_segment": "Yogasana",
+            "sub_category": f"Relaxation Pose for {disease_name}",
             "rounds": 1,
             "time_minutes": 15.0,
             "description": f"Deep relaxation for {disease_name}"
         },
         {
-            "practice_english": f"Meditation for {disease_name}",
+            "practice_english": f"Dhyana for {disease_name}",
             "practice_sanskrit": f"Dhyana for {disease_name}",
-            "kosa": "Manomaya_Kosa",
-            "sub_category": "meditation",
+            "practice_segment": "Meditation",
+            "sub_category": f"Meditation for {disease_name}",
             "rounds": 1,
             "time_minutes": 20.0,
             "description": f"Mindfulness meditation for {disease_name}"
@@ -114,7 +114,7 @@ def add_sample_practices(session, disease, disease_name):
         practice = Practice(
             practice_english=practice_data["practice_english"],
             practice_sanskrit=practice_data["practice_sanskrit"],
-            kosa=practice_data["kosa"],
+            practice_segment=practice_data["practice_segment"],
             sub_category=practice_data["sub_category"],
             rounds=practice_data["rounds"],
             time_minutes=practice_data["time_minutes"],
