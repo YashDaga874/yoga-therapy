@@ -16,7 +16,10 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>Contraindications by Disease</h2>
-    <a href="/contraindication/add" class="btn">Add Contraindication</a>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/export/contraindications/csv" class="btn" style="background: #28a745;">Download CSV</a>
+        <a href="/contraindication/add" class="btn">Add Contraindication</a>
+    </div>
 </div>
 
 {% if disease_contraindications %}

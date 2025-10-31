@@ -5,7 +5,10 @@
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>RCT Database</h2>
-    <a href="/rct/add" class="btn">Add New RCT Entry</a>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/export/rcts/csv" class="btn" style="background: #28a745;">Download CSV</a>
+        <a href="/rct/add" class="btn">Add New RCT Entry</a>
+    </div>
 </div>
 
 <!-- Filter Section for Disease + Practice RCT Count -->

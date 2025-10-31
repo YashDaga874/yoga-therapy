@@ -31,7 +31,10 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>Diseases & Conditions</h2>
-    <a href="/disease/add" class="btn">Add New Disease</a>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/export/diseases/csv" class="btn" style="background: #28a745;">Download CSV</a>
+        <a href="/disease/add" class="btn">Add New Disease</a>
+    </div>
 </div>
 
 {% if diseases %}

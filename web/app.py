@@ -15,13 +15,15 @@ Features:
 import sys
 import os
 import json
+import csv
+import io
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 
 # Add parent directory to path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
     RCT, RCTSymptom,
@@ -1379,6 +1381,253 @@ def delete_rct(rct_id):
         session.rollback()
         flash(f'Error deleting RCT: {str(e)}', 'error')
         return redirect(url_for('list_rcts'))
+    finally:
+        session.close()
+
+
+# CSV Export Routes
+@app.route('/export/diseases/csv')
+def export_diseases_csv():
+    """Export all diseases to CSV"""
+    session = get_db_session()
+    try:
+        diseases = session.query(Disease).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['Name', 'Description', 'Developed By', 'Module Description'])
+        
+        # Write data
+        for disease in diseases:
+            module = session.query(Module).filter_by(disease_id=disease.id).first()
+            writer.writerow([
+                disease.name or '',
+                disease.description or '',
+                module.developed_by if module else '',
+                module.module_description if module else ''
+            ])
+        
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=diseases.csv'
+        return response
+    finally:
+        session.close()
+
+
+@app.route('/export/practices/csv')
+def export_practices_csv():
+    """Export all practices to CSV (excluding images/videos)"""
+    session = get_db_session()
+    try:
+        practices = session.query(Practice).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Practice Sanskrit', 'Practice English', 'Practice Segment', 'Sub Category',
+            'Rounds', 'Time Minutes', 'Strokes Per Min', 'Strokes Per Cycle',
+            'Rest Between Cycles Sec', 'Variations', 'Steps', 'Description',
+            'How To Do', 'Used In Diseases', 'Citation Text', 'Citation Type',
+            'Full Reference', 'Citation URL', 'RCT Count'
+        ])
+        
+        # Write data
+        for practice in practices:
+            # Get diseases as comma-separated string
+            disease_names = ', '.join([d.name for d in practice.diseases])
+            
+            # Get citation info
+            citation_text = ''
+            citation_type = ''
+            full_reference = ''
+            citation_url = ''
+            if practice.citation:
+                citation_text = practice.citation.citation_text or ''
+                citation_type = practice.citation.citation_type or ''
+                full_reference = practice.citation.full_reference or ''
+                citation_url = practice.citation.url or ''
+            
+            # Parse JSON fields to readable format
+            variations_str = ''
+            if practice.variations:
+                try:
+                    variations = json.loads(practice.variations)
+                    variations_str = ', '.join([str(v) for v in variations])
+                except:
+                    variations_str = practice.variations
+            
+            steps_str = ''
+            if practice.steps:
+                try:
+                    steps = json.loads(practice.steps)
+                    steps_str = ' | '.join([str(s) for s in steps])
+                except:
+                    steps_str = practice.steps
+            
+            writer.writerow([
+                practice.practice_sanskrit or '',
+                practice.practice_english or '',
+                practice.practice_segment or '',
+                practice.sub_category or '',
+                practice.rounds if practice.rounds else '',
+                practice.time_minutes if practice.time_minutes else '',
+                practice.strokes_per_min if practice.strokes_per_min else '',
+                practice.strokes_per_cycle if practice.strokes_per_cycle else '',
+                practice.rest_between_cycles_sec if practice.rest_between_cycles_sec else '',
+                variations_str,
+                steps_str,
+                practice.description or '',
+                practice.how_to_do or '',
+                disease_names,
+                citation_text,
+                citation_type,
+                full_reference,
+                citation_url,
+                practice.rct_count or 0
+            ])
+        
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=practices.csv'
+        return response
+    finally:
+        session.close()
+
+
+@app.route('/export/contraindications/csv')
+def export_contraindications_csv():
+    """Export all contraindications to CSV"""
+    session = get_db_session()
+    try:
+        contraindications = session.query(Contraindication).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Practice Sanskrit', 'Practice English', 'Practice Segment', 'Sub Category',
+            'Reason', 'Source Type', 'Source Name', 'Page Number', 'APA Citation',
+            'Diseases'
+        ])
+        
+        # Write data
+        for contra in contraindications:
+            # Get diseases as comma-separated string
+            disease_names = ', '.join([d.name for d in contra.diseases])
+            
+            writer.writerow([
+                contra.practice_sanskrit or '',
+                contra.practice_english or '',
+                contra.practice_segment or '',
+                contra.sub_category or '',
+                contra.reason or '',
+                contra.source_type or '',
+                contra.source_name or '',
+                contra.page_number or '',
+                contra.apa_citation or '',
+                disease_names
+            ])
+        
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=contraindications.csv'
+        return response
+    finally:
+        session.close()
+
+
+@app.route('/export/rcts/csv')
+def export_rcts_csv():
+    """Export all RCTs to CSV"""
+    session = get_db_session()
+    try:
+        rcts = session.query(RCT).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Data Enrolled Date', 'Database/Journal', 'Keywords', 'DOI', 'PMIC/NMIC',
+            'Title', 'Parenthetical Citation', 'Citation Full', 'Citation Link',
+            'Study Type', 'Participant Type', 'Age Mean', 'Age Std Dev', 'Age Range Calculated',
+            'Gender Male', 'Gender Female', 'Gender Not Mentioned',
+            'Intervention Practices', 'Duration Type', 'Duration Value', 'Frequency Per Duration',
+            'Scales', 'Results', 'Conclusion', 'Remarks', 'Diseases', 'Symptoms'
+        ])
+        
+        # Write data
+        for rct in rcts:
+            # Get diseases as comma-separated string
+            disease_names = ', '.join([d.name for d in rct.diseases])
+            
+            # Get symptoms with details
+            symptom_details = []
+            for symptom in rct.symptoms:
+                sig_status = 'Significant' if symptom.is_significant else 'Not Significant'
+                symptom_str = f"{symptom.symptom_name} (p{symptom.p_value_operator}{symptom.p_value}, {sig_status}, Scale: {symptom.scale or 'N/A'})"
+                symptom_details.append(symptom_str)
+            symptoms_str = ' | '.join(symptom_details)
+            
+            # Parse intervention practices
+            intervention_str = ''
+            if rct.intervention_practices:
+                try:
+                    practices = json.loads(rct.intervention_practices)
+                    practice_details = []
+                    for p in practices:
+                        if p.get('name'):
+                            practice_details.append(f"{p.get('name')} ({p.get('category')})")
+                        else:
+                            practice_details.append(f"Category: {p.get('category')}")
+                    intervention_str = ' | '.join(practice_details)
+                except:
+                    intervention_str = rct.intervention_practices
+            
+            writer.writerow([
+                rct.data_enrolled_date or '',
+                rct.database_journal or '',
+                rct.keywords or '',
+                rct.doi or '',
+                rct.pmic_nmic or '',
+                rct.title or '',
+                rct.parenthetical_citation or '',
+                rct.citation_full or '',
+                rct.citation_link or '',
+                rct.study_type or '',
+                rct.participant_type or '',
+                rct.age_mean if rct.age_mean else '',
+                rct.age_std_dev if rct.age_std_dev else '',
+                rct.age_range_calculated or '',
+                rct.gender_male if rct.gender_male else 0,
+                rct.gender_female if rct.gender_female else 0,
+                rct.gender_not_mentioned if rct.gender_not_mentioned else 0,
+                intervention_str,
+                rct.duration_type or '',
+                rct.duration_value if rct.duration_value else '',
+                rct.frequency_per_duration or '',
+                rct.scales or '',
+                rct.results or '',
+                rct.conclusion or '',
+                rct.remarks or '',
+                disease_names,
+                symptoms_str
+            ])
+        
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=rcts.csv'
+        return response
     finally:
         session.close()
 
