@@ -10,7 +10,7 @@ Prerequisites:
 
 Setup:
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/yoga-therapy.git
+git clone https://github.com/YashDaga874/yoga-therapy.git
 cd yoga-therapy
 
 # Create and activate a virtual environment
