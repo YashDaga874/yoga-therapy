@@ -76,7 +76,7 @@ def index():
     # Get statistics
     disease_count = session.query(Disease).count()
     practice_count = session.query(Practice).count()
-    citation_count = session.query(Citation).count()
+    rct_count = session.query(RCT).count()
     contraindication_count = session.query(Contraindication).count()
     
     session.close()
@@ -84,7 +84,7 @@ def index():
     return render_template('index.html',
                          disease_count=disease_count,
                          practice_count=practice_count,
-                         citation_count=citation_count,
+                         rct_count=rct_count,
                          contraindication_count=contraindication_count)
 
 

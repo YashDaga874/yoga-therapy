@@ -4,8 +4,8 @@
 <h2>Welcome to the Yoga Therapy Management System</h2>
 
 <p style="font-size: 1.1rem; color: #666; margin: 1rem 0 2rem 0;">
-    This system helps manage yoga therapy practices based on the Pancha Kosha (Five Sheaths) framework. 
-    Researchers can input diseases, practices, contraindications, and citations to build comprehensive 
+    A comprehensive research database for managing yoga therapy practices across nine practice segments. 
+    Track diseases, practices, contraindications, and Randomized Controlled Trials (RCTs) to build evidence-based 
     treatment protocols.
 </p>
 
@@ -21,8 +21,8 @@
     </div>
     
     <div class="stat-card">
-        <h3>{{ citation_count }}</h3>
-        <p>Research Citations</p>
+        <h3>{{ rct_count }}</h3>
+        <p>RCT Studies</p>
     </div>
     
     <div class="stat-card">
@@ -38,6 +38,7 @@
         <a href="/disease/add" class="btn">Add New Disease</a>
         <a href="/practice/add" class="btn">Add New Practice</a>
         <a href="/contraindication/add" class="btn">Add Contraindication</a>
+        <a href="/rct/add" class="btn">Add RCT Entry</a>
     </div>
 </div>
 
@@ -56,9 +57,14 @@
         treatment protocols for patients with multiple conditions.
     </p>
     
+    <p style="margin-bottom: 1rem;">
+        The RCT Database tracks randomized controlled trials and studies, automatically calculating practice 
+        reliability scores based on the number of supporting research papers for each disease-practice combination.
+    </p>
+    
     <p>
-        All practices are linked to research citations, maintaining scientific rigor and traceability 
-        for academic and clinical use.
+        All data is maintained with scientific rigor, ensuring evidence-based treatment protocols for both 
+        academic research and clinical application.
     </p>
 </div>
 {% endblock %}
