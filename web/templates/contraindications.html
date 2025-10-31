@@ -29,7 +29,7 @@
                 <tr>
                     <th>Practice (Sanskrit)</th>
                     <th>Practice (English)</th>
-                    <th>Kosa</th>
+                    <th>Segment</th>
                     <th>Sub-Category</th>
                     <th>Reason</th>
                 </tr>
@@ -39,7 +39,7 @@
                 <tr class="clickable-row" onclick="window.location.href='/contraindication/{{ contra.id }}/edit'">
                     <td>{{ contra.practice_sanskrit or '-' }}</td>
                     <td><strong>{{ contra.practice_english }}</strong></td>
-                    <td>{{ contra.kosa.replace('_', ' ') }}</td>
+                    <td>{{ contra.practice_segment }}</td>
                     <td>{{ contra.sub_category or '-' }}</td>
                     <td>{{ contra.reason or '-' }}</td>
                 </tr>

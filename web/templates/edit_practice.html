@@ -25,14 +25,18 @@
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
         <div class="form-group">
-            <label for="kosa">Kosa *</label>
-            <select id="kosa" name="kosa" required>
-                <option value="">Select Kosa</option>
-                <option value="Annamaya_Kosa" {% if practice.kosa == 'Annamaya_Kosa' %}selected{% endif %}>Annamaya Kosa</option>
-                <option value="Pranamaya_Kosa" {% if practice.kosa == 'Pranamaya_Kosa' %}selected{% endif %}>Pranamaya Kosa</option>
-                <option value="Manomaya_Kosa" {% if practice.kosa == 'Manomaya_Kosa' %}selected{% endif %}>Manomaya Kosa</option>
-                <option value="Vijnanamaya_Kosa" {% if practice.kosa == 'Vijnanamaya_Kosa' %}selected{% endif %}>Vijnanamaya Kosa</option>
-                <option value="Anandamaya_Kosa" {% if practice.kosa == 'Anandamaya_Kosa' %}selected{% endif %}>Anandamaya Kosa</option>
+            <label for="practice_segment">Practice Segment *</label>
+            <select id="practice_segment" name="practice_segment" required>
+                <option value="">Select Practice Segment</option>
+                <option value="Preparatory Practice" {% if practice.practice_segment == 'Preparatory Practice' %}selected{% endif %}>Preparatory Practice</option>
+                <option value="Breathing Practice" {% if practice.practice_segment == 'Breathing Practice' %}selected{% endif %}>Breathing Practice</option>
+                <option value="Suryanamaskara" {% if practice.practice_segment == 'Suryanamaskara' %}selected{% endif %}>Suryanamaskara</option>
+                <option value="Yogasana" {% if practice.practice_segment == 'Yogasana' %}selected{% endif %}>Yogasana</option>
+                <option value="Pranayama" {% if practice.practice_segment == 'Pranayama' %}selected{% endif %}>Pranayama</option>
+                <option value="Meditation" {% if practice.practice_segment == 'Meditation' %}selected{% endif %}>Meditation</option>
+                <option value="Additional Practices" {% if practice.practice_segment == 'Additional Practices' %}selected{% endif %}>Additional Practices</option>
+                <option value="Kriya (Cleansing Techniques)" {% if practice.practice_segment == 'Kriya (Cleansing Techniques)' %}selected{% endif %}>Kriya (Cleansing Techniques)</option>
+                <option value="Yogic Counselling" {% if practice.practice_segment == 'Yogic Counselling' %}selected{% endif %}>Yogic Counselling</option>
             </select>
         </div>
         

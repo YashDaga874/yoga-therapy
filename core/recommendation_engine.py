@@ -30,12 +30,16 @@ class YogaTherapyRecommendationEngine:
     
     def __init__(self, db_path='sqlite:///yoga_therapy.db'):
         self.session = get_session(db_path)
-        self.kosa_order = [
-            'Annamaya_Kosa',
-            'Pranamaya_Kosa', 
-            'Manomaya_Kosa',
-            'Vijnanamaya_Kosa',
-            'Anandamaya_Kosa'
+        self.practice_segment_order = [
+            'Preparatory Practice',
+            'Breathing Practice',
+            'Suryanamaskara',
+            'Yogasana',
+            'Pranayama',
+            'Meditation',
+            'Additional Practices',
+            'Kriya (Cleansing Techniques)',
+            'Yogic Counselling'
         ]
     
     def get_recommendations(self, disease_names):
@@ -46,7 +50,7 @@ class YogaTherapyRecommendationEngine:
             disease_names: List of disease names (e.g., ['Depression', 'GAD'])
             
         Returns:
-            Dictionary organized by koshas with combined practices and citations
+            Dictionary organized by practice segments with combined practices and citations
         """
         
         # Step 1: Fetch all diseases from database
@@ -58,8 +62,8 @@ class YogaTherapyRecommendationEngine:
         # Step 2: Collect all practices for these diseases
         all_practices = self._collect_practices(diseases)
         
-        # Step 3: Organize by kosa and remove duplicates
-        organized_practices = self._organize_by_kosa(all_practices)
+        # Step 3: Organize by practice segment and remove duplicates
+        organized_practices = self._organize_by_segment(all_practices)
         
         # Step 4: Apply contraindications
         final_practices = self._apply_contraindications(organized_practices, diseases)
@@ -101,15 +105,15 @@ class YogaTherapyRecommendationEngine:
         
         return all_practices
     
-    def _organize_by_kosa(self, practices):
+    def _organize_by_segment(self, practices):
         """
-        Organize practices by kosa and remove duplicates
+        Organize practices by practice segment and remove duplicates
         
         Duplicate detection is based on:
         - Matching practice_english (case-insensitive)
-        - Same kosa and sub_category
+        - Same practice_segment and sub_category
         """
-        # Dictionary structure: kosa -> sub_category -> list of unique practices
+        # Dictionary structure: practice_segment -> sub_category -> list of unique practices
         organized = defaultdict(lambda: defaultdict(list))
         
         # Track what we've already added to avoid duplicates
@@ -117,16 +121,16 @@ class YogaTherapyRecommendationEngine:
         
         for practice in practices:
             # Create a unique identifier for this practice
-            # We use practice_english (lowercased) + kosa + sub_category as the key
+            # We use practice_english (lowercased) + practice_segment + sub_category as the key
             practice_key = (
                 practice.practice_english.lower().strip(),
-                practice.kosa,
+                practice.practice_segment,
                 practice.sub_category or ''
             )
             
             # Only add if we haven't seen this exact practice before
             if practice_key not in seen_practices:
-                organized[practice.kosa][practice.sub_category or 'general'].append(practice)
+                organized[practice.practice_segment][practice.sub_category or 'general'].append(practice)
                 seen_practices.add(practice_key)
         
         return organized
@@ -194,7 +198,7 @@ class YogaTherapyRecommendationEngine:
             
             contra_key = (
                 contra.practice_english.lower().strip(),
-                contra.kosa,
+                contra.practice_segment,
                 contra.sub_category or ''
             )
             contraindicated.add(contra_key)
@@ -204,7 +208,7 @@ class YogaTherapyRecommendationEngine:
                 contraindication_details[contra_key] = []
             contraindication_details[contra_key].append({
                 'practice': contra.practice_english,
-                'kosa': contra.kosa,
+                'practice_segment': contra.practice_segment,
                 'combination': combo_name,
                 'reason': contra.reason
             })
@@ -213,23 +217,23 @@ class YogaTherapyRecommendationEngine:
         filtered_practices = defaultdict(lambda: defaultdict(list))
         removed_practices = []  # Track what was removed for reporting
         
-        for kosa, sub_categories in organized_practices.items():
+        for segment, sub_categories in organized_practices.items():
             for sub_cat, practices in sub_categories.items():
                 for practice in practices:
                     practice_key = (
                         practice.practice_english.lower().strip(),
-                        practice.kosa,
+                        practice.practice_segment,
                         practice.sub_category or ''
                     )
                     
                     # Only include if not contraindicated
                     if practice_key not in contraindicated:
-                        filtered_practices[kosa][sub_cat].append(practice)
+                        filtered_practices[segment][sub_cat].append(practice)
                     else:
                         # Track what was removed
                         removed_practices.append({
                             'practice': practice.practice_english,
-                            'kosa': kosa,
+                            'practice_segment': segment,
                             'sub_category': sub_cat,
                             'contraindication_details': contraindication_details[practice_key]
                         })
@@ -243,14 +247,14 @@ class YogaTherapyRecommendationEngine:
         
         return filtered_practices
     
-    def _format_output(self, practices_by_kosa, diseases):
+    def _format_output(self, practices_by_segment, diseases):
         """
         Format the final output with proper structure and citations
         """
         output = {
             'diseases': [d.name for d in diseases],
             'modules': [],
-            'practices_by_kosa': {}
+            'practices_by_segment': {}
         }
         
         # Add module information for each disease
@@ -263,12 +267,12 @@ class YogaTherapyRecommendationEngine:
                     'description': module.module_description
                 })
         
-        # Organize practices by kosa in the defined order
-        for kosa in self.kosa_order:
-            if kosa in practices_by_kosa:
-                output['practices_by_kosa'][kosa] = {}
+        # Organize practices by segment in the defined order
+        for segment in self.practice_segment_order:
+            if segment in practices_by_segment:
+                output['practices_by_segment'][segment] = {}
                 
-                for sub_cat, practices in practices_by_kosa[kosa].items():
+                for sub_cat, practices in practices_by_segment[segment].items():
                     formatted_practices = []
                     
                     for practice in practices:
@@ -314,7 +318,7 @@ class YogaTherapyRecommendationEngine:
                         
                         formatted_practices.append(practice_dict)
                     
-                    output['practices_by_kosa'][kosa][sub_cat] = formatted_practices
+                    output['practices_by_segment'][segment][sub_cat] = formatted_practices
         
         return output
     
@@ -336,11 +340,11 @@ class YogaTherapyRecommendationEngine:
                 summary += f"- {module['disease']}: Developed by {module['developed_by']}\n"
             summary += "\n"
         
-        # Add practices by kosa
+        # Add practices by segment
         summary += "RECOMMENDED PRACTICES:\n\n"
         
-        for kosa, sub_categories in recommendations['practices_by_kosa'].items():
-            summary += f"{kosa.replace('_', ' ').upper()}:\n"
+        for segment, sub_categories in recommendations['practices_by_segment'].items():
+            summary += f"{segment.upper()}:\n"
             
             for sub_cat, practices in sub_categories.items():
                 if sub_cat != 'general':

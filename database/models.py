@@ -68,9 +68,9 @@ class Practice(Base):
     practice_sanskrit = Column(String(200))
     practice_english = Column(String(200), nullable=False)
     
-    # Kosa classification
-    kosa = Column(String(50), nullable=False)  # Annamaya_Kosa, Pranamaya_Kosa, etc.
-    sub_category = Column(String(100))  # Loosening_Practice, Asana, standing_asana, etc.
+    # Practice Segment classification
+    practice_segment = Column(String(50), nullable=False)  # Preparatory Practice, Breathing Practice, etc.
+    sub_category = Column(String(100))  # Subcategory within the segment
     
     # Practice details
     rounds = Column(Integer)
@@ -99,7 +99,7 @@ class Practice(Base):
     )
     
     def __repr__(self):
-        return f"<Practice(english='{self.practice_english}', kosa='{self.kosa}')>"
+        return f"<Practice(english='{self.practice_english}', segment='{self.practice_segment}')>"
 
 
 class Citation(Base):
@@ -152,8 +152,8 @@ class Contraindication(Base):
     practice_sanskrit = Column(String(200))
     practice_english = Column(String(200), nullable=False)
     
-    # Which kosa does this contraindication apply to
-    kosa = Column(String(50), nullable=False)
+    # Which practice segment does this contraindication apply to
+    practice_segment = Column(String(50), nullable=False)
     sub_category = Column(String(100))
     
     # Reason for contraindication
@@ -167,7 +167,7 @@ class Contraindication(Base):
     )
     
     def __repr__(self):
-        return f"<Contraindication(practice='{self.practice_english}', kosa='{self.kosa}')>"
+        return f"<Contraindication(practice='{self.practice_english}', segment='{self.practice_segment}')>"
 
 
 class Module(Base):

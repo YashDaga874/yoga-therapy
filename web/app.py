@@ -95,30 +95,43 @@ def add_disease():
     if request.method == 'POST':
         session = get_db_session()
         
-        disease = Disease(
-            name=request.form['name'],
-            description=request.form.get('description', '')
-        )
-        
-        session.add(disease)
-        
-        # Add module information if provided
-        if request.form.get('developed_by'):
-            module = Module(
-                disease=disease,
-                developed_by=request.form['developed_by'],
-                module_description=request.form.get('module_description', '')
+        try:
+            # Check if disease already exists
+            existing_disease = session.query(Disease).filter_by(name=request.form['name']).first()
+            if existing_disease:
+                flash(f'Disease "{request.form["name"]}" already exists!', 'error')
+                session.close()
+                return render_template('add_disease.html')
+            
+            disease = Disease(
+                name=request.form['name'],
+                description=request.form.get('description', '')
             )
-            session.add(module)
-        
-        # Store the disease name before closing the session
-        disease_name = disease.name
-        
-        session.commit()
-        session.close()
-        
-        flash(f'Disease "{disease_name}" added successfully!', 'success')
-        return redirect(url_for('list_diseases'))
+            
+            session.add(disease)
+            
+            # Add module information if provided
+            if request.form.get('developed_by'):
+                module = Module(
+                    disease=disease,
+                    developed_by=request.form['developed_by'],
+                    module_description=request.form.get('module_description', '')
+                )
+                session.add(module)
+            
+            # Store the disease name before closing the session
+            disease_name = disease.name
+            
+            session.commit()
+            session.close()
+            
+            flash(f'Disease "{disease_name}" added successfully!', 'success')
+            return redirect(url_for('list_diseases'))
+        except Exception as e:
+            session.rollback()
+            session.close()
+            flash(f'Error adding disease: {str(e)}', 'error')
+            return render_template('add_disease.html')
     
     return render_template('add_disease.html')
 
@@ -138,12 +151,12 @@ def view_disease(disease_id):
         # Get module info
         module = session.query(Module).filter_by(disease_id=disease_id).first()
         
-        # Organize practices by kosa and force load relationships
-        practices_by_kosa = {}
+        # Organize practices by segment and force load relationships
+        practices_by_segment = {}
         for practice in disease.practices:
-            if practice.kosa not in practices_by_kosa:
-                practices_by_kosa[practice.kosa] = []
-            practices_by_kosa[practice.kosa].append(practice)
+            if practice.practice_segment not in practices_by_segment:
+                practices_by_segment[practice.practice_segment] = []
+            practices_by_segment[practice.practice_segment].append(practice)
             # Force load citation
             if practice.citation:
                 _ = practice.citation.citation_text
@@ -155,7 +168,7 @@ def view_disease(disease_id):
         return render_template('view_disease.html',
                              disease=disease,
                              module=module,
-                             practices_by_kosa=practices_by_kosa,
+                             practices_by_segment=practices_by_segment,
                              contraindications=contraindications)
     finally:
         session.close()
@@ -192,11 +205,12 @@ def edit_disease(disease_id):
                         module_description=request.form.get('module_description', '')
                     )
                     session.add(module)
-            
+            # Store name before commit
+            disease_name = disease.name
             session.commit()
             session.close()
             
-            flash(f'Disease "{disease.name}" updated successfully!', 'success')
+            flash(f'Disease "{disease_name}" updated successfully!', 'success')
             return redirect(url_for('view_disease', disease_id=disease_id))
         
         return render_template('edit_disease.html', disease=disease, module=module)
@@ -242,13 +256,13 @@ def list_practices():
     
     try:
         # Get filter parameters
-        kosa_filter = request.args.get('kosa', '')
+        segment_filter = request.args.get('segment', '')
         search_term = request.args.get('search', '')
         
         query = session.query(Practice)
         
-        if kosa_filter:
-            query = query.filter(Practice.kosa == kosa_filter)
+        if segment_filter:
+            query = query.filter(Practice.practice_segment == segment_filter)
         
         if search_term:
             query = query.filter(
@@ -264,14 +278,14 @@ def list_practices():
             if practice.citation:
                 _ = practice.citation.citation_text  # Load citation
         
-        # Get all unique koshas for filter dropdown
-        all_koshas = session.query(Practice.kosa).distinct().all()
-        koshas = [k[0] for k in all_koshas]
+        # Get all unique segments for filter dropdown
+        all_segments = session.query(Practice.practice_segment).distinct().all()
+        segments = [s[0] for s in all_segments]
         
         return render_template('practices.html',
                              practices=practices,
-                             koshas=koshas,
-                             current_kosa=kosa_filter,
+                             segments=segments,
+                             current_segment=segment_filter,
                              search_term=search_term)
     finally:
         session.close()
@@ -287,7 +301,7 @@ def add_practice():
         practice = Practice(
             practice_sanskrit=request.form.get('practice_sanskrit', ''),
             practice_english=request.form['practice_english'],
-            kosa=request.form['kosa'],
+            practice_segment=request.form['practice_segment'],
             sub_category=request.form.get('sub_category', ''),
             rounds=int(request.form['rounds']) if request.form.get('rounds') else None,
             time_minutes=float(request.form['time_minutes']) if request.form.get('time_minutes') else None,
@@ -376,7 +390,7 @@ def edit_practice(practice_id):
             # Update practice fields
             practice.practice_sanskrit = request.form.get('practice_sanskrit', '')
             practice.practice_english = request.form['practice_english']
-            practice.kosa = request.form['kosa']
+            practice.practice_segment = request.form['practice_segment']
             practice.sub_category = request.form.get('sub_category', '')
             practice.rounds = int(request.form['rounds']) if request.form.get('rounds') else None
             practice.time_minutes = float(request.form['time_minutes']) if request.form.get('time_minutes') else None
@@ -528,7 +542,7 @@ def add_contraindication():
         contraindication = Contraindication(
             practice_english=request.form['practice_english'],
             practice_sanskrit=request.form.get('practice_sanskrit', ''),
-            kosa=request.form['kosa'],
+            practice_segment=request.form['practice_segment'],
             sub_category=request.form.get('sub_category', ''),
             reason=request.form.get('reason', '')
         )
@@ -571,7 +585,7 @@ def edit_contraindication(contraindication_id):
         if request.method == 'POST':
             contraindication.practice_english = request.form['practice_english']
             contraindication.practice_sanskrit = request.form.get('practice_sanskrit', '')
-            contraindication.kosa = request.form['kosa']
+            contraindication.practice_segment = request.form['practice_segment']
             contraindication.sub_category = request.form.get('sub_category', '')
             contraindication.reason = request.form.get('reason', '')
             
@@ -737,7 +751,7 @@ def api_search_practices():
                 'id': practice.id,
                 'practice_sanskrit': practice.practice_sanskrit or '',
                 'practice_english': practice.practice_english,
-                'kosa': practice.kosa,
+                'practice_segment': practice.practice_segment,
                 'sub_category': practice.sub_category or '',
                 'rounds': practice.rounds,
                 'time_minutes': practice.time_minutes,

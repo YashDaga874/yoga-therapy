@@ -103,43 +103,45 @@
 </div>
 {% endif %}
 
-<h3 style="margin-top: 2rem;">Practices by Kosa</h3>
+<h3 style="margin-top: 2rem;">Practices by Segment</h3>
 
-{% if practices_by_kosa %}
-    {% for kosa, practices in practices_by_kosa.items() %}
+{% if practices_by_segment %}
+    {% for segment, practices in practices_by_segment.items() %}
     <div style="margin: 2rem 0; padding: 1.5rem; border: 1px solid #ddd; border-radius: 8px;">
-        <h4 style="color: #667eea; margin-bottom: 1rem;">{{ kosa.replace('_', ' ') }}</h4>
+        <h4 style="color: #667eea; margin-bottom: 1rem;">{{ segment }}</h4>
         
         <table>
             <thead>
-                <tr>
-                    <th>Practice</th>
-                    <th>Sub-Category</th>
-                    <th>Rounds</th>
-                    <th>Duration</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for practice in practices %}
-                <tr>
-                    <td>
+            <tr>
+                <th>Practice</th>
+                <th>Sub-Category</th>
+                <th>Rounds</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for practice in practices %}
+            <tr>
+                <td>
+                    <a href="/practice/{{ practice.id }}" style="text-decoration: none; color: #495057;">
                         {% if practice.practice_sanskrit %}
                             <strong>{{ practice.practice_sanskrit }}</strong><br>
                         {% endif %}
                         {{ practice.practice_english }}
-                        {% if practice.citation %}
-                            <br><span style="font-size: 0.9em; color: #666;">
-                                [{{ practice.citation.citation_text }}]
-                            </span>
-                        {% endif %}
-                    </td>
-                    <td>{{ practice.sub_category or '-' }}</td>
-                    <td>{{ practice.rounds or '-' }}</td>
-                    <td>{{ practice.time_minutes or '-' }} min</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </a>
+                    {% if practice.citation %}
+                        <br><span style="font-size: 0.9em; color: #666;">
+                            [{{ practice.citation.citation_text }}]
+                        </span>
+                    {% endif %}
+                </td>
+                <td>{{ practice.sub_category or '-' }}</td>
+                <td>{{ practice.rounds or '-' }}</td>
+                <td>{{ practice.time_minutes or '-' }} min</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     </div>
     {% endfor %}
 {% else %}
@@ -155,7 +157,7 @@
         <thead>
             <tr>
                 <th>Practice</th>
-                <th>Kosa</th>
+                <th>Segment</th>
                 <th>Reason</th>
             </tr>
         </thead>
@@ -163,7 +165,7 @@
             {% for contra in contraindications %}
             <tr>
                 <td>{{ contra.practice_english }}</td>
-                <td>{{ contra.kosa }}</td>
+                <td>{{ contra.practice_segment }}</td>
                 <td>{{ contra.reason or 'Not specified' }}</td>
             </tr>
             {% endfor %}
