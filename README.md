@@ -1,39 +1,58 @@
 # Yoga Therapy Recommendation System
 
+> **📌 NEW USERS: Start with [START_HERE.md](START_HERE.md) for the simplest setup instructions!**
+
 > Quick start for new users is below. A detailed, research-focused guide follows after that.
 
-## Quick Start (5–10 minutes)
+## Quick Start
 
-Prerequisites:
-- Python 3.10+
-- Git
+> **For detailed step-by-step instructions, see [QUICK_START.md](QUICK_START.md) or [START_HERE.md](START_HERE.md)**
 
-Setup:
+### 🚀 First Time Setup (Do This Once)
+
+1. Navigate to project folder:
+   ```bash
+   cd yoga-therapy
+   ```
+
+2. Run setup script:
+   - **Windows:** `setup.bat`
+   - **macOS/Linux:** `chmod +x setup.sh && ./setup.sh`
+
+   This installs everything you need automatically!
+
+3. (Optional) Initialize database with sample data:
+   ```bash
+   python utils/import_data.py
+   ```
+
+### ▶️ Running the App (Every Time After Setup)
+
+**Easiest Way - Use the Run Script:**
+
+- **Windows:** `run.bat`
+- **macOS/Linux:** `./run.sh`
+
+The app will start at http://127.0.0.1:5000
+
+**Alternative - Manual Run:**
 ```bash
-git clone https://github.com/YashDaga874/yoga-therapy.git
-cd yoga-therapy
-
-# Create and activate a virtual environment
-python -m venv venv
 # Windows
-venv\Scripts\Activate
+venv\Scripts\activate
+python web\app.py
+
 # macOS/Linux
-# source venv/bin/activate
-
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-Initialize database with sample data:
-```bash
-python utils/import_data.py
-```
-
-Run the web app:
-```bash
+source venv/bin/activate
 python web/app.py
 ```
-Open http://127.0.0.1:5000 in your browser.
+
+> ⚠️ **Important:** Always activate the virtual environment first, or use the `run.bat`/`run.sh` scripts which do this automatically!
+
+---
+
+### 📋 Prerequisites
+- Python 3.10 or higher
+- Git (for cloning, if applicable)
 
 Run tests/demo (optional):
 ```bash
@@ -54,9 +73,23 @@ curl -X POST http://127.0.0.1:5000/api/summary \
 ```
 
 Troubleshooting:
+
+**Common Issue: "No module named Werkzeug" or "No module named Flask"**
+- **Solution**: This happens when the virtual environment is not activated. Always activate the venv before running the app:
+  - Windows: `venv\Scripts\activate` (you should see `(venv)` in your prompt)
+  - macOS/Linux: `source venv/bin/activate` (you should see `(venv)` in your prompt)
+- **Alternative**: Use the `run.bat` (Windows) or `run.sh` (macOS/Linux) script, which automatically activates the venv
+- **If still failing**: Reinstall dependencies: `pip install -r requirements.txt`
+
+**SQLAlchemy Compatibility Issues with Latest Python**
+- If you're using Python 3.12+ and facing SQLAlchemy issues, ensure you have the latest compatible version by running: `pip install --upgrade SQLAlchemy`
+- The requirements.txt uses version ranges that should work with Python 3.10-3.13
+
+**Other Issues**:
 - Activate the venv and run from the repo root if you see import errors.
 - If port 5000 is busy, Flask prints the actual port—use that.
-- If the database is missing/empty, re-run `python utils/import_data.py`.
+- If the database is missing/empty, re-run `python utils/import_data.py` (make sure venv is activated).
+- If dependencies fail to install, try: `pip install --upgrade pip` then `pip install -r requirements.txt`.
 
 ---
 
