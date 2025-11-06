@@ -26,6 +26,10 @@
    ```
 
 4. **Wait for setup to complete** (takes 1-2 minutes)
+   - The setup script will automatically:
+     - Create virtual environment
+     - Install dependencies
+     - Run database migration (ensures database schema is up-to-date)
 
 5. **(Optional) Initialize the database with sample data:**
    ```bash
@@ -51,7 +55,9 @@ run.bat
 ./run.sh
 ```
 
-**That's it!** The app will start automatically at: http://127.0.0.1:5000
+**That's it!** The app will:
+- ✅ Automatically check and update database schema
+- ✅ Start at http://127.0.0.1:5000
 
 ---
 

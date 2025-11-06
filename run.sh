@@ -41,6 +41,15 @@ if [ $? -ne 0 ]; then
     pip install Werkzeug
 fi
 
+# Run database migration to ensure all columns exist
+echo ""
+echo "Checking database schema..."
+python add_kosha_field.py
+if [ $? -ne 0 ]; then
+    echo "WARNING: Database migration had issues, but continuing..."
+    echo "If you encounter database errors, run: python add_kosha_field.py"
+fi
+
 # Run the app from the web directory
 echo ""
 echo "Starting Flask application..."

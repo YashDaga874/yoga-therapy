@@ -58,6 +58,18 @@ fi
 
 echo ""
 echo "========================================"
+echo "Running database migration..."
+echo "========================================"
+echo ""
+# Run database migration to ensure all columns exist
+python add_kosha_field.py
+if [ $? -ne 0 ]; then
+    echo "WARNING: Database migration had issues, but continuing..."
+    echo "You may need to run: python add_kosha_field.py"
+fi
+
+echo ""
+echo "========================================"
 echo "Setup completed successfully!"
 echo "========================================"
 echo ""
@@ -66,7 +78,6 @@ echo "  ./run.sh"
 echo ""
 echo "Or manually activate the venv and run:"
 echo "  source venv/bin/activate"
-echo "  cd web"
-echo "  python app.py"
+echo "  python web/app.py"
 echo ""
 

@@ -19,7 +19,10 @@
    - **Windows:** `setup.bat`
    - **macOS/Linux:** `chmod +x setup.sh && ./setup.sh`
 
-   This installs everything you need automatically!
+   This installs everything you need automatically, including:
+   - Creating virtual environment
+   - Installing dependencies
+   - Running database migration (ensures database schema is up-to-date)
 
 3. (Optional) Initialize database with sample data:
    ```bash
@@ -33,7 +36,9 @@
 - **Windows:** `run.bat`
 - **macOS/Linux:** `./run.sh`
 
-The app will start at http://127.0.0.1:5000
+The app will:
+- Automatically check and update database schema
+- Start at http://127.0.0.1:5000
 
 **Alternative - Manual Run:**
 ```bash
@@ -84,6 +89,11 @@ Troubleshooting:
 **SQLAlchemy Compatibility Issues with Latest Python**
 - If you're using Python 3.12+ and facing SQLAlchemy issues, ensure you have the latest compatible version by running: `pip install --upgrade SQLAlchemy`
 - The requirements.txt uses version ranges that should work with Python 3.10-3.13
+
+**Database Schema Issues**:
+- If you see errors about missing columns (like `kosha`, `module_id`, `paper_link`), the migration script should run automatically when you use `run.bat`/`run.sh`.
+- If migration doesn't run automatically, manually run: `python add_kosha_field.py` (make sure venv is activated).
+- The migration script will automatically add any missing columns to your database.
 
 **Other Issues**:
 - Activate the venv and run from the repo root if you see import errors.

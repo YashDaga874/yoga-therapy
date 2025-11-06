@@ -23,6 +23,7 @@ chmod +x setup.sh
 This will:
 - ✅ Create a virtual environment
 - ✅ Install all required packages (Flask, Werkzeug, SQLAlchemy, etc.)
+- ✅ Run database migration (ensures database schema is up-to-date)
 - ✅ Set up everything you need
 
 **That's it! Setup is complete.**
@@ -43,7 +44,9 @@ run.bat
 ./run.sh
 ```
 
-**That's it!** The app will start at http://127.0.0.1:5000
+**That's it!** The app will:
+- ✅ Check and update database schema automatically
+- ✅ Start at http://127.0.0.1:5000
 
 ### Option 2: Manual Run (If you prefer)
 
