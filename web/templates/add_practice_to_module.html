@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+
+{% block title %}Add Practice to Module{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
+    <h3 style="margin: 0 0 0.5rem 0; color: #2c3e50;">Adding Practice to Module</h3>
+    <p style="margin: 0; color: #555;">
+        <strong>Module:</strong> 
+        {% if module.paper_link %}
+            <a href="{{ module.paper_link }}" target="_blank" style="color: #667eea; text-decoration: none;">
+                {{ module.developed_by or 'N/A' }}
+            </a>
+        {% else %}
+            {{ module.developed_by or 'N/A' }}
+        {% endif %}
+        <br>
+        <strong>Disease:</strong> {{ module.disease.name if module.disease else 'N/A' }}
+    </p>
+    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
+        This practice will be automatically associated with the disease: <strong>{{ module.disease.name if module.disease else 'N/A' }}</strong>
+    </p>
+</div>
+
+<h2>Add Practice to Module</h2>
+
+<form method="POST" enctype="multipart/form-data" style="max-width: 900px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="form-group">
+            <label for="practice_sanskrit">Sanskrit Name</label>
+            <input type="text" id="practice_sanskrit" name="practice_sanskrit" 
+                   placeholder="e.g., Shavasana" autocomplete="off">
+            <div id="autocomplete-results" style="position: relative;"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="practice_english">English Name *</label>
+            <input type="text" id="practice_english" name="practice_english" required
+                   placeholder="e.g., Corpse pose">
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="form-group">
+            <label for="practice_segment">Category *</label>
+            <select id="practice_segment" name="practice_segment" required>
+                <option value="">Select Category</option>
+                {% for segment in practice_segments %}
+                <option value="{{ segment }}">{{ segment }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="sub_category">Sub-Category</label>
+            <input type="text" id="sub_category" name="sub_category" 
+                   placeholder="e.g., standing_asana, pranayama_practices">
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="form-group">
+            <label for="kosha">Kosha *</label>
+            <select id="kosha" name="kosha" required>
+                <option value="">Select Kosha</option>
+                <option value="Annamaya Kosha">Annamaya Kosha</option>
+                <option value="Pranamaya Kosha">Pranamaya Kosha</option>
+                <option value="Manomaya Kosha">Manomaya Kosha</option>
+                <option value="Vijnanamaya Kosha">Vijnanamaya Kosha</option>
+                <option value="Anandamaya Kosha">Anandamaya Kosha</option>
+            </select>
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="form-group">
+            <label for="rounds">Rounds</label>
+            <input type="number" id="rounds" name="rounds" placeholder="e.g., 5">
+        </div>
+        
+        <div class="form-group">
+            <label for="time_minutes">Duration (minutes)</label>
+            <input type="number" step="0.5" id="time_minutes" name="time_minutes" placeholder="e.g., 2">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="strokes_per_min">Strokes (if applicable)</label>
+        <input type="number" id="strokes_per_min" name="strokes_per_min" placeholder="If applicable">
+    </div>
+    
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" 
+                  placeholder="Brief description of the practice"></textarea>
+    </div>
+    
+    <div class="form-group">
+        <label>How to do!</label>
+        <button type="button" class="btn btn-secondary" onclick="addVariationToHowToDo()" style="margin-bottom: 1rem;">Add Variation</button>
+        <div id="variations-container"></div>
+    </div>
+    
+    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem;">
+        <h4 style="margin-bottom: 1rem;">Media Attachments</h4>
+        
+        <div class="form-group">
+            <label for="photo">Attach Photo</label>
+            <input type="file" id="photo" name="photo" accept="image/*">
+        </div>
+        
+        <div class="form-group">
+            <label for="video">Attach Video</label>
+            <input type="file" id="video" name="video" accept="video/*">
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" name="add_another" value="no" class="btn">Add Practice & Finish</button>
+        <button type="submit" name="add_another" value="yes" class="btn btn-secondary">Add Practice & Add Another</button>
+        <a href="/module/{{ module.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+let variationCount = 0;
+
+function addVariationToHowToDo() {
+    variationCount++;
+    const container = document.getElementById('variations-container');
+    const div = document.createElement('div');
+    div.id = `variation-${variationCount}`;
+    div.style.display = 'grid';
+    div.style.gridTemplateColumns = '2fr 1fr';
+    div.style.gap = '1rem';
+    div.style.marginBottom = '1rem';
+    div.innerHTML = `
+        <div>
+            <input type="text" name="variation_${variationCount}" 
+                   placeholder="Variation description" required>
+        </div>
+        <div>
+            <input type="text" name="variation_ref_${variationCount}" 
+                   placeholder="Referred in (paper/book)">
+            <button type="button" onclick="removeVariation(${variationCount})" 
+                    class="btn btn-secondary" style="margin-left: 0.5rem; padding: 0.5rem 1rem;">Remove</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeVariation(id) {
+    const elem = document.getElementById(`variation-${id}`);
+    if (elem) elem.remove();
+}
+
+// Variations are handled separately, no need to append to how_to_do
+
+// Autocomplete functionality for Sanskrit name
+let autocompleteTimeout;
+let currentPractices = [];
+let selectedIndex = -1;
+const sanskritInput = document.getElementById('practice_sanskrit');
+const autocompleteDiv = document.getElementById('autocomplete-results');
+
+// Category to Kosha mapping
+const categoryToKosha = {
+    'Preparatory Practice': 'Annamaya Kosha',
+    'Yogasana': 'Annamaya Kosha',
+    'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Breathing Practice': 'Pranamaya Kosha',
+    'Pranayama': 'Pranamaya Kosha',
+    'Meditation': 'Manomaya Kosha',
+    'Chanting': 'Manomaya Kosha',
+    'Yogic Counselling': 'Vijnanamaya Kosha',
+    'Additional Practices': ''  // Can be left empty or determined by user
+};
+
+// Auto-fill Kosha based on Category selection
+const categorySelect = document.getElementById('practice_segment');
+const koshaSelect = document.getElementById('kosha');
+
+if (categorySelect && koshaSelect) {
+    categorySelect.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        const mappedKosha = categoryToKosha[selectedCategory];
+        if (mappedKosha) {
+            koshaSelect.value = mappedKosha;
+        }
+    });
+}
+
+if (sanskritInput) {
+    sanskritInput.addEventListener('input', function() {
+        clearTimeout(autocompleteTimeout);
+        const query = this.value.trim();
+        selectedIndex = -1;
+        
+        if (query.length < 1) {
+            autocompleteDiv.innerHTML = '';
+            currentPractices = [];
+            return;
+        }
+        
+        autocompleteTimeout = setTimeout(() => {
+            fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentPractices = data;
+                    displayAutocompleteResults(data);
+                });
+        }, 300);
+    });
+    
+    // Keyboard navigation
+    sanskritInput.addEventListener('keydown', function(e) {
+        if (autocompleteDiv.innerHTML === '') return;
+        
+        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection();
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection();
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < items.length) {
+                    selectPractice(currentPractices[selectedIndex].id);
+                    document.getElementById('practice_english').focus();
+                }
+                break;
+            case 'Escape':
+                autocompleteDiv.innerHTML = '';
+                currentPractices = [];
+                selectedIndex = -1;
+                break;
+        }
+    });
+}
+
+function updateSelection() {
+    const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === selectedIndex) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function displayAutocompleteResults(practices) {
+    if (practices.length === 0) {
+        autocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    autocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
+        practices.map((p, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectPractice(${p.id})" data-index="${index}">
+                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectPractice(id) {
+    const practice = currentPractices.find(p => p.id === id);
+    if (practice) {
+        // Close autocomplete immediately
+        autocompleteDiv.innerHTML = '';
+        currentPractices = [];
+        selectedIndex = -1;
+        
+        document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
+        document.getElementById('practice_english').value = practice.practice_english;
+        
+        // Fill Category (practice_segment)
+        const practiceSegmentField = document.getElementById('practice_segment');
+        if (practiceSegmentField && practice.practice_segment) {
+            practiceSegmentField.value = practice.practice_segment;
+        }
+        
+        // Fill Kosha
+        const koshaField = document.getElementById('kosha');
+        if (koshaField && practice.kosha) {
+            koshaField.value = practice.kosha;
+        } else if (koshaField && practiceSegmentField && practice.practice_segment) {
+            // Auto-fill kosha based on category if not provided
+            const categoryToKosha = {
+                'Preparatory Practice': 'Annamaya Kosha',
+                'Yogasana': 'Annamaya Kosha',
+                'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+                'Sequential Yogic Practice': 'Annamaya Kosha',
+                'Breathing Practice': 'Pranamaya Kosha',
+                'Pranayama': 'Pranamaya Kosha',
+                'Meditation': 'Manomaya Kosha',
+                'Chanting': 'Manomaya Kosha',
+                'Yogic Counselling': 'Vijnanamaya Kosha',
+                'Additional Practices': ''
+            };
+            const mappedKosha = categoryToKosha[practice.practice_segment];
+            if (mappedKosha) {
+                koshaField.value = mappedKosha;
+            }
+        }
+        
+        document.getElementById('sub_category').value = practice.sub_category || '';
+        document.getElementById('rounds').value = practice.rounds || '';
+        document.getElementById('time_minutes').value = practice.time_minutes || '';
+        document.getElementById('strokes_per_min').value = practice.strokes_per_min || '';
+        document.getElementById('description').value = practice.description || '';
+        
+        const variationsContainer = document.getElementById('variations-container');
+        if (variationsContainer) {
+            variationsContainer.innerHTML = '';
+            variationCount = 0;
+            
+            if (practice.variations) {
+                try {
+                    const variations = JSON.parse(practice.variations);
+                    if (variations && variations.length > 0) {
+                        variations.forEach((v) => {
+                            addVariationToHowToDo();
+                            const variationInput = document.getElementsByName(`variation_${variationCount}`)[0];
+                            const refInput = document.getElementsByName(`variation_ref_${variationCount}`)[0];
+                            if (variationInput) variationInput.value = v.text || v;
+                            if (refInput) refInput.value = v.referred_in || '';
+                        });
+                    }
+                } catch (e) {
+                    const variations = typeof practice.variations === 'string' ? JSON.parse(practice.variations) : [];
+                    if (variations && variations.length > 0) {
+                        variations.forEach((v) => {
+                            addVariationToHowToDo();
+                            const variationInput = document.getElementsByName(`variation_${variationCount}`)[0];
+                            if (variationInput) variationInput.value = v;
+                        });
+                    }
+                }
+            }
+        }
+        
+        document.getElementById('practice_english').focus();
+    }
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#practice_sanskrit') && !e.target.closest('#autocomplete-results')) {
+        autocompleteDiv.innerHTML = '';
+        currentPractices = [];
+        selectedIndex = -1;
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+</style>
+{% endblock %}
+

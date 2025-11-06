@@ -93,60 +93,96 @@
 <p style="color: #666; margin: 1rem 0;">{{ disease.description }}</p>
 {% endif %}
 
-{% if module %}
-<div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin: 2rem 0;">
-    <h4 style="margin-bottom: 0.5rem;">Module Information</h4>
-    <p><strong>Developed by:</strong> {{ module.developed_by }}</p>
-    {% if module.module_description %}
-    <p><strong>Description:</strong> {{ module.module_description }}</p>
-    {% endif %}
+{% if modules %}
+<div style="padding: 1.5rem; background: #e7f3ff; border-radius: 8px; margin: 2rem 0; border-left: 4px solid #2196F3;">
+    <h4 style="margin-bottom: 1rem; color: #2c3e50;">Modules for this Disease</h4>
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+        {% for module in modules %}
+        <div style="padding: 0.8rem 1.2rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
+            {% if module.paper_link %}
+                <a href="{{ module.paper_link }}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">
+                    {{ module.developed_by or 'N/A' }}
+                </a>
+            {% else %}
+                <strong>{{ module.developed_by or 'N/A' }}</strong>
+            {% endif %}
+            <span style="color: #666; font-size: 0.9rem;">({{ module.practices|length if module.practices else 0 }} practices)</span>
+            <a href="/module/{{ module.id }}" style="margin-left: 0.5rem; color: #495057; text-decoration: none; font-size: 0.85rem;">View Module →</a>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 {% endif %}
 
-<h3 style="margin-top: 2rem;">Practices by Segment</h3>
+<h3 style="margin-top: 2rem;">Practices Organized by Module</h3>
 
-{% if practices_by_segment %}
-    {% for segment, practices in practices_by_segment.items() %}
-    <div style="margin: 2rem 0; padding: 1.5rem; border: 1px solid #ddd; border-radius: 8px;">
-        <h4 style="color: #667eea; margin-bottom: 1rem;">{{ segment }}</h4>
-        
-        <table>
-            <thead>
-            <tr>
-                <th>Practice</th>
-                <th>Sub-Category</th>
-                <th>Rounds</th>
-                <th>Duration</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for practice in practices %}
-            <tr>
-                <td>
-                    <a href="/practice/{{ practice.id }}" style="text-decoration: none; color: #495057;">
-                        {% if practice.practice_sanskrit %}
-                            <strong>{{ practice.practice_sanskrit }}</strong><br>
-                        {% endif %}
-                        {{ practice.practice_english }}
+{% if practices_by_module %}
+    {% for module_id, module_data in practices_by_module.items() %}
+    <div style="margin: 3rem 0; padding: 2rem; background: #f8f9fa; border-radius: 12px; border: 2px solid #e9ecef;">
+        <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #dee2e6;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #2c3e50;">
+                {% if module_data.module.paper_link %}
+                    <a href="{{ module_data.module.paper_link }}" target="_blank" style="color: #667eea; text-decoration: none;">
+                        {{ module_data.module.developed_by or 'Module' }}
                     </a>
-                    {% if practice.citation %}
-                        <br><span style="font-size: 0.9em; color: #666;">
-                            [{{ practice.citation.citation_text }}]
-                        </span>
-                    {% endif %}
-                </td>
-                <td>{{ practice.sub_category or '-' }}</td>
-                <td>{{ practice.rounds or '-' }}</td>
-                <td>{{ practice.time_minutes or '-' }} min</td>
-            </tr>
+                {% else %}
+                    {{ module_data.module.developed_by or 'Module' }}
+                {% endif %}
+            </h3>
+            {% if module_data.module.module_description %}
+            <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.95rem;">{{ module_data.module.module_description }}</p>
+            {% endif %}
+        </div>
+        
+        {% if module_data.practices_by_segment %}
+            {% for segment, practices in module_data.practices_by_segment.items() %}
+            <div style="margin: 1.5rem 0; padding: 1.5rem; background: white; border-radius: 8px; border-left: 4px solid #667eea;">
+                <h4 style="color: #667eea; margin-bottom: 1rem; font-size: 1.1rem;">{{ segment }}</h4>
+                
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Practice</th>
+                        <th>Sub-Category</th>
+                        <th>Rounds</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for practice in practices %}
+                    <tr>
+                        <td>
+                            <a href="/practice/{{ practice.id }}" style="text-decoration: none; color: #495057;">
+                                {% if practice.practice_sanskrit %}
+                                    <strong>{{ practice.practice_sanskrit }}</strong><br>
+                                {% endif %}
+                                {{ practice.practice_english }}
+                            </a>
+                            {% if practice.citation %}
+                                <br><span style="font-size: 0.9em; color: #666;">
+                                    [{{ practice.citation.citation_text }}]
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ practice.sub_category or '-' }}</td>
+                        <td>{{ practice.rounds or '-' }}</td>
+                        <td>{{ practice.time_minutes or '-' }} min</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
+        {% else %}
+            <p style="padding: 1rem; background: white; border-radius: 6px; color: #666;">
+                No practices in this module yet.
+            </p>
+        {% endif %}
     </div>
     {% endfor %}
 {% else %}
     <p style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
-        No practices found for this disease. <a href="/practice/add">Add practices</a>
+        No practices found for this disease. <a href="/module/add">Create a module</a> to add practices.
     </p>
 {% endif %}
 

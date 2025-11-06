@@ -96,9 +96,14 @@ def list_diseases():
     session = get_db_session()
     try:
         diseases = session.query(Disease).all()
-        # Force load the practices relationship before closing session
+        # Force load the practices and modules relationships before closing session
         for disease in diseases:
             _ = len(disease.practices)  # This loads the relationship
+            _ = len(disease.modules)  # This loads the modules relationship
+            # Force load module details
+            for module in disease.modules:
+                _ = module.developed_by
+                _ = module.paper_link
         return render_template('diseases.html', diseases=diseases)
     finally:
         session.close()
@@ -153,7 +158,7 @@ def add_disease():
 
 @app.route('/disease/<int:disease_id>')
 def view_disease(disease_id):
-    """View a specific disease and its practices"""
+    """View a specific disease and its practices organized by module then segment"""
     session = get_db_session()
     
     try:
@@ -163,27 +168,37 @@ def view_disease(disease_id):
             flash('Disease not found', 'error')
             return redirect(url_for('list_diseases'))
         
-        # Get module info
-        module = session.query(Module).filter_by(disease_id=disease_id).first()
+        # Get all modules for this disease
+        modules = session.query(Module).filter_by(disease_id=disease_id).all()
         
-        # Organize practices by segment and force load relationships
-        practices_by_segment = {}
-        for practice in disease.practices:
-            if practice.practice_segment not in practices_by_segment:
-                practices_by_segment[practice.practice_segment] = []
-            practices_by_segment[practice.practice_segment].append(practice)
-            # Force load citation
-            if practice.citation:
-                _ = practice.citation.citation_text
+        # Organize practices by module, then by segment
+        # Structure: {module_id: {module_obj, practices_by_segment: {segment: [practices]}}}
+        practices_by_module = {}
+        
+        for module in modules:
+            practices_by_module[module.id] = {
+                'module': module,
+                'practices_by_segment': {}
+            }
+            # Force load practices relationship
+            if module.practices:
+                # Get practices for this module
+                for practice in module.practices:
+                    segment = practice.practice_segment
+                    if segment not in practices_by_module[module.id]['practices_by_segment']:
+                        practices_by_module[module.id]['practices_by_segment'][segment] = []
+                    practices_by_module[module.id]['practices_by_segment'][segment].append(practice)
+                    # Force load citation
+                    if practice.citation:
+                        _ = practice.citation.citation_text
         
         # Get contraindications for this disease
-        # Contraindications are now directly linked to individual diseases
         contraindications = disease.contraindications
         
         return render_template('view_disease.html',
                              disease=disease,
-                             module=module,
-                             practices_by_segment=practices_by_segment,
+                             modules=modules,
+                             practices_by_module=practices_by_module,
                              contraindications=contraindications)
     finally:
         session.close()
@@ -266,7 +281,7 @@ def delete_disease(disease_id):
 
 @app.route('/practices')
 def list_practices():
-    """List all practices"""
+    """List all practices, grouped by all fields except module"""
     session = get_db_session()
     
     try:
@@ -290,15 +305,67 @@ def list_practices():
         # Force load relationships before closing session
         for practice in practices:
             _ = len(practice.diseases)  # Load diseases relationship
+            # Force load module and citation
+            if practice.module:
+                _ = practice.module.id  # Load module ID
+                _ = practice.module.developed_by
+                _ = practice.module.paper_link
             if practice.citation:
                 _ = practice.citation.citation_text  # Load citation
+        
+        # Group practices by all fields except module_id
+        # Create a key based on all fields except module_id
+        grouped_practices = {}
+        for practice in practices:
+            # Create a unique key based on all fields except module_id
+            key = (
+                practice.practice_sanskrit or '',
+                practice.practice_english,
+                practice.practice_segment,
+                practice.sub_category or '',
+                practice.kosha or '',
+                practice.rounds,
+                practice.time_minutes,
+                practice.strokes_per_min,
+                practice.strokes_per_cycle,
+                practice.rest_between_cycles_sec,
+                practice.variations or '',
+                practice.steps or '',
+                practice.description or '',
+                practice.how_to_do or '',
+                practice.photo_path or '',
+                practice.video_path or '',
+                practice.citation_id,
+                tuple(sorted([d.id for d in practice.diseases])),  # Sorted disease IDs
+                practice.rct_count or 0
+            )
+            
+            if key not in grouped_practices:
+                grouped_practices[key] = {
+                    'practice': practice,  # Use first practice as representative
+                    'modules': [],  # List of (module_id, developed_by) tuples
+                    'practice_ids': []  # All practice IDs in this group
+                }
+            
+            # Add module information if it exists
+            if practice.module and practice.module.developed_by:
+                module_info = (practice.module.id, practice.module.developed_by)
+                if module_info not in grouped_practices[key]['modules']:
+                    grouped_practices[key]['modules'].append(module_info)
+            
+            # Track all practice IDs in this group
+            if practice.id not in grouped_practices[key]['practice_ids']:
+                grouped_practices[key]['practice_ids'].append(practice.id)
+        
+        # Convert to list for template
+        grouped_list = list(grouped_practices.values())
         
         # Get all unique segments for filter dropdown
         all_segments = session.query(Practice.practice_segment).distinct().all()
         segments = [s[0] for s in all_segments]
         
         return render_template('practices.html',
-                             practices=practices,
+                             practices=grouped_list,
                              segments=segments,
                              current_segment=segment_filter,
                              search_term=search_term)
@@ -318,6 +385,7 @@ def add_practice():
             practice_english=request.form['practice_english'],
             practice_segment=request.form['practice_segment'],
             sub_category=request.form.get('sub_category', ''),
+            kosha=request.form.get('kosha', ''),
             rounds=int(request.form['rounds']) if request.form.get('rounds') else None,
             time_minutes=float(request.form['time_minutes']) if request.form.get('time_minutes') else None,
             description=request.form.get('description', ''),
@@ -349,12 +417,19 @@ def add_practice():
         if variations:
             practice.variations = json.dumps(variations)
         
-        # Link to diseases
+        # Link to diseases and modules
         disease_ids = request.form.getlist('diseases')
         for disease_id in disease_ids:
             disease = session.query(Disease).get(int(disease_id))
             if disease:
                 practice.diseases.append(disease)
+                # Check if module is specified for this disease
+                module_id_key = f'module_id_{disease_id}'
+                module_id = request.form.get(module_id_key)
+                if module_id:
+                    module = session.query(Module).get(int(module_id))
+                    if module and module.disease_id == int(disease_id):
+                        practice.module_id = module.id
         
         session.add(practice)
         session.flush()  # Flush to get the ID
@@ -407,6 +482,7 @@ def edit_practice(practice_id):
             practice.practice_english = request.form['practice_english']
             practice.practice_segment = request.form['practice_segment']
             practice.sub_category = request.form.get('sub_category', '')
+            practice.kosha = request.form.get('kosha', '')
             practice.rounds = int(request.form['rounds']) if request.form.get('rounds') else None
             practice.time_minutes = float(request.form['time_minutes']) if request.form.get('time_minutes') else None
             practice.how_to_do = request.form.get('how_to_do', '')
@@ -458,19 +534,186 @@ def edit_practice(practice_id):
             old_category = practice.practice_segment
             old_disease_ids = set([d.id for d in practice.diseases])
             
-            # Update disease associations
-            practice.diseases = []
-            disease_ids = request.form.getlist('diseases')
-            for disease_id in disease_ids:
-                disease = session.query(Disease).get(int(disease_id))
-                if disease:
-                    practice.diseases.append(disease)
+            # Get the practice key to find all related practices
+            practice_key = (
+                practice.practice_sanskrit or '',
+                practice.practice_english,
+                practice.practice_segment,
+                practice.sub_category or '',
+                practice.kosha or '',
+                practice.rounds,
+                practice.time_minutes,
+                practice.strokes_per_min,
+                practice.strokes_per_cycle,
+                practice.rest_between_cycles_sec,
+                practice.variations or '',
+                practice.steps or '',
+                practice.description or '',
+                practice.how_to_do or '',
+                practice.photo_path or '',
+                practice.video_path or '',
+                practice.citation_id,
+                tuple(sorted([d.id for d in practice.diseases])),
+                practice.rct_count or 0
+            )
             
-            new_disease_ids = set([d.id for d in practice.diseases])
+            # Find all related practices (identical except for module)
+            all_practices = session.query(Practice).all()
+            related_practices = []
+            for p in all_practices:
+                p_key = (
+                    p.practice_sanskrit or '',
+                    p.practice_english,
+                    p.practice_segment,
+                    p.sub_category or '',
+                    p.kosha or '',
+                    p.rounds,
+                    p.time_minutes,
+                    p.strokes_per_min,
+                    p.strokes_per_cycle,
+                    p.rest_between_cycles_sec,
+                    p.variations or '',
+                    p.steps or '',
+                    p.description or '',
+                    p.how_to_do or '',
+                    p.photo_path or '',
+                    p.video_path or '',
+                    p.citation_id,
+                    tuple(sorted([d.id for d in p.diseases])),
+                    p.rct_count or 0
+                )
+                if p_key == practice_key:
+                    related_practices.append(p)
+            
+            # Update all related practices with new field values
+            for p in related_practices:
+                p.practice_sanskrit = practice.practice_sanskrit
+                p.practice_english = practice.practice_english
+                p.practice_segment = practice.practice_segment
+                p.sub_category = practice.sub_category
+                p.kosha = practice.kosha
+                p.rounds = practice.rounds
+                p.time_minutes = practice.time_minutes
+                p.strokes_per_min = practice.strokes_per_min
+                p.strokes_per_cycle = practice.strokes_per_cycle
+                p.rest_between_cycles_sec = practice.rest_between_cycles_sec
+                p.variations = practice.variations
+                p.steps = practice.steps
+                p.description = practice.description
+                p.how_to_do = practice.how_to_do
+                p.photo_path = practice.photo_path
+                p.video_path = practice.video_path
+                p.citation_id = practice.citation_id
+                p.rct_count = practice.rct_count
+            
+            # Get disease associations and modules from form
+            disease_ids = request.form.getlist('diseases')
+            
+            # Collect all module IDs for each disease
+            modules_by_disease = {}
+            for disease_id in disease_ids:
+                disease_id_int = int(disease_id)
+                # Get all module IDs for this disease (format: module_id_diseaseId_index)
+                module_keys = [key for key in request.form.keys() 
+                              if key.startswith(f'module_id_{disease_id_int}_')]
+                modules_for_disease = []
+                for key in module_keys:
+                    module_id = request.form.get(key)
+                    if module_id:
+                        modules_for_disease.append(int(module_id))
+                modules_by_disease[disease_id_int] = modules_for_disease
+            
+            # Update disease associations for all related practices
+            for p in related_practices:
+                p.diseases = []
+                for disease_id in disease_ids:
+                    disease = session.query(Disease).get(int(disease_id))
+                    if disease:
+                        p.diseases.append(disease)
+            
+            # Create/update/delete practice entries based on modules
+            # First, delete practices that don't have a module in the new list
+            practices_to_delete = []
+            for p in related_practices:
+                if p.module:
+                    module_found = False
+                    for disease_id, module_ids in modules_by_disease.items():
+                        if p.module.id in module_ids and p.module.disease_id == disease_id:
+                            module_found = True
+                            break
+                    if not module_found:
+                        practices_to_delete.append(p)
+            
+            for p in practices_to_delete:
+                session.delete(p)
+                related_practices.remove(p)
+            
+            # Create new practice entries for modules that don't have a practice yet
+            for disease_id, module_ids in modules_by_disease.items():
+                disease = session.query(Disease).get(disease_id)
+                if not disease:
+                    continue
+                
+                for module_id in module_ids:
+                    module = session.query(Module).get(module_id)
+                    if not module or module.disease_id != disease_id:
+                        continue
+                    
+                    # Check if a practice with this module already exists
+                    practice_exists = False
+                    for p in related_practices:
+                        if p.module and p.module.id == module_id:
+                            practice_exists = True
+                            break
+                    
+                    if not practice_exists:
+                        # Create new practice entry
+                        new_practice = Practice(
+                            practice_sanskrit=practice.practice_sanskrit,
+                            practice_english=practice.practice_english,
+                            practice_segment=practice.practice_segment,
+                            sub_category=practice.sub_category,
+                            kosha=practice.kosha,
+                            rounds=practice.rounds,
+                            time_minutes=practice.time_minutes,
+                            strokes_per_min=practice.strokes_per_min,
+                            strokes_per_cycle=practice.strokes_per_cycle,
+                            rest_between_cycles_sec=practice.rest_between_cycles_sec,
+                            variations=practice.variations,
+                            steps=practice.steps,
+                            description=practice.description,
+                            how_to_do=practice.how_to_do,
+                            photo_path=practice.photo_path,
+                            video_path=practice.video_path,
+                            citation_id=practice.citation_id,
+                            module_id=module_id,
+                            rct_count=practice.rct_count
+                        )
+                        new_practice.diseases.append(disease)
+                        session.add(new_practice)
+            
+            # Update module_id for existing practices
+            for p in related_practices:
+                if p.module:
+                    # Find the module for this practice's disease
+                    for disease_id, module_ids in modules_by_disease.items():
+                        if p.module.disease_id == disease_id and p.module.id in module_ids:
+                            # Keep the same module
+                            break
+                    else:
+                        # Assign first module for first disease if no match
+                        if modules_by_disease:
+                            first_disease_id = list(modules_by_disease.keys())[0]
+                            first_module_id = modules_by_disease[first_disease_id][0] if modules_by_disease[first_disease_id] else None
+                            if first_module_id:
+                                p.module_id = first_module_id
+            
+            new_disease_ids = set([int(d) for d in disease_ids])
             
             # Recalculate RCT count if category or diseases changed
             if old_category != practice.practice_segment or old_disease_ids != new_disease_ids:
-                recalculate_practice_rct_count(session, practice)
+                for p in related_practices:
+                    recalculate_practice_rct_count(session, p)
             
             # Store the practice name before closing session
             practice_name = practice.practice_english
@@ -481,9 +724,80 @@ def edit_practice(practice_id):
             flash(f'Practice "{practice_name}" updated successfully!', 'success')
             return redirect(url_for('list_practices'))
         
-        # GET request
+        # GET request - find all practices that are identical (except module)
+        # Create a key based on all fields except module_id
+        practice_key = (
+            practice.practice_sanskrit or '',
+            practice.practice_english,
+            practice.practice_segment,
+            practice.sub_category or '',
+            practice.kosha or '',
+            practice.rounds,
+            practice.time_minutes,
+            practice.strokes_per_min,
+            practice.strokes_per_cycle,
+            practice.rest_between_cycles_sec,
+            practice.variations or '',
+            practice.steps or '',
+            practice.description or '',
+            practice.how_to_do or '',
+            practice.photo_path or '',
+            practice.video_path or '',
+            practice.citation_id,
+            tuple(sorted([d.id for d in practice.diseases])),
+            practice.rct_count or 0
+        )
+        
+        # Find all practices with the same key
+        all_practices = session.query(Practice).all()
+        related_practices = []
+        for p in all_practices:
+            p_key = (
+                p.practice_sanskrit or '',
+                p.practice_english,
+                p.practice_segment,
+                p.sub_category or '',
+                p.kosha or '',
+                p.rounds,
+                p.time_minutes,
+                p.strokes_per_min,
+                p.strokes_per_cycle,
+                p.rest_between_cycles_sec,
+                p.variations or '',
+                p.steps or '',
+                p.description or '',
+                p.how_to_do or '',
+                p.photo_path or '',
+                p.video_path or '',
+                p.citation_id,
+                tuple(sorted([d.id for d in p.diseases])),
+                p.rct_count or 0
+            )
+            if p_key == practice_key:
+                related_practices.append(p)
+                # Force load module
+                if p.module:
+                    _ = p.module.id
+                    _ = p.module.developed_by
+                    _ = p.module.disease_id
+        
+        # Group modules by disease
+        modules_by_disease = {}
+        for p in related_practices:
+            for disease in p.diseases:
+                if disease.id not in modules_by_disease:
+                    modules_by_disease[disease.id] = []
+                if p.module and p.module.disease_id == disease.id:
+                    module_info = (p.module.id, p.module.developed_by, p.id)
+                    if module_info not in modules_by_disease[disease.id]:
+                        modules_by_disease[disease.id].append(module_info)
+        
         diseases = session.query(Disease).all()
-        return render_template('edit_practice.html', practice=practice, diseases=diseases)
+        return render_template('edit_practice.html', 
+                             practice=practice, 
+                             diseases=diseases,
+                             modules_by_disease=modules_by_disease,
+                             related_practices=related_practices)
     finally:
         session.close()
 
@@ -707,6 +1021,287 @@ def add_citation():
     return render_template('add_citation.html')
 
 
+# ==================== MODULE MANAGEMENT ROUTES ====================
+
+@app.route('/modules')
+def list_modules():
+    """List all modules"""
+    session = get_db_session()
+    try:
+        # Get filter parameters
+        search_term = request.args.get('search', '')
+        
+        query = session.query(Module)
+        
+        if search_term:
+            query = query.filter(Module.developed_by.ilike(f'%{search_term}%'))
+        
+        modules = query.all()
+        
+        # Force load relationships before closing session
+        for module in modules:
+            if module.disease:
+                _ = module.disease.name
+            if module.practices:
+                _ = len(module.practices)
+        return render_template('modules.html', modules=modules, search_term=search_term)
+    finally:
+        session.close()
+
+
+@app.route('/module/add', methods=['GET', 'POST'])
+def add_module():
+    """Add a new module"""
+    session = get_db_session()
+    
+    if request.method == 'POST':
+        try:
+            disease_id = request.form.get('disease_id')
+            disease_name = request.form.get('disease_name', '').strip()
+            
+            # If disease_id is provided, use it
+            if disease_id:
+                disease = session.query(Disease).get(disease_id)
+                if not disease:
+                    flash('Disease not found', 'error')
+                    diseases = session.query(Disease).all()
+                    return render_template('add_module.html', diseases=diseases)
+            # If disease_name is provided but no disease_id, create new disease
+            elif disease_name:
+                # Check if disease already exists
+                disease = session.query(Disease).filter_by(name=disease_name).first()
+                if not disease:
+                    # Create new disease
+                    disease = Disease(name=disease_name)
+                    session.add(disease)
+                    session.flush()  # Get the ID
+                    flash(f'New disease "{disease_name}" created!', 'success')
+                disease_id = disease.id
+            else:
+                flash('Please select or enter a disease', 'error')
+                diseases = session.query(Disease).all()
+                return render_template('add_module.html', diseases=diseases)
+            
+            module = Module(
+                disease_id=disease_id,
+                developed_by=request.form.get('developed_by', ''),
+                paper_link=request.form.get('paper_link', ''),
+                module_description=request.form.get('module_description', '')
+            )
+            
+            session.add(module)
+            session.commit()
+            
+            flash(f'Module "{module.developed_by}" added successfully!', 'success')
+            return redirect(url_for('view_module', module_id=module.id))
+        except Exception as e:
+            session.rollback()
+            flash(f'Error adding module: {str(e)}', 'error')
+            diseases = session.query(Disease).all()
+            return render_template('add_module.html', diseases=diseases)
+        finally:
+            session.close()
+    
+    try:
+        diseases = session.query(Disease).all()
+        return render_template('add_module.html', diseases=diseases)
+    finally:
+        session.close()
+
+
+@app.route('/module/<int:module_id>')
+def view_module(module_id):
+    """View a specific module and its practices"""
+    session = get_db_session()
+    
+    try:
+        module = session.query(Module).get(module_id)
+        
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+        
+        # Force load relationships
+        if module.disease:
+            _ = module.disease.name
+        
+        # Organize practices by segment
+        practices_by_segment = {}
+        if module.practices:
+            for practice in module.practices:
+                segment = practice.practice_segment
+                if segment not in practices_by_segment:
+                    practices_by_segment[segment] = []
+                practices_by_segment[segment].append(practice)
+                # Force load citation if exists
+                if practice.citation:
+                    _ = practice.citation.citation_text
+        
+        return render_template('view_module.html',
+                             module=module,
+                             practices_by_segment=practices_by_segment)
+    finally:
+        session.close()
+
+
+@app.route('/module/<int:module_id>/edit', methods=['GET', 'POST'])
+def edit_module(module_id):
+    """Edit an existing module"""
+    session = get_db_session()
+    
+    try:
+        module = session.query(Module).get(module_id)
+        
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+        
+        if request.method == 'POST':
+            try:
+                module.developed_by = request.form.get('developed_by', '')
+                module.paper_link = request.form.get('paper_link', '')
+                module.module_description = request.form.get('module_description', '')
+                
+                session.commit()
+                flash('Module updated successfully!', 'success')
+                return redirect(url_for('view_module', module_id=module_id))
+            except Exception as e:
+                session.rollback()
+                flash(f'Error updating module: {str(e)}', 'error')
+        
+        diseases = session.query(Disease).all()
+        return render_template('edit_module.html', module=module, diseases=diseases)
+    finally:
+        session.close()
+
+
+@app.route('/module/<int:module_id>/delete', methods=['POST'])
+def delete_module(module_id):
+    """Delete a module"""
+    session = get_db_session()
+    
+    try:
+        module = session.query(Module).get(module_id)
+        
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+        
+        module_name = module.developed_by or f"Module {module_id}"
+        session.delete(module)
+        session.commit()
+        
+        flash(f'Module "{module_name}" deleted successfully!', 'success')
+        return redirect(url_for('list_modules'))
+    except Exception as e:
+        session.rollback()
+        flash(f'Error deleting module: {str(e)}', 'error')
+        return redirect(url_for('list_modules'))
+    finally:
+        session.close()
+
+
+@app.route('/module/<int:module_id>/practice/add', methods=['GET', 'POST'])
+def add_practice_to_module(module_id):
+    """Add a practice to a specific module (module-based practice addition)"""
+    session = get_db_session()
+    
+    try:
+        module = session.query(Module).get(module_id)
+        
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+        
+        if request.method == 'POST':
+            try:
+                # Collect variations from form
+                variations = []
+                variation_count = 1
+                while True:
+                    variation_key = f'variation_{variation_count}'
+                    if variation_key not in request.form:
+                        break
+                    variation_text = request.form.get(variation_key, '').strip()
+                    if variation_text:
+                        variation_ref = request.form.get(f'variation_ref_{variation_count}', '').strip()
+                        variations.append({
+                            'text': variation_text,
+                            'referred_in': variation_ref if variation_ref else None
+                        })
+                    variation_count += 1
+                
+                # Create practice
+                practice = Practice(
+                    practice_sanskrit=request.form.get('practice_sanskrit', ''),
+                    practice_english=request.form['practice_english'],
+                    practice_segment=request.form['practice_segment'],
+                    sub_category=request.form.get('sub_category', ''),
+                    kosha=request.form.get('kosha', ''),
+                    rounds=int(request.form['rounds']) if request.form.get('rounds') else None,
+                    time_minutes=float(request.form['time_minutes']) if request.form.get('time_minutes') else None,
+                    strokes_per_min=int(request.form['strokes_per_min']) if request.form.get('strokes_per_min') else None,
+                    variations=json.dumps(variations) if variations else None,
+                    description=request.form.get('description', ''),
+                    module_id=module_id  # Associate with module
+                )
+                
+                # Associate practice with module's disease automatically
+                if module.disease:
+                    practice.diseases.append(module.disease)
+                
+                # Handle file uploads
+                if 'photo' in request.files:
+                    photo = request.files['photo']
+                    if photo and photo.filename and allowed_file(photo.filename):
+                        filename = secure_filename(photo.filename)
+                        photo_path = os.path.join(UPLOAD_FOLDER, 'photos', f"{module_id}_{practice.practice_english}_{filename}")
+                        photo.save(photo_path)
+                        practice.photo_path = photo_path
+                
+                if 'video' in request.files:
+                    video = request.files['video']
+                    if video and video.filename and allowed_file(video.filename):
+                        filename = secure_filename(video.filename)
+                        video_path = os.path.join(UPLOAD_FOLDER, 'videos', f"{module_id}_{practice.practice_english}_{filename}")
+                        video.save(video_path)
+                        practice.video_path = video_path
+                
+                session.add(practice)
+                session.commit()
+                
+                flash(f'Practice "{practice.practice_english}" added to module!', 'success')
+                
+                # Check if user wants to add another practice
+                if request.form.get('add_another') == 'yes':
+                    return redirect(url_for('add_practice_to_module', module_id=module_id))
+                else:
+                    return redirect(url_for('view_module', module_id=module_id))
+            except Exception as e:
+                session.rollback()
+                flash(f'Error adding practice: {str(e)}', 'error')
+        
+        # Get practice segments for dropdown (now called "Category")
+        practice_segments = [
+            'Preparatory Practice',
+            'Breathing Practice',
+            'Sequential Yogic Practice',
+            'Yogasana',
+            'Pranayama',
+            'Meditation',
+            'Chanting',
+            'Additional Practices',
+            'Kriya (Cleansing Techniques)',
+            'Yogic Counselling'
+        ]
+        
+        return render_template('add_practice_to_module.html', 
+                             module=module, 
+                             practice_segments=practice_segments)
+    finally:
+        session.close()
+
+
 # API Endpoints for future RAG integration
 @app.route('/api/recommendations', methods=['POST'])
 def api_get_recommendations():
@@ -798,6 +1393,7 @@ def api_search_practices():
                 'practice_sanskrit': practice.practice_sanskrit or '',
                 'practice_english': practice.practice_english,
                 'practice_segment': practice.practice_segment,
+                'kosha': practice.kosha or '',
                 'sub_category': practice.sub_category or '',
                 'rounds': practice.rounds,
                 'time_minutes': practice.time_minutes,
@@ -840,6 +1436,74 @@ def api_search_diseases():
             results.append({
                 'id': disease.id,
                 'name': disease.name
+            })
+        
+        return jsonify(results)
+    finally:
+        session.close()
+
+
+@app.route('/api/module/search', methods=['GET'])
+def api_search_modules():
+    """
+    API endpoint for autocomplete - search modules by name for a specific disease
+    Query parameters: q (search query), disease_id (required)
+    Returns list of matching modules
+    """
+    query = request.args.get('q', '')
+    disease_id = request.args.get('disease_id')
+    
+    if not query or not disease_id:
+        return jsonify([])
+    
+    session = get_db_session()
+    
+    try:
+        # Search for modules for the specified disease
+        modules = session.query(Module).filter(
+            Module.disease_id == int(disease_id),
+            Module.developed_by.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        results = []
+        for module in modules:
+            results.append({
+                'id': module.id,
+                'name': module.developed_by or 'N/A'
+            })
+        
+        return jsonify(results)
+    finally:
+        session.close()
+
+
+@app.route('/api/module/search/all', methods=['GET'])
+def api_search_all_modules():
+    """
+    API endpoint for autocomplete - search all modules by name
+    Query parameter: q (search query)
+    Returns list of matching modules with disease names
+    """
+    query = request.args.get('q', '')
+    
+    if not query:
+        return jsonify([])
+    
+    session = get_db_session()
+    
+    try:
+        # Search for modules
+        modules = session.query(Module).filter(
+            Module.developed_by.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        results = []
+        for module in modules:
+            disease_name = module.disease.name if module.disease else 'N/A'
+            results.append({
+                'id': module.id,
+                'name': module.developed_by or 'N/A',
+                'disease': disease_name
             })
         
         return jsonify(results)

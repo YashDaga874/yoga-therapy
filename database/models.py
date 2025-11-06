@@ -68,9 +68,10 @@ class Practice(Base):
     practice_sanskrit = Column(String(200))
     practice_english = Column(String(200), nullable=False)
     
-    # Practice Segment classification
-    practice_segment = Column(String(50), nullable=False)  # Preparatory Practice, Breathing Practice, etc.
+    # Practice Category classification (formerly practice_segment)
+    practice_segment = Column(String(50), nullable=False)  # Preparatory Practice, Breathing Practice, etc. (now called "Category")
     sub_category = Column(String(100))  # Subcategory within the segment
+    kosha = Column(String(50))  # Annamaya Kosha, Pranamaya Kosha, Manomaya Kosha, Vijnanamaya Kosha, Anandamaya Kosha
     
     # Practice details
     rounds = Column(Integer)
@@ -90,6 +91,10 @@ class Practice(Base):
     # Citation tracking
     citation_id = Column(Integer, ForeignKey('citations.id'))
     citation = relationship('Citation', back_populates='practices')
+    
+    # Module relationship (practices belong to a module)
+    module_id = Column(Integer, ForeignKey('modules.id'), nullable=True)
+    module = relationship('Module', back_populates='practices')
     
     # Relationships
     diseases = relationship(
@@ -182,19 +187,25 @@ class Contraindication(Base):
 class Module(Base):
     """
     Stores metadata about therapy modules for each disease
-    This is where we store 'Developed by' information
+    Each module represents a research paper/study
+    Multiple modules can exist for the same disease
     """
     __tablename__ = 'modules'
     
     id = Column(Integer, primary_key=True)
-    disease_id = Column(Integer, ForeignKey('diseases.id'), unique=True, nullable=False)
-    disease = relationship('Disease')
+    disease_id = Column(Integer, ForeignKey('diseases.id'), nullable=False)
+    disease = relationship('Disease', backref='modules')
     
-    developed_by = Column(String(500))
+    # Module identification
+    developed_by = Column(String(500))  # Parenthetical citation (e.g., "Naveen et al., 2013")
+    paper_link = Column(String(1000))  # Link to research paper
     module_description = Column(Text)
     
+    # Relationship to practices
+    practices = relationship('Practice', back_populates='module', cascade='all, delete-orphan')
+    
     def __repr__(self):
-        return f"<Module(disease='{self.disease.name}', developed_by='{self.developed_by}')>"
+        return f"<Module(disease='{self.disease.name if self.disease else 'N/A'}', developed_by='{self.developed_by}')>"
 
 
 # Association table for RCT and symptoms (many-to-many)

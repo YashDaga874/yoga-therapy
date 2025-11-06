@@ -72,14 +72,17 @@
         <thead>
             <tr>
                 <th>Practice Name</th>
-                <th>Segment</th>
+                <th>Category</th>
+                <th>Kosha</th>
                 <th>Sub-Category</th>
                 <th>Positive impact diseases</th>
+                <th>Parenthetical Citations</th>
                 <th>RCT Count</th>
             </tr>
         </thead>
         <tbody>
-            {% for practice in practices %}
+            {% for group in practices %}
+            {% set practice = group.practice %}
             <tr class="clickable-row" onclick="window.location.href='/practice/{{ practice.id }}'">
                 <td>
                     {% if practice.practice_sanskrit %}
@@ -90,11 +93,25 @@
                     {% endif %}
                 </td>
                 <td>{{ practice.practice_segment }}</td>
+                <td>{{ practice.kosha or '-' }}</td>
                 <td>{{ practice.sub_category or '-' }}</td>
                 <td>
                     {% for disease in practice.diseases %}
                         <span class="disease-tag-small">{{ disease.name }}</span>{% if not loop.last %} {% endif %}
                     {% endfor %}
+                </td>
+                <td>
+                    {% if group.modules %}
+                        {% for module_id, developed_by in group.modules %}
+                            <a href="/module/{{ module_id }}" 
+                               onclick="event.stopPropagation();" 
+                               style="color: #667eea; text-decoration: none; font-weight: 500;">
+                                {{ developed_by }}
+                            </a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
                 </td>
                 <td style="text-align: center;">
                     <span style="background: #667eea; color: white; padding: 0.3rem 0.7rem; border-radius: 12px; font-weight: bold;">

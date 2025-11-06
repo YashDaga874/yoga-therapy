@@ -1,70 +1,74 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Welcome to the Yoga Therapy Management System</h2>
+<h2>Personalized Yoga Therapy Management System</h2>
+<p style="font-size: 1.1rem; color: #667eea; font-weight: 600; margin-bottom: 2rem;">evidence based database based on IAYT module</p>
 
-<p style="font-size: 1.1rem; color: #666; margin: 1rem 0 2rem 0;">
-    A comprehensive research database for managing yoga therapy practices across nine practice segments. 
-    Track diseases, practices, contraindications, and Randomized Controlled Trials (RCTs) to build evidence-based 
-    treatment protocols.
-</p>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <h3>{{ disease_count }}</h3>
-        <p>Diseases/Conditions</p>
-    </div>
+<div style="margin-top: 2rem; padding: 2rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+    <h3 style="margin-bottom: 1rem; color: #2c3e50;">Purpose</h3>
+    <p style="margin-bottom: 1.5rem; line-height: 1.8; color: #555;">
+        This system is designed to manage and organize yoga therapy practices based on evidence from research papers and clinical studies. 
+        It enables researchers and practitioners to create structured therapy modules for various diseases and conditions, 
+        track supporting evidence through Randomized Controlled Trials (RCTs), and generate personalized practice recommendations 
+        based on scientific data.
+    </p>
     
-    <div class="stat-card">
-        <h3>{{ practice_count }}</h3>
-        <p>Yoga Practices</p>
-    </div>
-    
-    <div class="stat-card">
-        <h3>{{ rct_count }}</h3>
-        <p>RCT Studies</p>
-    </div>
-    
-    <div class="stat-card">
-        <h3>{{ contraindication_count }}</h3>
-        <p>Contraindications</p>
+    <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+        <p style="margin-bottom: 0; line-height: 1.8; color: #856404;">
+            Confidentiality = concept given by Mr. Pritam Chakraborty, and the web design by Yash Daga
+        </p>
     </div>
 </div>
 
-<div style="margin-top: 3rem;">
-    <h3 style="margin-bottom: 1rem;">Quick Actions</h3>
+<div style="margin-top: 3rem; padding: 2rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
+    <h3 style="margin-bottom: 1rem; color: #2c3e50;">System Logic & How It Works</h3>
     
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="/disease/add" class="btn">Add New Disease</a>
-        <a href="/practice/add" class="btn">Add New Practice</a>
-        <a href="/contraindication/add" class="btn">Add Contraindication</a>
-        <a href="/rct/add" class="btn">Add RCT Entry</a>
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">1. Module-Based Structure</h4>
+        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
+            The system is organized around <strong>Modules</strong>, where each module represents a research paper or study 
+            that focuses on yoga therapy for a specific disease. A single disease can have multiple modules, as different 
+            research papers may propose different sets of practices for the same condition.
+        </p>
+        <p style="line-height: 1.8; color: #555;">
+            For example, <em>Depression</em> may have Module A (developed by Naveen et al., 2013) with one set of practices, 
+            and Module B (developed by another research team) with a different set of practices. Each module is linked to 
+            its source research paper through a hyperlink.
+        </p>
     </div>
-</div>
-
-<div style="margin-top: 3rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
-    <h3 style="margin-bottom: 1rem;">How It Works</h3>
     
-    <p style="margin-bottom: 1rem;">
-        The system organizes yoga practices across nine practice segments: Preparatory Practice, 
-        Breathing Practice, Suryanamaskara, Yogasana, Pranayama, Meditation, Additional Practices, 
-        Kriya (Cleansing Techniques), and Yogic Counselling.
-    </p>
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">2. Practices Within Modules</h4>
+        <p style="line-height: 1.8; color: #555;">
+            Each module contains multiple <strong>Yoga Practices</strong> organized across nine practice segments: 
+            Preparatory Practice, Breathing Practice, Suryanamaskara, Yogasana, Pranayama, Meditation, 
+            Additional Practices, Kriya (Cleansing Techniques), and Yogic Counselling. Practices are automatically 
+            associated with the disease that the module addresses.
+        </p>
+    </div>
     
-    <p style="margin-bottom: 1rem;">
-        When multiple diseases are combined, the system intelligently merges practices from each disease 
-        while removing duplicates and applying contraindications. This ensures safe and comprehensive 
-        treatment protocols for patients with multiple conditions.
-    </p>
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">3. RCT Database & Evidence Scoring</h4>
+        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
+            The system maintains a comprehensive <strong>RCT (Randomized Controlled Trial) Database</strong> that tracks 
+            clinical studies and research papers supporting specific practice-disease combinations. Each RCT entry includes 
+            detailed information about the study, participants, interventions, and results.
+        </p>
+        <p style="line-height: 1.8; color: #555;">
+            <strong>RCT Score:</strong> The system calculates an RCT count for each practice within a disease context. 
+            The higher the RCT score (number of supporting research studies), the stronger the evidence for that practice 
+            in treating that particular disease. This scoring mechanism helps prioritize practices with stronger scientific 
+            backing when generating recommendations.
+        </p>
+    </div>
     
-    <p style="margin-bottom: 1rem;">
-        The RCT Database tracks randomized controlled trials and studies, automatically calculating practice 
-        reliability scores based on the number of supporting research papers for each disease-practice combination.
-    </p>
-    
-    <p>
-        All data is maintained with scientific rigor, ensuring evidence-based treatment protocols for both 
-        academic research and clinical application.
-    </p>
+    <div>
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">4. Recommendation Generation</h4>
+        <p style="line-height: 1.8; color: #555;">
+            When generating therapy recommendations, the system combines practices from relevant modules, removes duplicates, 
+            applies contraindications based on disease combinations, and prioritizes practices with higher RCT scores. 
+            This ensures that recommendations are evidence-based, safe, and personalized to the specific disease profile.
+        </p>
+    </div>
 </div>
 {% endblock %}

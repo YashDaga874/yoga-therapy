@@ -31,10 +31,6 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>Diseases & Conditions</h2>
-    <div style="display: flex; gap: 1rem;">
-        <a href="/export/diseases/csv" class="btn" style="background: #28a745;">Download CSV</a>
-        <a href="/disease/add" class="btn">Add New Disease</a>
-    </div>
 </div>
 
 {% if diseases %}
@@ -42,14 +38,30 @@
         <thead>
             <tr>
                 <th>Disease Name</th>
-                <th>Number of Practices</th>
+                <th>Modules (with Practice Count)</th>
             </tr>
         </thead>
         <tbody>
             {% for disease in diseases %}
             <tr class="clickable-row" onclick="window.location.href='/disease/{{ disease.id }}'">
                 <td><strong>{{ disease.name }}</strong></td>
-                <td>{{ disease.practices|length }} practices</td>
+                <td>
+                    {% if disease.modules %}
+                        {% for module in disease.modules %}
+                            {% if module.paper_link %}
+                                <a href="{{ module.paper_link }}" target="_blank" style="color: #667eea; text-decoration: none; font-size: 0.9rem;">
+                                    {{ module.developed_by or 'N/A' }}
+                                </a>
+                            {% else %}
+                                <span style="font-size: 0.9rem;">{{ module.developed_by or 'N/A' }}</span>
+                            {% endif %}
+                            <span style="color: #666; font-size: 0.85rem;">({{ module.practices|length if module.practices else 0 }} practices)</span>
+                            {% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <span style="color: #999; font-size: 0.9rem;">No modules</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

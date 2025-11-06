@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}{{ module.developed_by or 'Module' }}{% endblock %}
+
+{% block content %}
+<style>
+.module-header {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.module-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+}
+
+.module-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.module-link:hover {
+    text-decoration: underline;
+}
+
+.practice-segment {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.practice-item {
+    padding: 1rem;
+    background: white;
+    margin: 0.5rem 0;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+</style>
+
+<div class="module-header">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+        <div>
+            <h1 class="module-title" style="font-size: 1.8rem; margin: 0 0 1rem 0;">
+                <span style="font-weight: 500; color: #666;">Parenthetical citation - </span>
+                {% if module.paper_link %}
+                    <a href="{{ module.paper_link }}" target="_blank" class="module-link" style="font-size: 1.8rem;">
+                        {{ module.developed_by or 'Module' }}
+                    </a>
+                {% else %}
+                    <span style="color: #667eea; font-weight: 600; font-size: 1.8rem;">
+                        {{ module.developed_by or 'Module' }}
+                    </span>
+                {% endif %}
+            </h1>
+            <p style="color: #666; margin: 0.5rem 0; font-size: 1.2rem;">
+                <strong>Disease:</strong> 
+                {% if module.disease %}
+                    <a href="/disease/{{ module.disease.id }}" style="color: #495057; text-decoration: none; font-size: 1.2rem;">
+                        {{ module.disease.name }}
+                    </a>
+                {% else %}
+                    <span style="font-size: 1.2rem;">N/A</span>
+                {% endif %}
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="/module/{{ module.id }}/edit" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Edit</a>
+            <form method="POST" action="/module/{{ module.id }}/delete" style="display: inline;" 
+                  onsubmit="return confirm('Are you sure you want to delete this module?')">
+                <button type="submit" class="btn" style="background: #dc3545; color: white; padding: 0.5rem 1rem;">
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    {% if module.module_description %}
+    <div style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 6px;">
+        <strong>Description:</strong>
+        <p style="margin: 0.5rem 0 0 0; color: #555;">{{ module.module_description }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h2>Practices</h2>
+    <a href="/module/{{ module.id }}/practice/add" class="btn">Add Practice to Module</a>
+</div>
+
+{% if practices_by_segment %}
+    {% for segment, practices in practices_by_segment.items() %}
+    <div class="practice-segment">
+        <h3 style="margin: 0 0 1rem 0; color: #495057;">{{ segment }}</h3>
+        
+        {% for practice in practices %}
+        <div class="practice-item">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50;">
+                        {% if practice.practice_sanskrit %}
+                            {{ practice.practice_sanskrit }} 
+                            <span style="color: #666; font-weight: normal;">({{ practice.practice_english }})</span>
+                        {% else %}
+                            {{ practice.practice_english }}
+                        {% endif %}
+                    </h4>
+                    
+                    {% if practice.sub_category %}
+                    <p style="margin: 0.3rem 0; color: #666; font-size: 0.9rem;">
+                        <em>{{ practice.sub_category }}</em>
+                    </p>
+                    {% endif %}
+                    
+                    <div style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                        {% if practice.rounds %}
+                            <span>Rounds: {{ practice.rounds }}</span>
+                        {% endif %}
+                        {% if practice.time_minutes %}
+                            <span style="margin-left: 1rem;">Time: {{ practice.time_minutes }} min</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if practice.description %}
+                    <p style="margin-top: 0.5rem; color: #555;">{{ practice.description }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="/practice/{{ practice.id }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">View</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p>No practices added to this module yet.</p>
+        <p style="margin-top: 1rem;">
+            <a href="/module/{{ module.id }}/practice/add" class="btn">Add First Practice</a>
+        </p>
+    </div>
+{% endif %}
+
+<div style="margin-top: 2rem;">
+    <a href="/modules" class="btn btn-secondary">← Back to Modules</a>
+</div>
+{% endblock %}
+

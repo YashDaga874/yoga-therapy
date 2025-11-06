@@ -92,15 +92,21 @@
             
             <div class="form-group">
                 <label for="database_journal">Database/Journal *</label>
-                <select id="database_journal" name="database_journal" required>
-                    <option value="">Select Database/Journal</option>
-                    <option value="PubMed">PubMed</option>
-                    <option value="Embase">Embase</option>
-                    <option value="Cochrane">Cochrane</option>
-                    <option value="Scopus">Scopus</option>
-                    <option value="Web of Science">Web of Science</option>
-                    <option value="Other">Other</option>
-                </select>
+                <div style="position: relative;">
+                    <input type="text" id="database_journal" name="database_journal" required
+                           placeholder="Type database/journal name (e.g., PubMed, Embase)" 
+                           autocomplete="off"
+                           list="database_journal_suggestions"
+                           value="">
+                    <datalist id="database_journal_suggestions">
+                        <option value="PubMed">
+                        <option value="Embase">
+                        <option value="Cochrane">
+                        <option value="Scopus">
+                        <option value="Web of Science">
+                        <option value="Other">
+                    </datalist>
+                </div>
             </div>
             
             <div class="form-group">

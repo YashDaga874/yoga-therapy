@@ -25,15 +25,16 @@
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
         <div class="form-group">
-            <label for="practice_segment">Practice Segment *</label>
+            <label for="practice_segment">Category *</label>
             <select id="practice_segment" name="practice_segment" required>
-                <option value="">Select Practice Segment</option>
+                <option value="">Select Category</option>
                 <option value="Preparatory Practice" {% if practice.practice_segment == 'Preparatory Practice' %}selected{% endif %}>Preparatory Practice</option>
                 <option value="Breathing Practice" {% if practice.practice_segment == 'Breathing Practice' %}selected{% endif %}>Breathing Practice</option>
-                <option value="Suryanamaskara" {% if practice.practice_segment == 'Suryanamaskara' %}selected{% endif %}>Suryanamaskara</option>
+                <option value="Sequential Yogic Practice" {% if practice.practice_segment == 'Sequential Yogic Practice' or practice.practice_segment == 'Suryanamaskara' %}selected{% endif %}>Sequential Yogic Practice</option>
                 <option value="Yogasana" {% if practice.practice_segment == 'Yogasana' %}selected{% endif %}>Yogasana</option>
                 <option value="Pranayama" {% if practice.practice_segment == 'Pranayama' %}selected{% endif %}>Pranayama</option>
                 <option value="Meditation" {% if practice.practice_segment == 'Meditation' %}selected{% endif %}>Meditation</option>
+                <option value="Chanting" {% if practice.practice_segment == 'Chanting' %}selected{% endif %}>Chanting</option>
                 <option value="Additional Practices" {% if practice.practice_segment == 'Additional Practices' %}selected{% endif %}>Additional Practices</option>
                 <option value="Kriya (Cleansing Techniques)" {% if practice.practice_segment == 'Kriya (Cleansing Techniques)' %}selected{% endif %}>Kriya (Cleansing Techniques)</option>
                 <option value="Yogic Counselling" {% if practice.practice_segment == 'Yogic Counselling' %}selected{% endif %}>Yogic Counselling</option>
@@ -44,6 +45,20 @@
             <label for="sub_category">Sub-Category</label>
             <input type="text" id="sub_category" name="sub_category" 
                    value="{{ practice.sub_category or '' }}" placeholder="e.g., standing_asana, pranayama_practices">
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="form-group">
+            <label for="kosha">Kosha *</label>
+            <select id="kosha" name="kosha" required>
+                <option value="">Select Kosha</option>
+                <option value="Annamaya Kosha" {% if practice.kosha == 'Annamaya Kosha' %}selected{% endif %}>Annamaya Kosha</option>
+                <option value="Pranamaya Kosha" {% if practice.kosha == 'Pranamaya Kosha' %}selected{% endif %}>Pranamaya Kosha</option>
+                <option value="Manomaya Kosha" {% if practice.kosha == 'Manomaya Kosha' %}selected{% endif %}>Manomaya Kosha</option>
+                <option value="Vijnanamaya Kosha" {% if practice.kosha == 'Vijnanamaya Kosha' %}selected{% endif %}>Vijnanamaya Kosha</option>
+                <option value="Anandamaya Kosha" {% if practice.kosha == 'Anandamaya Kosha' %}selected{% endif %}>Anandamaya Kosha</option>
+            </select>
         </div>
     </div>
     
@@ -58,12 +73,12 @@
             <input type="number" step="0.5" id="time_minutes" name="time_minutes" 
                    value="{{ practice.time_minutes or '' }}" placeholder="e.g., 2">
         </div>
-        
-        <div class="form-group">
-            <label for="strokes_per_min">Strokes/Min</label>
-            <input type="number" id="strokes_per_min" name="strokes_per_min" 
-                   value="{{ practice.strokes_per_min or '' }}" placeholder="If applicable">
-        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="strokes_per_min">Strokes</label>
+        <input type="number" id="strokes_per_min" name="strokes_per_min" 
+               value="{{ practice.strokes_per_min or '' }}" placeholder="If applicable">
     </div>
     
     <div class="form-group">
@@ -72,14 +87,8 @@
                   placeholder="Brief description of the practice">{{ practice.description or '' }}</textarea>
     </div>
     
-    <div class="form-group">
-        <label for="how_to_do">How to Do This Practice *</label>
-        <textarea id="how_to_do" name="how_to_do" required
-                  placeholder="Detailed instructions on how to perform this practice">{{ practice.how_to_do or '' }}</textarea>
-    </div>
-    
     <div class="form-group" id="variations-container">
-        <label>Variations</label>
+        <label>How to do!</label>
         <button type="button" class="btn btn-secondary" onclick="addVariationField()" style="margin-bottom: 1rem;">Add Variation</button>
         <div id="variations">
             {% if practice.variations %}
@@ -121,16 +130,45 @@
     
     <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem;">
         <h4 style="margin-bottom: 1rem;">Associate with Diseases</h4>
-        <p style="color: #666; margin-bottom: 1rem;">Select which diseases use this practice:</p>
+        <p style="color: #666; margin-bottom: 1rem;">Select which diseases use this practice and their modules:</p>
         
         {% for disease in diseases %}
-        <div style="margin-bottom: 0.5rem;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
+        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
+            <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 0.5rem;">
                 <input type="checkbox" name="diseases" value="{{ disease.id }}" 
+                       class="disease-checkbox" data-disease-id="{{ disease.id }}"
                        {% if disease in practice.diseases %}checked{% endif %}
                        style="margin-right: 0.5rem;">
-                {{ disease.name }}
+                <strong>{{ disease.name }}</strong>
             </label>
+            <div id="module-selection-{{ disease.id }}" style="display: {% if disease in practice.diseases %}block{% else %}none{% endif %}; margin-left: 1.5rem; margin-top: 0.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #666; font-weight: 500;">
+                    Modules Referred From:
+                </label>
+                <div id="modules-container-{{ disease.id }}">
+                    {% if modules_by_disease and disease.id in modules_by_disease %}
+                        {% for module_id, developed_by, practice_id in modules_by_disease[disease.id] %}
+                        <div class="module-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
+                            <input type="text" name="module_name_{{ disease.id }}_{{ loop.index0 }}" 
+                                   class="module-input" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}"
+                                   value="{{ developed_by }}"
+                                   placeholder="Type module name (e.g., Naveen et al., 2013)" 
+                                   autocomplete="off" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <input type="hidden" name="module_id_{{ disease.id }}_{{ loop.index0 }}" 
+                                   class="module-id-input" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}"
+                                   value="{{ module_id }}">
+                            <div class="module-autocomplete" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}" style="position: relative; flex: 1;"></div>
+                            <button type="button" class="remove-module-btn" data-disease-id="{{ disease.id }}" 
+                                    style="padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">Remove</button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <button type="button" class="add-module-btn" data-disease-id="{{ disease.id }}" 
+                        style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                    + Add Module
+                </button>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -168,6 +206,34 @@ function addVariationField() {
 function removeVariation(id) {
     const elem = document.getElementById(`variation-${id}`);
     if (elem) elem.remove();
+}
+
+// Category to Kosha mapping
+const categoryToKosha = {
+    'Preparatory Practice': 'Annamaya Kosha',
+    'Yogasana': 'Annamaya Kosha',
+    'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Breathing Practice': 'Pranamaya Kosha',
+    'Pranayama': 'Pranamaya Kosha',
+    'Meditation': 'Manomaya Kosha',
+    'Chanting': 'Manomaya Kosha',
+    'Yogic Counselling': 'Vijnanamaya Kosha',
+    'Additional Practices': ''  // Can be left empty or determined by user
+};
+
+// Auto-fill Kosha based on Category selection
+const categorySelect = document.getElementById('practice_segment');
+const koshaSelect = document.getElementById('kosha');
+
+if (categorySelect && koshaSelect) {
+    categorySelect.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        const mappedKosha = categoryToKosha[selectedCategory];
+        if (mappedKosha) {
+            koshaSelect.value = mappedKosha;
+        }
+    });
 }
 
 // Autocomplete functionality for Sanskrit name
@@ -275,7 +341,6 @@ function selectPractice(id) {
         document.getElementById('strokes_per_cycle').value = practice.strokes_per_cycle || '';
         document.getElementById('rest_between_cycles_sec').value = practice.rest_between_cycles_sec || '';
         document.getElementById('description').value = practice.description || '';
-        document.getElementById('how_to_do').value = practice.how_to_do || '';
         
         // Clear existing variations first
         const variationsContainer = document.getElementById('variations');
@@ -323,6 +388,242 @@ document.addEventListener('click', function(e) {
         selectedIndex = -1;
     }
 });
+
+// Track module counts per disease
+const moduleCounts = {};
+document.querySelectorAll('.disease-checkbox').forEach(checkbox => {
+    const diseaseId = checkbox.dataset.diseaseId;
+    const container = document.getElementById(`modules-container-${diseaseId}`);
+    if (container) {
+        moduleCounts[diseaseId] = container.querySelectorAll('.module-row').length;
+    } else {
+        moduleCounts[diseaseId] = 0;
+    }
+});
+
+// Add module button functionality
+document.querySelectorAll('.add-module-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const diseaseId = this.dataset.diseaseId;
+        const container = document.getElementById(`modules-container-${diseaseId}`);
+        const index = moduleCounts[diseaseId];
+        
+        const moduleRow = document.createElement('div');
+        moduleRow.className = 'module-row';
+        moduleRow.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
+        moduleRow.innerHTML = `
+            <input type="text" name="module_name_${diseaseId}_${index}" 
+                   class="module-input" data-disease-id="${diseaseId}" data-index="${index}"
+                   placeholder="Type module name (e.g., Naveen et al., 2013)" 
+                   autocomplete="off" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="hidden" name="module_id_${diseaseId}_${index}" 
+                   class="module-id-input" data-disease-id="${diseaseId}" data-index="${index}" value="">
+            <div class="module-autocomplete" data-disease-id="${diseaseId}" data-index="${index}" style="position: relative; flex: 1;"></div>
+            <button type="button" class="remove-module-btn" data-disease-id="${diseaseId}" 
+                    style="padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">Remove</button>
+        `;
+        
+        container.appendChild(moduleRow);
+        moduleCounts[diseaseId]++;
+        
+        // Initialize autocomplete for the new field
+        const moduleInput = moduleRow.querySelector('.module-input');
+        const moduleIdInput = moduleRow.querySelector('.module-id-input');
+        const autocompleteDiv = moduleRow.querySelector('.module-autocomplete');
+        initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
+    });
+});
+
+// Remove module button functionality
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-module-btn')) {
+        const diseaseId = e.target.dataset.diseaseId;
+        const moduleRow = e.target.closest('.module-row');
+        if (moduleRow) {
+            moduleRow.remove();
+            // Reindex remaining modules
+            const container = document.getElementById(`modules-container-${diseaseId}`);
+            const rows = container.querySelectorAll('.module-row');
+            rows.forEach((row, index) => {
+                const inputs = row.querySelectorAll('input, .module-autocomplete');
+                inputs.forEach(input => {
+                    if (input.name) {
+                        input.name = input.name.replace(/_\d+$/, `_${index}`);
+                    }
+                    if (input.dataset.index !== undefined) {
+                        input.dataset.index = index;
+                    }
+                });
+            });
+            moduleCounts[diseaseId] = rows.length;
+        }
+    }
+});
+
+// Module selection for each disease
+document.querySelectorAll('.disease-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const diseaseId = this.dataset.diseaseId;
+        const moduleSelection = document.getElementById(`module-selection-${diseaseId}`);
+        
+        if (this.checked) {
+            moduleSelection.style.display = 'block';
+            // Initialize autocomplete for all existing module fields
+            const container = document.getElementById(`modules-container-${diseaseId}`);
+            if (container) {
+                container.querySelectorAll('.module-row').forEach((row, index) => {
+                    const moduleInput = row.querySelector('.module-input');
+                    const moduleIdInput = row.querySelector('.module-id-input');
+                    const autocompleteDiv = row.querySelector('.module-autocomplete');
+                    if (moduleInput && moduleIdInput && autocompleteDiv) {
+                        initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
+                    }
+                });
+            }
+        } else {
+            moduleSelection.style.display = 'none';
+        }
+    });
+    
+    // Initialize autocomplete if disease is already checked
+    if (checkbox.checked) {
+        const diseaseId = checkbox.dataset.diseaseId;
+        const container = document.getElementById(`modules-container-${diseaseId}`);
+        if (container) {
+            container.querySelectorAll('.module-row').forEach((row, index) => {
+                const moduleInput = row.querySelector('.module-input');
+                const moduleIdInput = row.querySelector('.module-id-input');
+                const autocompleteDiv = row.querySelector('.module-autocomplete');
+                if (moduleInput && moduleIdInput && autocompleteDiv) {
+                    initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
+                }
+            });
+        }
+    }
+});
+
+function initModuleAutocomplete(diseaseId, input, hiddenInput, autocompleteDiv, index) {
+    let autocompleteTimeout;
+    let currentModules = [];
+    let selectedIndex = -1;
+    const uniqueId = `${diseaseId}_${index}`;
+    
+    input.addEventListener('input', function() {
+        clearTimeout(autocompleteTimeout);
+        const query = this.value.trim();
+        selectedIndex = -1;
+        
+        if (query.length < 1) {
+            autocompleteDiv.innerHTML = '';
+            currentModules = [];
+            hiddenInput.value = '';
+            return;
+        }
+        
+        autocompleteTimeout = setTimeout(() => {
+            fetch(`/api/module/search?q=${encodeURIComponent(query)}&disease_id=${diseaseId}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentModules = data;
+                    displayModuleAutocompleteResults(data, autocompleteDiv, diseaseId, index);
+                });
+        }, 300);
+    });
+    
+    input.addEventListener('keydown', function(e) {
+        if (autocompleteDiv.innerHTML === '') return;
+        
+        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateModuleSelection(items, selectedIndex);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateModuleSelection(items, selectedIndex);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < items.length) {
+                    selectModuleLocal(currentModules[selectedIndex].id, currentModules[selectedIndex].name);
+                }
+                break;
+            case 'Escape':
+                autocompleteDiv.innerHTML = '';
+                currentModules = [];
+                selectedIndex = -1;
+                break;
+        }
+    });
+    
+    function displayModuleAutocompleteResults(modules, div, diseaseId, idx) {
+        if (modules.length === 0) {
+            div.innerHTML = '';
+            return;
+        }
+        
+        div.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
+            modules.map((m, i) => {
+                const escapedName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                return `
+                <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                     onclick="selectModuleForDisease(${diseaseId}, ${idx}, ${m.id}, '${escapedName}')" data-index="${i}">
+                    <strong>${m.name}</strong>
+                </div>
+            `;
+            }).join('') +
+            '</div>';
+    }
+    
+    function updateModuleSelection(items, idx) {
+        items.forEach((item, i) => {
+            if (i === idx) {
+                item.style.backgroundColor = '#e3f2fd';
+                item.style.borderLeft = '3px solid #2196f3';
+            } else {
+                item.style.backgroundColor = '';
+                item.style.borderLeft = '';
+            }
+        });
+    }
+    
+    function selectModuleLocal(id, name) {
+        input.value = name;
+        hiddenInput.value = id;
+        autocompleteDiv.innerHTML = '';
+        currentModules = [];
+        selectedIndex = -1;
+    }
+    
+    // Store the select function for this specific field
+    window[`selectModuleForDisease_${uniqueId}`] = selectModuleLocal;
+    
+    // Close autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest(input) && !e.target.closest(autocompleteDiv)) {
+            autocompleteDiv.innerHTML = '';
+            currentModules = [];
+            selectedIndex = -1;
+        }
+    });
+}
+
+// Global function to select module for a disease
+function selectModuleForDisease(diseaseId, index, moduleId, moduleName) {
+    const moduleInput = document.querySelector(`input.module-input[data-disease-id="${diseaseId}"][data-index="${index}"]`);
+    const moduleIdInput = document.querySelector(`input.module-id-input[data-disease-id="${diseaseId}"][data-index="${index}"]`);
+    const autocompleteDiv = document.querySelector(`.module-autocomplete[data-disease-id="${diseaseId}"][data-index="${index}"]`);
+    
+    if (moduleInput && moduleIdInput && autocompleteDiv) {
+        moduleInput.value = moduleName;
+        moduleIdInput.value = moduleId;
+        autocompleteDiv.innerHTML = '';
+    }
+}
 </script>
 
 <style>

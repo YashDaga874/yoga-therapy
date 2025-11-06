@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Add Module{% endblock %}
+
+{% block content %}
+<h2>Add New Module</h2>
+
+<form method="POST" style="max-width: 800px;">
+    <div class="form-group">
+        <label for="disease_name">Disease *</label>
+        <input type="text" id="disease_name" name="disease_name" 
+               placeholder="Type disease name (e.g., Depression)" autocomplete="off" required>
+        <input type="hidden" id="disease_id" name="disease_id">
+        <div id="disease-autocomplete-results" style="position: relative;"></div>
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Type to search existing diseases or create a new one. Press Enter to create new disease.
+        </small>
+    </div>
+    
+    <div class="form-group">
+        <label for="developed_by">Developed By (Parenthetical Citation) *</label>
+        <input type="text" name="developed_by" id="developed_by" 
+               placeholder="e.g., Naveen et al., 2013" required>
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Enter the citation in parenthetical format (e.g., "Author et al., Year")
+        </small>
+    </div>
+    
+    <div class="form-group">
+        <label for="paper_link">Research Paper Link</label>
+        <input type="url" name="paper_link" id="paper_link" 
+               placeholder="https://example.com/paper.pdf">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            URL to the research paper (this will be displayed as a hyperlink)
+        </small>
+    </div>
+    
+    <div class="form-group">
+        <label for="module_description">Module Description</label>
+        <textarea name="module_description" id="module_description" rows="5" 
+                  placeholder="Describe the module, its focus, methodology, etc."></textarea>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" class="btn">Create Module</button>
+        <a href="/modules" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+// Disease autocomplete functionality
+let diseaseAutocompleteTimeout;
+let currentDiseases = [];
+let selectedDiseaseIndex = -1;
+const diseaseInput = document.getElementById('disease_name');
+const diseaseIdInput = document.getElementById('disease_id');
+const diseaseAutocompleteDiv = document.getElementById('disease-autocomplete-results');
+
+diseaseInput.addEventListener('input', function() {
+    clearTimeout(diseaseAutocompleteTimeout);
+    const query = this.value.trim();
+    selectedDiseaseIndex = -1;
+    
+    if (query.length < 1) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        currentDiseases = [];
+        diseaseIdInput.value = '';
+        return;
+    }
+    
+    diseaseAutocompleteTimeout = setTimeout(() => {
+        fetch(`/api/disease/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                currentDiseases = data;
+                displayDiseaseAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+// Keyboard navigation
+diseaseInput.addEventListener('keydown', function(e) {
+    if (diseaseAutocompleteDiv.innerHTML === '') return;
+    
+    const items = diseaseAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedDiseaseIndex = Math.min(selectedDiseaseIndex + 1, items.length - 1);
+            updateDiseaseSelection();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedDiseaseIndex = Math.max(selectedDiseaseIndex - 1, -1);
+            updateDiseaseSelection();
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (selectedDiseaseIndex >= 0 && selectedDiseaseIndex < items.length) {
+                selectDisease(currentDiseases[selectedDiseaseIndex].id);
+            }
+            // If no selection, allow form submission to create new disease
+            break;
+        case 'Escape':
+            diseaseAutocompleteDiv.innerHTML = '';
+            currentDiseases = [];
+            selectedDiseaseIndex = -1;
+            break;
+    }
+});
+
+function updateDiseaseSelection() {
+    const items = diseaseAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === selectedDiseaseIndex) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function displayDiseaseAutocompleteResults(diseases) {
+    if (diseases.length === 0) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    diseaseAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
+        diseases.map((d, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectDisease(${d.id})" data-index="${index}">
+                <strong>${d.name}</strong>
+            </div>
+        `).join('') +
+        '</div>';
+}
+
+function selectDisease(id) {
+    const disease = currentDiseases.find(d => d.id === id);
+    if (disease) {
+        diseaseInput.value = disease.name;
+        diseaseIdInput.value = disease.id;
+        diseaseAutocompleteDiv.innerHTML = '';
+        currentDiseases = [];
+        selectedDiseaseIndex = -1;
+    }
+}
+
+// Close autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#disease_name') && !e.target.closest('#disease-autocomplete-results')) {
+        diseaseAutocompleteDiv.innerHTML = '';
+        currentDiseases = [];
+        selectedDiseaseIndex = -1;
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+</style>
+{% endblock %}
+

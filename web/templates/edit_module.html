@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Module{% endblock %}
+
+{% block content %}
+<h2>Edit Module</h2>
+
+<form method="POST" style="max-width: 800px;">
+    <div class="form-group">
+        <label for="disease_id">Disease</label>
+        <select name="disease_id" id="disease_id" disabled>
+            {% if module.disease %}
+                <option value="{{ module.disease.id }}" selected>{{ module.disease.name }}</option>
+            {% else %}
+                <option value="" selected>N/A</option>
+            {% endif %}
+        </select>
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Disease cannot be changed. Delete and recreate the module if needed.
+        </small>
+    </div>
+    
+    <div class="form-group">
+        <label for="developed_by">Developed By (Parenthetical Citation) *</label>
+        <input type="text" name="developed_by" id="developed_by" 
+               value="{{ module.developed_by or '' }}" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="paper_link">Research Paper Link</label>
+        <input type="url" name="paper_link" id="paper_link" 
+               value="{{ module.paper_link or '' }}"
+               placeholder="https://example.com/paper.pdf">
+    </div>
+    
+    <div class="form-group">
+        <label for="module_description">Module Description</label>
+        <textarea name="module_description" id="module_description" rows="5">{{ module.module_description or '' }}</textarea>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" class="btn">Update Module</button>
+        <a href="/module/{{ module.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
