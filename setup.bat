@@ -55,6 +55,18 @@ if errorlevel 1 (
 
 echo.
 echo ========================================
+echo Running database migration...
+echo ========================================
+echo.
+REM Run database migration to ensure all columns exist
+python add_kosha_field.py
+if errorlevel 1 (
+    echo WARNING: Database migration had issues, but continuing...
+    echo You may need to run: python add_kosha_field.py
+)
+
+echo.
+echo ========================================
 echo Setup completed successfully!
 echo ========================================
 echo.
@@ -63,8 +75,7 @@ echo   run.bat
 echo.
 echo Or manually activate the venv and run:
 echo   venv\Scripts\activate
-echo   cd web
-echo   python app.py
+echo   python web\app.py
 echo.
 pause
 

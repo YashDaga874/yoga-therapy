@@ -40,6 +40,17 @@ def column_exists(session, table_name, column_name):
 
 def add_kosha_column_and_fill():
     """Add missing columns to database tables and fill them for existing data"""
+    import os
+    from database.models import create_database
+    
+    # Check if database file exists, if not create it
+    db_file = 'yoga_therapy.db'
+    if not os.path.exists(db_file):
+        print("Database file not found. Creating new database...")
+        create_database(DB_PATH)
+        print("Database created successfully.")
+        return  # New database already has all columns
+    
     session = get_session(DB_PATH)
     
     try:
