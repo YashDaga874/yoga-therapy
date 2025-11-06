@@ -39,10 +39,24 @@ def column_exists(session, table_name, column_name):
         return False
 
 def add_kosha_column_and_fill():
-    """Add Kosha column to practices table and fill it for existing practices"""
+    """Add missing columns to database tables and fill them for existing data"""
     session = get_session(DB_PATH)
     
     try:
+        # Check and add paper_link to modules table if it doesn't exist
+        if not column_exists(session, 'modules', 'paper_link'):
+            print("Adding paper_link column to modules table...")
+            session.execute(text("ALTER TABLE modules ADD COLUMN paper_link VARCHAR(1000)"))
+            session.commit()
+            print("paper_link column added successfully.")
+        
+        # Check and add module_description to modules table if it doesn't exist
+        if not column_exists(session, 'modules', 'module_description'):
+            print("Adding module_description column to modules table...")
+            session.execute(text("ALTER TABLE modules ADD COLUMN module_description TEXT"))
+            session.commit()
+            print("module_description column added successfully.")
+        
         # First, check and add module_id if it doesn't exist (needed for ORM queries)
         if not column_exists(session, 'practices', 'module_id'):
             print("Adding module_id column to practices table...")
@@ -134,7 +148,8 @@ def add_kosha_column_and_fill():
         session.close()
 
 if __name__ == "__main__":
-    print("Starting Kosha field addition and update process...")
+    print("Starting database migration process...")
+    print("This will add missing columns (paper_link, module_description, module_id, kosha) and update existing data.")
     add_kosha_column_and_fill()
-    print("Update completed!")
+    print("Database migration completed!")
 
