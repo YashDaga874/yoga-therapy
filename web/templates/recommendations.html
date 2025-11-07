@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+
+{% block title %}Recommendation System{% endblock %}
+
+{% block content %}
+<h2>Recommendation System</h2>
+
+<form method="POST" id="recommendation-form" style="max-width: 1200px;">
+    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem; margin-bottom: 2rem;">
+        <!-- Major Disease -->
+        <div class="form-group">
+            <label for="major_module" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">
+                Major Disease *
+            </label>
+            <div style="position: relative;">
+                <input type="text" id="major_module" name="major_module_display" 
+                       placeholder="Type disease name (e.g., Depression (Naveen et al., 2013))" 
+                       autocomplete="off" required
+                       style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 6px; font-size: 1rem;">
+                <input type="hidden" id="major_module_id" name="major_module_id">
+                <div id="major-autocomplete-results" style="position: absolute; width: 100%; z-index: 1000;"></div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                Select one module for the major disease
+            </small>
+        </div>
+        
+        <!-- Co-morbid Diseases -->
+        <div class="form-group">
+            <label style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">
+                Co-morbid Disease
+            </label>
+            <label for="comorbid_module" style="font-size: 0.9rem; color: #666; margin-bottom: 0.5rem; display: block;">
+                Disease wise Customized Module
+            </label>
+            
+            <!-- Tag container -->
+            <div id="comorbid-tags-container" 
+                 style="min-height: 60px; padding: 0.75rem; border: 2px solid #ddd; border-radius: 6px; 
+                        background: #f8f9fa; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+                        margin-bottom: 0.5rem;">
+                <input type="text" id="comorbid_module" 
+                       placeholder="Type disease name (e.g., GAD (Naveen et al., 2017))" 
+                       autocomplete="off"
+                       style="border: none; outline: none; background: transparent; flex: 1; min-width: 200px; font-size: 1rem; padding: 0.25rem;">
+            </div>
+            <div id="comorbid-autocomplete-results" style="position: relative; z-index: 1000;"></div>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                Add multiple co-morbid diseases by selecting modules. Click the 'x' to remove a disease.
+            </small>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" class="btn" style="padding: 0.75rem 2rem; font-size: 1rem;">
+            Generate Practice Plan
+        </button>
+        <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+            Clear
+        </button>
+    </div>
+</form>
+
+<script>
+// Major Disease Autocomplete
+let majorAutocompleteTimeout;
+let currentMajorModules = [];
+let selectedMajorIndex = -1;
+const majorInput = document.getElementById('major_module');
+const majorIdInput = document.getElementById('major_module_id');
+const majorAutocompleteDiv = document.getElementById('major-autocomplete-results');
+
+majorInput.addEventListener('input', function() {
+    clearTimeout(majorAutocompleteTimeout);
+    const query = this.value.trim();
+    selectedMajorIndex = -1;
+    
+    if (query.length < 1) {
+        majorAutocompleteDiv.innerHTML = '';
+        currentMajorModules = [];
+        majorIdInput.value = '';
+        return;
+    }
+    
+    majorAutocompleteTimeout = setTimeout(() => {
+        fetch(`/api/module/search/recommendation?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                currentMajorModules = data;
+                displayMajorAutocompleteResults(data);
+            });
+    }, 300);
+});
+
+majorInput.addEventListener('keydown', function(e) {
+    if (majorAutocompleteDiv.innerHTML === '') return;
+    
+    const items = majorAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedMajorIndex = Math.min(selectedMajorIndex + 1, items.length - 1);
+            updateMajorSelection(items, selectedMajorIndex);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedMajorIndex = Math.max(selectedMajorIndex - 1, -1);
+            updateMajorSelection(items, selectedMajorIndex);
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (selectedMajorIndex >= 0 && selectedMajorIndex < items.length) {
+                selectMajorModule(currentMajorModules[selectedMajorIndex]);
+                majorInput.focus();
+            }
+            break;
+        case 'Escape':
+            majorAutocompleteDiv.innerHTML = '';
+            currentMajorModules = [];
+            selectedMajorIndex = -1;
+            break;
+    }
+});
+
+function displayMajorAutocompleteResults(modules) {
+    if (modules.length === 0) {
+        majorAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    majorAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        modules.map((m, index) => {
+            const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
+            return `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectMajorModuleFromString('${escaped}')" data-index="${index}">
+                <strong>${m.display_name}</strong>
+            </div>
+        `;
+        }).join('') +
+        '</div>';
+}
+
+function updateMajorSelection(items, index) {
+    items.forEach((item, idx) => {
+        if (idx === index) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function selectMajorModule(module) {
+    majorInput.value = module.display_name;
+    majorIdInput.value = module.module_id;
+    majorAutocompleteDiv.innerHTML = '';
+    currentMajorModules = [];
+    selectedMajorIndex = -1;
+}
+
+function selectMajorModuleFromString(moduleStr) {
+    const module = JSON.parse(moduleStr.replace(/&quot;/g, '"'));
+    selectMajorModule(module);
+}
+
+// Co-morbid Diseases Autocomplete (Tag-based)
+let comorbidModules = []; // Array of {module_id, display_name, disease_name, module_name}
+let comorbidAutocompleteTimeout;
+let currentComorbidModules = [];
+let selectedComorbidIndex = -1;
+const comorbidInput = document.getElementById('comorbid_module');
+const comorbidAutocompleteDiv = document.getElementById('comorbid-autocomplete-results');
+const comorbidTagsContainer = document.getElementById('comorbid-tags-container');
+
+comorbidInput.addEventListener('input', function() {
+    clearTimeout(comorbidAutocompleteTimeout);
+    const query = this.value.trim();
+    selectedComorbidIndex = -1;
+    
+    if (query.length < 1) {
+        comorbidAutocompleteDiv.innerHTML = '';
+        currentComorbidModules = [];
+        return;
+    }
+    
+    comorbidAutocompleteTimeout = setTimeout(() => {
+        fetch(`/api/module/search/recommendation?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                // Filter out already selected modules
+                const selectedIds = new Set(comorbidModules.map(m => m.module_id));
+                currentComorbidModules = data.filter(m => !selectedIds.has(m.module_id));
+                displayComorbidAutocompleteResults(currentComorbidModules);
+            });
+    }, 300);
+});
+
+comorbidInput.addEventListener('keydown', function(e) {
+    if (comorbidAutocompleteDiv.innerHTML === '') return;
+    
+    const items = comorbidAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedComorbidIndex = Math.min(selectedComorbidIndex + 1, items.length - 1);
+            updateComorbidSelection(items, selectedComorbidIndex);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedComorbidIndex = Math.max(selectedComorbidIndex - 1, -1);
+            updateComorbidSelection(items, selectedComorbidIndex);
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (selectedComorbidIndex >= 0 && selectedComorbidIndex < items.length) {
+                selectComorbidModule(currentComorbidModules[selectedComorbidIndex]);
+                comorbidInput.focus();
+            }
+            break;
+        case 'Escape':
+            comorbidAutocompleteDiv.innerHTML = '';
+            currentComorbidModules = [];
+            selectedComorbidIndex = -1;
+            break;
+    }
+});
+
+function displayComorbidAutocompleteResults(modules) {
+    if (modules.length === 0) {
+        comorbidAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    comorbidAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; margin-top: 0.5rem;">' +
+        modules.map((m, index) => {
+            const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
+            return `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectComorbidModuleFromString('${escaped}')" data-index="${index}">
+                <strong>${m.display_name}</strong>
+            </div>
+        `;
+        }).join('') +
+        '</div>';
+}
+
+function updateComorbidSelection(items, index) {
+    items.forEach((item, idx) => {
+        if (idx === index) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function selectComorbidModule(module) {
+    // Add to array
+    comorbidModules.push(module);
+    
+    // Create tag
+    const tag = document.createElement('div');
+    tag.className = 'comorbid-tag';
+    tag.dataset.moduleId = module.module_id;
+    tag.style.cssText = 'display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #667eea; color: white; border-radius: 20px; font-size: 0.9rem;';
+    tag.innerHTML = `
+        <span>${module.display_name}</span>
+        <button type="button" onclick="removeComorbidModule(${module.module_id})" 
+                style="background: rgba(255,255,255,0.3); border: none; color: white; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0;">
+            ×
+        </button>
+    `;
+    
+    // Insert before input
+    comorbidTagsContainer.insertBefore(tag, comorbidInput);
+    
+    // Clear input
+    comorbidInput.value = '';
+    comorbidAutocompleteDiv.innerHTML = '';
+    currentComorbidModules = [];
+    selectedComorbidIndex = -1;
+    
+    // Update hidden inputs
+    updateComorbidHiddenInputs();
+    
+    // Refocus input
+    setTimeout(() => comorbidInput.focus(), 100);
+}
+
+function selectComorbidModuleFromString(moduleStr) {
+    const module = JSON.parse(moduleStr.replace(/&quot;/g, '"'));
+    selectComorbidModule(module);
+}
+
+function removeComorbidModule(moduleId) {
+    comorbidModules = comorbidModules.filter(m => m.module_id !== moduleId);
+    
+    // Remove tag by data attribute
+    const tag = comorbidTagsContainer.querySelector(`.comorbid-tag[data-module-id="${moduleId}"]`);
+    if (tag) {
+        tag.remove();
+    }
+    
+    updateComorbidHiddenInputs();
+}
+
+function updateComorbidHiddenInputs() {
+    // Remove existing hidden inputs
+    document.querySelectorAll('input[name="comorbid_module_ids"]').forEach(input => input.remove());
+    
+    // Add new hidden inputs
+    comorbidModules.forEach(module => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'comorbid_module_ids';
+        input.value = module.module_id;
+        document.getElementById('recommendation-form').appendChild(input);
+    });
+}
+
+function clearForm() {
+    majorInput.value = '';
+    majorIdInput.value = '';
+    comorbidInput.value = '';
+    comorbidModules = [];
+    comorbidTagsContainer.querySelectorAll('.comorbid-tag').forEach(tag => tag.remove());
+    updateComorbidHiddenInputs();
+    majorAutocompleteDiv.innerHTML = '';
+    comorbidAutocompleteDiv.innerHTML = '';
+}
+
+// Close autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#major_module') && !e.target.closest('#major-autocomplete-results')) {
+        majorAutocompleteDiv.innerHTML = '';
+        currentMajorModules = [];
+        selectedMajorIndex = -1;
+    }
+    
+    if (!e.target.closest('#comorbid_module') && !e.target.closest('#comorbid-autocomplete-results') && !e.target.closest('.comorbid-tag')) {
+        comorbidAutocompleteDiv.innerHTML = '';
+        currentComorbidModules = [];
+        selectedComorbidIndex = -1;
+    }
+});
+</script>
+
+<style>
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+
+.comorbid-tag button:hover {
+    background: rgba(255,255,255,0.5) !important;
+}
+</style>
+{% endblock %}
+

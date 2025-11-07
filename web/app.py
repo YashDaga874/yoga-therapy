@@ -1511,6 +1511,277 @@ def api_search_all_modules():
         session.close()
 
 
+@app.route('/api/module/search/recommendation', methods=['GET'])
+def api_search_modules_for_recommendation():
+    """
+    API endpoint for recommendation system autocomplete
+    Returns modules in format "Disease (Module Name)"
+    Query parameter: q (search query)
+    Prioritizes results starting with the query
+    """
+    query = request.args.get('q', '').strip()
+    
+    if not query:
+        return jsonify([])
+    
+    session = get_db_session()
+    
+    try:
+        query_lower = query.lower()
+        
+        # Get all modules with their diseases
+        all_modules = session.query(Module).join(Disease).all()
+        
+        results = []
+        for module in all_modules:
+            disease_name = module.disease.name if module.disease else 'N/A'
+            module_name = module.developed_by or 'N/A'
+            display_name = f"{disease_name} ({module_name})"
+            
+            disease_lower = disease_name.lower()
+            module_lower = (module_name or '').lower()
+            display_lower = display_name.lower()
+            
+            # Calculate match score: higher = better match
+            score = 0
+            match_type = None
+            
+            # Priority 1: Disease name starts with query
+            if disease_lower.startswith(query_lower):
+                score = 1000 + len(disease_lower)
+                match_type = 'disease_starts'
+            # Priority 2: Module name starts with query
+            elif module_lower.startswith(query_lower):
+                score = 500 + len(module_lower)
+                match_type = 'module_starts'
+            # Priority 3: Display name starts with query
+            elif display_lower.startswith(query_lower):
+                score = 300 + len(display_lower)
+                match_type = 'display_starts'
+            # Priority 4: Disease name contains query
+            elif query_lower in disease_lower:
+                score = 100 + len(disease_lower)
+                match_type = 'disease_contains'
+            # Priority 5: Module name contains query
+            elif query_lower in module_lower:
+                score = 50 + len(module_lower)
+                match_type = 'module_contains'
+            # Priority 6: Display name contains query
+            elif query_lower in display_lower:
+                score = 10 + len(display_lower)
+                match_type = 'display_contains'
+            else:
+                continue  # No match, skip this module
+            
+            results.append({
+                'id': module.id,
+                'module_id': module.id,
+                'disease_id': module.disease_id,
+                'disease_name': disease_name,
+                'module_name': module_name,
+                'display_name': display_name,
+                'score': score,
+                'match_type': match_type
+            })
+        
+        # Sort by score (descending) and then by display name
+        results.sort(key=lambda x: (-x['score'], x['display_name']))
+        
+        # Remove score and match_type from response (they were just for sorting)
+        for result in results:
+            del result['score']
+            del result['match_type']
+        
+        # Limit to top 20 results
+        return jsonify(results[:20])
+    finally:
+        session.close()
+
+
+# ============================================================================
+# Recommendation System Routes
+# ============================================================================
+
+@app.route('/recommendations', methods=['GET', 'POST'])
+def recommendations():
+    """Generate practice recommendations based on selected modules"""
+    session = get_db_session()
+    
+    try:
+        if request.method == 'POST':
+            # Get selected modules
+            major_module_id = request.form.get('major_module_id')
+            comorbid_module_ids = request.form.getlist('comorbid_module_ids')
+            
+            if not major_module_id:
+                flash('Please select a major disease module', 'error')
+                return redirect(url_for('recommendations'))
+            
+            # Fetch modules
+            major_module = session.query(Module).get(int(major_module_id))
+            if not major_module:
+                flash('Major disease module not found', 'error')
+                return redirect(url_for('recommendations'))
+            
+            comorbid_modules = []
+            for module_id in comorbid_module_ids:
+                module = session.query(Module).get(int(module_id))
+                if module:
+                    comorbid_modules.append(module)
+            
+            # Collect all modules
+            all_modules = [major_module] + comorbid_modules
+            
+            # Get all diseases from selected modules
+            all_disease_ids = set()
+            for module in all_modules:
+                if module.disease_id:
+                    all_disease_ids.add(module.disease_id)
+            
+            # Get all practices from selected modules
+            all_practices = []
+            for module in all_modules:
+                # Force load practices
+                if module.practices:
+                    for practice in module.practices:
+                        # Force load relationships
+                        _ = practice.practice_english
+                        _ = practice.practice_segment
+                        _ = practice.kosha
+                        _ = practice.sub_category
+                        all_practices.append(practice)
+            
+            # Get contraindications for all diseases
+            contraindications = []
+            for disease_id in all_disease_ids:
+                disease = session.query(Disease).get(disease_id)
+                if disease:
+                    for contraindication in disease.contraindications:
+                        contraindications.append(contraindication)
+            
+            # Remove duplicates from contraindications
+            seen_contraindications = set()
+            unique_contraindications = []
+            for contra in contraindications:
+                key = (contra.practice_english, contra.practice_segment)
+                if key not in seen_contraindications:
+                    seen_contraindications.add(key)
+                    unique_contraindications.append(contra)
+            
+            # Filter out contraindicated practices
+            contraindicated_keys = set()
+            for contra in unique_contraindications:
+                contraindicated_keys.add((
+                    contra.practice_english.lower().strip(),
+                    contra.practice_segment
+                ))
+            
+            filtered_practices = []
+            for practice in all_practices:
+                practice_key = (
+                    practice.practice_english.lower().strip() if practice.practice_english else '',
+                    practice.practice_segment
+                )
+                if practice_key not in contraindicated_keys:
+                    filtered_practices.append(practice)
+            
+            # Get RCTs for practices
+            # We need to get all RCTs and match them to practices
+            all_rcts = session.query(RCT).all()
+            practice_rcts = {}  # practice_id -> list of RCT parenthetical citations
+            
+            for practice in filtered_practices:
+                practice_rcts[practice.id] = []
+                practice_disease_ids = [d.id for d in practice.diseases]
+                
+                for rct in all_rcts:
+                    rct_disease_ids = [d.id for d in rct.diseases]
+                    # Check if RCT is for any of the practice's diseases
+                    if any(did in practice_disease_ids for did in rct_disease_ids):
+                        # Check if RCT mentions this practice
+                        if rct.intervention_practices:
+                            try:
+                                intervention_list = json.loads(rct.intervention_practices)
+                                for intervention in intervention_list:
+                                    practice_name = intervention.get('name', '').strip()
+                                    intervention_category = intervention.get('category', '').strip()
+                                    
+                                    # Match by name or category
+                                    if (practice_name and 
+                                        ((practice.practice_sanskrit and practice.practice_sanskrit.lower() == practice_name.lower()) or
+                                         (practice.practice_english and practice.practice_english.lower() == practice_name.lower()))):
+                                        if rct.parenthetical_citation:
+                                            practice_rcts[practice.id].append(rct.parenthetical_citation)
+                                            break
+                                    elif intervention_category and practice.practice_segment == intervention_category:
+                                        if rct.parenthetical_citation:
+                                            practice_rcts[practice.id].append(rct.parenthetical_citation)
+                                            break
+                            except:
+                                pass
+            
+            # Organize practices by Kosha, then Category, then Subcategory
+            # Kosha order: Annamaya, Pranamaya, Manomaya, Vijnanamaya, Anandamaya
+            kosha_order = {
+                'Annamaya Kosha': 1,
+                'Pranamaya Kosha': 2,
+                'Manomaya Kosha': 3,
+                'Vijnanamaya Kosha': 4,
+                'Anandamaya Kosha': 5
+            }
+            
+            organized_practices = {}
+            for practice in filtered_practices:
+                kosha = practice.kosha or 'Unknown'
+                category = practice.practice_segment or 'Unknown'
+                subcategory = practice.sub_category or 'None'
+                
+                if kosha not in organized_practices:
+                    organized_practices[kosha] = {}
+                if category not in organized_practices[kosha]:
+                    organized_practices[kosha][category] = {}
+                if subcategory not in organized_practices[kosha][category]:
+                    organized_practices[kosha][category][subcategory] = []
+                
+                organized_practices[kosha][category][subcategory].append({
+                    'practice': practice,
+                    'rcts': practice_rcts.get(practice.id, [])
+                })
+            
+            # Sort practices within each subcategory by RCT count (descending)
+            for kosha in organized_practices:
+                for category in organized_practices[kosha]:
+                    for subcategory in organized_practices[kosha][category]:
+                        organized_practices[kosha][category][subcategory].sort(
+                            key=lambda x: len(x['rcts']), 
+                            reverse=True
+                        )
+            
+            # Get disease names
+            major_disease_name = major_module.disease.name if major_module.disease else 'N/A'
+            comorbid_disease_names = [m.disease.name if m.disease else 'N/A' for m in comorbid_modules]
+            
+            # Sort koshas by order (descending: highest number first)
+            sorted_koshas = sorted(
+                organized_practices.keys(),
+                key=lambda x: kosha_order.get(x, 0),
+                reverse=True
+            )
+            
+            return render_template('recommendations_result.html',
+                                 major_disease_name=major_disease_name,
+                                 comorbid_disease_names=comorbid_disease_names,
+                                 organized_practices=organized_practices,
+                                 contraindications=unique_contraindications,
+                                 kosha_order=kosha_order,
+                                 sorted_koshas=sorted_koshas)
+        
+        # GET request - show form
+        return render_template('recommendations.html')
+    finally:
+        session.close()
+
+
 # ============================================================================
 # RCT Database Routes
 # ============================================================================
