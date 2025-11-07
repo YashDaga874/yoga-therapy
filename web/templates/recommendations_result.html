@@ -52,9 +52,11 @@
                     <td style="padding: 0.75rem; border: 1px solid #ddd;">{{ contra.practice_segment }}</td>
                     <td style="padding: 0.75rem; border: 1px solid #ddd;">
                         {% if contra.apa_citation %}
-                            {{ contra.apa_citation }}
+                            {{ contra.apa_citation|safe }}
+                        {% elif contra.source_type %}
+                            {{ contra.source_type }}
                         {% elif contra.source_name %}
-                            {{ contra.source_name }}
+                            <a href="{{ contra.source_name }}" target="_blank" style="color: #667eea; text-decoration: none;">{{ contra.source_name }}</a>
                         {% else %}
                             N/A
                         {% endif %}

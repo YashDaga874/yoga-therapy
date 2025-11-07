@@ -50,7 +50,7 @@ The `Module` model represents a research paper or clinical study that contains a
 **Attributes:**
 - `id`: Primary key (Integer)
 - `disease_id`: Foreign key to Disease (Integer, required)
-- `developed_by`: Parenthetical citation (String, e.g., "Naveen et al., 2013")
+- `developed_by`: Citation string (e.g., "Naveen et al., 2013")
 - `paper_link`: URL to the research paper (String, optional)
 - `module_description`: Description of the module and its approach (Text, optional)
 
@@ -111,7 +111,7 @@ The `Citation` model stores bibliographic references for practices.
 
 **Attributes:**
 - `id`: Primary key (Integer)
-- `citation_text`: Parenthetical citation text (Text, required, e.g., "Dr Naveen GH et al., 2013")
+- `citation_text`: Citation text (Text, required, e.g., "Dr Naveen GH et al., 2013")
 - `citation_type`: Type of citation (String, optional: 'research_paper', 'book', 'study')
 - `full_reference`: Complete bibliographic reference (Text, optional)
 - `url`: URL to the source (String, optional)
@@ -153,7 +153,7 @@ The `RCT` model stores comprehensive data about clinical studies supporting prac
 - `doi`: Digital Object Identifier (String, optional)
 - `pmic_nmic`: PMIC/NMIC identifier (String, optional)
 - `title`: Study title (Text, optional)
-- `parenthetical_citation`: Parenthetical citation (Text, optional)
+- `parenthetical_citation`: Citation text stored for reference (Text, optional)
 - `citation_full`: Full citation (Text, optional)
 - `citation_link`: URL to the paper (String, optional)
 - `study_type`: Type of study (String, optional: 'RCT', 'Clinical Trial', 'Others')
@@ -240,7 +240,7 @@ A **Module** represents a research paper or clinical study that contains a struc
    - This ensures diseases are created only through modules, maintaining data integrity
 
 2. **Module Information Entry**:
-   - **Developed By**: Parenthetical citation (e.g., "Naveen et al., 2013")
+   - **Developed By**: Citation (e.g., "Naveen et al., 2013")
    - **Paper Link**: URL to the research paper (optional but recommended)
    - **Module Description**: Description of the module's approach and methodology
 

@@ -3,186 +3,571 @@
 {% block title %}Add Contraindication{% endblock %}
 
 {% block content %}
-<h2>Add Contraindication</h2>
+<style>
+.compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.9rem;
+}
 
-<form method="POST" style="max-width: 800px;">
-    <div class="form-group">
-        <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
-        <input type="text" id="practice_sanskrit" name="practice_sanskrit" 
-               placeholder="e.g., Shavasana" autocomplete="off">
-        <div id="autocomplete-results" style="position: relative;"></div>
-    </div>
-    
-    <div class="form-group">
-        <label for="practice_english">Practice Name (English) *</label>
-        <input type="text" id="practice_english" name="practice_english" required
-               placeholder="e.g., Corpse pose">
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-        <div class="form-group">
-            <label for="practice_segment">Practice Segment *</label>
-            <select id="practice_segment" name="practice_segment" required>
-                <option value="">Select Practice Segment</option>
-                <option value="Preparatory Practice">Preparatory Practice</option>
-                <option value="Breathing Practice">Breathing Practice</option>
-                <option value="Suryanamaskara">Suryanamaskara</option>
-                <option value="Yogasana">Yogasana</option>
-                <option value="Pranayama">Pranayama</option>
-                <option value="Meditation">Meditation</option>
-                <option value="Additional Practices">Additional Practices</option>
-                <option value="Kriya (Cleansing Techniques)">Kriya (Cleansing Techniques)</option>
-                <option value="Yogic Counselling">Yogic Counselling</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="sub_category">Sub-Category</label>
-            <input type="text" id="sub_category" name="sub_category">
-        </div>
-    </div>
-    
-    <div class="form-group">
-        <label for="reason">Reason for Contraindication</label>
-        <textarea id="reason" name="reason" 
-                  placeholder="Why is this practice contraindicated?"></textarea>
-    </div>
-    
-    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Source Information</h3>
-    
-    <div class="form-group">
-        <label for="source_type">Type of Source *</label>
-        <select id="source_type" name="source_type" required>
-            <option value="">Select Source Type</option>
-            <option value="book">Book</option>
-            <option value="paper">Research Paper</option>
-            <option value="ancient_text">Ancient Text</option>
-        </select>
-    </div>
-    
-    <div class="form-group">
-        <label for="source_name">Name of Source / Link *</label>
-        <input type="text" id="source_name" name="source_name" required
-               placeholder="Book name, paper title, or link">
-    </div>
-    
-    <div class="form-group" id="page-number-group" style="display: none;">
-        <label for="page_number">Page Number / Range</label>
-        <input type="text" id="page_number" name="page_number" 
-               placeholder="e.g., 45 or 45-47">
-    </div>
-    
-    <div class="form-group" id="apa-citation-group" style="display: none;">
-        <label for="apa_citation">APA Citation</label>
-        <textarea id="apa_citation" name="apa_citation" 
-                  placeholder="Full APA citation format"></textarea>
-    </div>
-    
-    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1.5rem;">
-        <h4 style="margin-bottom: 1rem;">For Which Diseases *</h4>
-        <p style="color: #666; margin-bottom: 1rem;">Select which disease(s) this contraindication applies to:</p>
-        
-        {% for disease in diseases %}
-        <div style="margin-bottom: 0.5rem;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" name="diseases" value="{{ disease.id }}" 
-                       style="margin-right: 0.5rem;">
-                {{ disease.name }}
-            </label>
-        </div>
+.compact-grid .form-group input,
+.compact-grid .form-group select {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.text-toolbar {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.format-btn {
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.85rem;
+    min-width: 2.2rem;
+}
+
+.format-btn:hover {
+    background: #e2e8f0;
+}
+
+.rich-text-editor {
+    min-height: 140px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 0.65rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: white;
+}
+
+.rich-text-editor:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.autocomplete-list {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: absolute;
+    width: 100%;
+    z-index: 1000;
+}
+
+.autocomplete-item {
+    padding: 0.7rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.autocomplete-item:hover {
+    background: #f0f0f0;
+}
+
+.active-autocomplete-item {
+    background: #e3f2fd !important;
+    border-left: 3px solid #2196f3;
+}
+
+.readonly-field {
+    background: #f1f3f5;
+    cursor: not-allowed;
+}
+
+.existing-pill {
+    display: inline-flex;
+    align-items: center;
+    background: #edf2ff;
+    color: #334155;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    margin: 0.25rem;
+}
+</style>
+
+<h2 style="margin-bottom: 1.5rem;">Add Contraindication</h2>
+
+{% if selected_disease %}
+<div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e2e8f0;">
+    <strong style="display: block; color: #2c3e50;">Selected Disease:</strong>
+    <span>{{ selected_disease.name }}</span>
+</div>
+{% endif %}
+
+<div id="existing-wrapper" style="margin-bottom: 1.5rem;{% if not existing_contras %} display:none;{% endif %}">
+    <h4 style="margin-bottom: 0.5rem; color: #2c3e50;">Existing contraindications for this disease</h4>
+    <div id="existing-list">
+        {% for contra in existing_contras %}
+            <span class="existing-pill">
+                {{ contra.practice_english }}{% if contra.source_type %} : {{ contra.source_type }}{% endif %}
+            </span>
         {% endfor %}
     </div>
-    
-    <div style="display: flex; gap: 1rem;">
-        <button type="submit" class="btn">Add Contraindication</button>
-        <a href="/" class="btn btn-secondary">Cancel</a>
+</div>
+
+<form method="POST" id="contra-form" style="max-width: 900px;">
+    <input type="hidden" name="disease_id" id="disease_id" value="{{ selected_disease.id if selected_disease else '' }}">
+    <input type="hidden" name="practice_id" id="practice_id">
+    <input type="hidden" name="reason" id="reason">
+    <input type="hidden" name="reference_full" id="reference_full">
+
+    <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+        <label for="disease_input">Disease *</label>
+        <input type="text" id="disease_input" placeholder="Start typing disease name" autocomplete="off"
+               value="{{ selected_disease.name if selected_disease else '' }}">
+        <div id="disease-autocomplete" class="autocomplete-list" style="display: none;"></div>
+        <small style="color: #666; display: block; margin-top: 0.4rem;">Search shows diseases once, regardless of module count.</small>
+    </div>
+
+    <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+        <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
+        <input type="text" id="practice_sanskrit" placeholder="Select a practice" autocomplete="off" disabled>
+        <div id="practice-autocomplete" class="autocomplete-list" style="display: none;"></div>
+        <small style="color: #666; display: block; margin-top: 0.4rem;">Only practices from the selected disease's modules are shown.</small>
+    </div>
+
+    <div class="compact-grid" style="margin-bottom: 1rem;">
+        <div class="form-group">
+            <label for="practice_english">Practice Name (English)</label>
+            <input type="text" id="practice_english" class="readonly-field" readonly>
+        </div>
+        <div class="form-group">
+            <label for="practice_segment">Category</label>
+            <input type="text" id="practice_segment" class="readonly-field" readonly>
+        </div>
+        <div class="form-group">
+            <label for="sub_category">Sub-Category</label>
+            <input type="text" id="sub_category" class="readonly-field" readonly>
+        </div>
+        <div class="form-group">
+            <label for="kosha">Kosha</label>
+            <input type="text" id="kosha" class="readonly-field" readonly>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Reason for Contraindication</label>
+        <div class="text-toolbar" data-editor="reason-editor">
+            <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
+            <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
+            <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+        </div>
+        <div id="reason-editor" class="rich-text-editor" contenteditable="true"></div>
+    </div>
+
+    <h3 style="margin: 2rem 0 1rem 0;">Reference</h3>
+
+    <div class="form-group">
+        <label>Reference (APA 7th edition)</label>
+        <div class="text-toolbar" data-editor="reference-editor">
+            <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
+            <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
+            <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+            <button type="button" class="format-btn" data-command="link">Link</button>
+        </div>
+        <div id="reference-editor" class="rich-text-editor" contenteditable="true" placeholder="Enter the formatted reference"></div>
+    </div>
+
+    <div class="compact-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="form-group">
+            <label for="parenthetical_citation">Parenthetical (APA 7th edition)</label>
+            <input type="text" id="parenthetical_citation" name="parenthetical_citation" placeholder="e.g., Thirthalli et al., 2013">
+        </div>
+        <div class="form-group">
+            <label for="reference_link">Link</label>
+            <input type="url" id="reference_link" name="reference_link" placeholder="https://doi.org/...">
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem;">
+        <button type="submit" name="add_another" value="yes" class="btn btn-secondary">Add Another Practice</button>
+        <div style="display: flex; gap: 0.75rem;">
+            <button type="submit" class="btn">Finish</button>
+            <a href="/contraindications" class="btn btn-secondary">Cancel</a>
+        </div>
     </div>
 </form>
 
 <script>
-// Autocomplete functionality for Sanskrit name
-let autocompleteTimeout;
-const sanskritInput = document.getElementById('practice_sanskrit');
-const autocompleteDiv = document.getElementById('autocomplete-results');
+let diseaseDebounce;
+let practiceDebounce;
+let availablePractices = [];
+let diseaseResults = [];
+let diseaseSelectedIndex = -1;
+let practiceResults = [];
+let practiceSelectedIndex = -1;
 
-sanskritInput.addEventListener('input', function() {
-    clearTimeout(autocompleteTimeout);
-    const query = this.value.trim();
-    
-    if (query.length < 1) {
-        autocompleteDiv.innerHTML = '';
-        return;
-    }
-    
-    autocompleteTimeout = setTimeout(() => {
-        fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                displayAutocompleteResults(data);
-            });
-    }, 300);
-});
+const diseaseInput = document.getElementById('disease_input');
+const diseaseIdInput = document.getElementById('disease_id');
+const diseaseAutocomplete = document.getElementById('disease-autocomplete');
+const practiceInput = document.getElementById('practice_sanskrit');
+const practiceAutocomplete = document.getElementById('practice-autocomplete');
+const practiceIdInput = document.getElementById('practice_id');
+const existingWrapper = document.getElementById('existing-wrapper');
+const existingList = document.getElementById('existing-list');
 
-function displayAutocompleteResults(practices) {
-    if (practices.length === 0) {
-        autocompleteDiv.innerHTML = '';
-        return;
-    }
-    
-    autocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
-        practices.map(p => `
-            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" onclick="selectPractice(${p.id})">
-                <strong>${p.practice_sanskrit || 'No Sanskrit name'}</strong><br>
-                <small>${p.practice_english}</small>
-            </div>
-        `).join('') +
-        '</div>';
+const reasonEditor = document.getElementById('reason-editor');
+const reasonHidden = document.getElementById('reason');
+const referenceEditor = document.getElementById('reference-editor');
+const referenceHidden = document.getElementById('reference_full');
+const form = document.getElementById('contra-form');
+
+function syncEditor(editor, hiddenInput) {
+    hiddenInput.value = editor.innerHTML.trim();
 }
 
-function selectPractice(id) {
-    fetch(`/api/practice/search?q=` + document.getElementById('practice_sanskrit').value)
-        .then(response => response.json())
-        .then(data => {
-            const practice = data.find(p => p.id === id);
-            if (practice) {
-                document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
-                document.getElementById('practice_english').value = practice.practice_english;
-                document.getElementById('practice_segment').value = practice.practice_segment;
-                document.getElementById('sub_category').value = practice.sub_category || '';
-                autocompleteDiv.innerHTML = '';
+reasonEditor.addEventListener('input', () => syncEditor(reasonEditor, reasonHidden));
+referenceEditor.addEventListener('input', () => syncEditor(referenceEditor, referenceHidden));
+
+form.addEventListener('submit', () => {
+    syncEditor(reasonEditor, reasonHidden);
+    syncEditor(referenceEditor, referenceHidden);
+});
+
+function attachToolbarListeners(toolbarSelector) {
+    document.querySelectorAll(`${toolbarSelector} .format-btn`).forEach(button => {
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            const command = button.dataset.command;
+            const targetId = toolbarSelector === '[data-editor="reason-editor"]' ? 'reason-editor' : 'reference-editor';
+            const editor = document.getElementById(targetId);
+            editor.focus();
+            if (command === 'link') {
+                const url = prompt('Enter URL to link to:');
+                if (url) {
+                    document.execCommand('createLink', false, url);
+                }
+            } else {
+                document.execCommand(command, false, null);
             }
+            if (toolbarSelector === '[data-editor="reason-editor"]') {
+                syncEditor(reasonEditor, reasonHidden);
+            } else {
+                syncEditor(referenceEditor, referenceHidden);
+            }
+        });
+    });
+}
+
+attachToolbarListeners('[data-editor="reason-editor"]');
+attachToolbarListeners('[data-editor="reference-editor"]');
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('#disease_input') && !event.target.closest('#disease-autocomplete')) {
+        diseaseAutocomplete.style.display = 'none';
+    }
+    if (!event.target.closest('#practice_sanskrit') && !event.target.closest('#practice-autocomplete')) {
+        practiceAutocomplete.style.display = 'none';
+    }
+});
+
+function renderExistingContraindications(items) {
+    if (!items || items.length === 0) {
+        existingWrapper.style.display = 'none';
+        existingList.innerHTML = '';
+        return;
+    }
+    existingWrapper.style.display = 'block';
+    existingList.innerHTML = items.map(item => {
+        const label = item.practice_english || item.practice_sanskrit;
+        if (item.parenthetical) {
+            return `<span class="existing-pill">${label} : ${item.parenthetical}</span>`;
+        }
+        return `<span class="existing-pill">${label}</span>`;
+    }).join('');
+}
+
+function fetchExistingContraindications(diseaseId) {
+    fetch(`/api/contraindications/by-disease/${diseaseId}`)
+        .then(res => res.json())
+        .then(renderExistingContraindications)
+        .catch(() => {
+            existingWrapper.style.display = 'none';
+            existingList.innerHTML = '';
         });
 }
 
-// Close autocomplete when clicking outside
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('#practice_sanskrit') && !e.target.closest('#autocomplete-results')) {
-        autocompleteDiv.innerHTML = '';
-    }
-});
-
-// Toggle page number and APA citation fields based on source type
-document.getElementById('source_type').addEventListener('change', function() {
-    const sourceType = this.value;
-    const pageNumberGroup = document.getElementById('page-number-group');
-    const apaCitationGroup = document.getElementById('apa-citation-group');
-    
-    if (sourceType === 'book') {
-        pageNumberGroup.style.display = 'block';
-        apaCitationGroup.style.display = 'block';
-    } else if (sourceType === 'paper') {
-        pageNumberGroup.style.display = 'none';
-        apaCitationGroup.style.display = 'block';
-    } else {
-        pageNumberGroup.style.display = 'none';
-        apaCitationGroup.style.display = 'none';
-    }
-});
-</script>
-
-<style>
-.autocomplete-item:hover {
-    background: #f0f0f0;
+function fetchPracticesForDisease(diseaseId) {
+    fetch(`/api/practices/by-disease/${diseaseId}`)
+        .then(res => res.json())
+        .then(data => {
+            availablePractices = data;
+            practiceInput.disabled = false;
+            practiceInput.value = '';
+            practiceIdInput.value = '';
+            document.getElementById('practice_english').value = '';
+            document.getElementById('practice_segment').value = '';
+            document.getElementById('sub_category').value = '';
+            document.getElementById('kosha').value = '';
+        });
 }
-</style>
+
+function loadDiseaseContext(diseaseId) {
+    if (!diseaseId) {
+        practiceInput.disabled = true;
+        availablePractices = [];
+        practiceIdInput.value = '';
+        practiceInput.value = '';
+        document.getElementById('practice_english').value = '';
+        document.getElementById('practice_segment').value = '';
+        document.getElementById('sub_category').value = '';
+        document.getElementById('kosha').value = '';
+        renderExistingContraindications([]);
+        return;
+    }
+    fetchPracticesForDisease(diseaseId);
+    fetchExistingContraindications(diseaseId);
+}
+
+function clearDiseaseSelection() {
+    diseaseSelectedIndex = -1;
+}
+
+function updateDiseaseSelection() {
+    const items = diseaseAutocomplete.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === diseaseSelectedIndex) {
+            item.classList.add('active-autocomplete-item');
+        } else {
+            item.classList.remove('active-autocomplete-item');
+        }
+    });
+}
+
+function displayDiseaseResults(results) {
+    if (!results || results.length === 0) {
+        diseaseAutocomplete.style.display = 'none';
+        diseaseAutocomplete.innerHTML = '';
+        diseaseResults = [];
+        clearDiseaseSelection();
+        return;
+    }
+    diseaseAutocomplete.style.display = 'block';
+    diseaseResults = results;
+    clearDiseaseSelection();
+    diseaseAutocomplete.innerHTML = results.map(result => {
+        const encodedName = encodeURIComponent(result.name);
+        return `<div class="autocomplete-item" data-disease="${result.id}" data-name="${encodedName}">
+            <strong>${result.name}</strong>
+        </div>`;
+    }).join('');
+
+    Array.from(diseaseAutocomplete.querySelectorAll('.autocomplete-item')).forEach(item => {
+        item.addEventListener('click', () => {
+            const diseaseId = parseInt(item.dataset.disease, 10);
+            const diseaseName = decodeURIComponent(item.dataset.name || '');
+            selectDisease(diseaseId, diseaseName);
+        });
+        item.addEventListener('mouseenter', () => {
+            diseaseSelectedIndex = Array.from(diseaseAutocomplete.children).indexOf(item);
+            updateDiseaseSelection();
+        });
+    });
+
+    updateDiseaseSelection();
+}
+
+function selectHighlightedDisease() {
+    if (diseaseSelectedIndex >= 0 && diseaseSelectedIndex < diseaseResults.length) {
+        const choice = diseaseResults[diseaseSelectedIndex];
+        selectDisease(choice.id, choice.name);
+        return true;
+    }
+    if (diseaseResults.length === 1) {
+        selectDisease(diseaseResults[0].id, diseaseResults[0].name);
+        return true;
+    }
+    return false;
+}
+
+function selectDisease(diseaseId, displayName) {
+    diseaseIdInput.value = diseaseId || '';
+    diseaseInput.value = displayName;
+    diseaseAutocomplete.style.display = 'none';
+    practiceInput.disabled = true;
+    availablePractices = [];
+    loadDiseaseContext(diseaseId);
+}
+
+function displayPracticeResults(results) {
+    if (!results || results.length === 0) {
+        practiceAutocomplete.style.display = 'none';
+        practiceAutocomplete.innerHTML = '';
+        practiceResults = [];
+        practiceSelectedIndex = -1;
+        return;
+    }
+    practiceAutocomplete.style.display = 'block';
+    practiceResults = results;
+    practiceSelectedIndex = -1;
+    practiceAutocomplete.innerHTML = results.map((practice, index) => {
+        const displayLabel = practice.practice_sanskrit || practice.practice_english;
+        const labelJson = JSON.stringify(displayLabel);
+        return `<div class="autocomplete-item" onclick="selectPracticeOption(${practice.id}, ${labelJson})">
+            <strong>${displayLabel}</strong><br>
+            <small>${practice.practice_english || ''}</small>
+        </div>`;
+    }).join('');
+
+    Array.from(practiceAutocomplete.querySelectorAll('.autocomplete-item')).forEach((item, index) => {
+        item.addEventListener('mouseenter', () => {
+            practiceSelectedIndex = index;
+            updatePracticeSelection();
+        });
+    });
+
+    updatePracticeSelection();
+}
+
+function selectPracticeOption(practiceId, label) {
+    const practice = availablePractices.find(p => p.id === practiceId);
+    if (!practice) return;
+    practiceIdInput.value = practice.id;
+    practiceInput.value = label || practice.practice_sanskrit || practice.practice_english;
+    document.getElementById('practice_english').value = practice.practice_english || '';
+    document.getElementById('practice_segment').value = practice.practice_segment || '';
+    document.getElementById('sub_category').value = practice.sub_category || '';
+    document.getElementById('kosha').value = practice.kosha || '';
+    practiceAutocomplete.style.display = 'none';
+    practiceResults = [];
+    practiceSelectedIndex = -1;
+}
+
+diseaseInput.addEventListener('input', () => {
+    clearTimeout(diseaseDebounce);
+    const query = diseaseInput.value.trim();
+    if (query.length < 1) {
+        diseaseAutocomplete.style.display = 'none';
+        diseaseResults = [];
+        clearDiseaseSelection();
+        return;
+    }
+    diseaseDebounce = setTimeout(() => {
+        fetch(`/api/disease/search?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(displayDiseaseResults);
+    }, 250);
+});
+
+diseaseInput.addEventListener('keydown', e => {
+    if (diseaseAutocomplete.style.display === 'none') return;
+
+    switch (e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            diseaseSelectedIndex = Math.min(diseaseSelectedIndex + 1, diseaseResults.length - 1);
+            updateDiseaseSelection();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            diseaseSelectedIndex = Math.max(diseaseSelectedIndex - 1, 0);
+            updateDiseaseSelection();
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (!selectHighlightedDisease() && diseaseResults.length > 0) {
+                selectDisease(diseaseResults[0].id, diseaseResults[0].name);
+            }
+            break;
+        case 'Escape':
+            diseaseAutocomplete.style.display = 'none';
+            diseaseResults = [];
+            clearDiseaseSelection();
+            break;
+    }
+});
+
+practiceInput.addEventListener('input', () => {
+    clearTimeout(practiceDebounce);
+    practiceIdInput.value = '';
+    const query = practiceInput.value.trim().toLowerCase();
+    if (query.length < 1) {
+        practiceAutocomplete.style.display = 'none';
+        practiceResults = [];
+        practiceSelectedIndex = -1;
+        return;
+    }
+    practiceDebounce = setTimeout(() => {
+        const matches = availablePractices.filter(p => {
+            const sanskrit = (p.practice_sanskrit || '').toLowerCase();
+            const english = (p.practice_english || '').toLowerCase();
+            return sanskrit.startsWith(query) || english.startsWith(query);
+        });
+        practiceResults = matches.slice(0, 20);
+        displayPracticeResults(practiceResults);
+    }, 200);
+});
+
+function updatePracticeSelection() {
+    const items = practiceAutocomplete.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === practiceSelectedIndex) {
+            item.classList.add('active-autocomplete-item');
+        } else {
+            item.classList.remove('active-autocomplete-item');
+        }
+    });
+}
+
+function selectHighlightedPractice() {
+    if (practiceSelectedIndex >= 0 && practiceSelectedIndex < practiceResults.length) {
+        selectPracticeOption(practiceResults[practiceSelectedIndex].id);
+        return true;
+    }
+    if (practiceResults.length === 1) {
+        selectPracticeOption(practiceResults[0].id);
+        return true;
+    }
+    return false;
+}
+
+practiceInput.addEventListener('keydown', e => {
+    if (practiceAutocomplete.style.display === 'none') return;
+
+    switch (e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            practiceSelectedIndex = Math.min(practiceSelectedIndex + 1, practiceResults.length - 1);
+            updatePracticeSelection();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            practiceSelectedIndex = Math.max(practiceSelectedIndex - 1, 0);
+            updatePracticeSelection();
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (!selectHighlightedPractice()) {
+                practiceAutocomplete.style.display = 'none';
+            }
+            break;
+        case 'Escape':
+            practiceAutocomplete.style.display = 'none';
+            practiceResults = [];
+            practiceSelectedIndex = -1;
+            break;
+    }
+});
+
+if (diseaseIdInput.value) {
+    loadDiseaseContext(diseaseIdInput.value);
+    if (referenceHidden.value) {
+        referenceEditor.innerHTML = referenceHidden.value;
+    }
+    if (reasonHidden.value) {
+        reasonEditor.innerHTML = reasonHidden.value;
+    }
+}
+</script>
 {% endblock %}

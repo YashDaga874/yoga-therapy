@@ -32,17 +32,19 @@
 <div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
     <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Modules:</label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Disease:</label>
             <div style="position: relative;">
-                <input type="text" id="module-search" name="search" value="{{ search_term }}" 
-                       placeholder="Type to search..." autocomplete="off"
+                <input type="text" id="disease-search" name="disease_name" value="{{ selected_disease_name or '' }}" 
+                       placeholder="Start typing disease name..." autocomplete="off"
                        style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
-                <div id="module-search-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
+                <input type="hidden" id="disease_id" name="disease_id" value="{{ selected_disease_id or '' }}">
+                <div id="disease-search-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
             </div>
         </div>
         
         <div style="display: flex; align-items: end;">
-            <button type="submit" class="btn">Filter</button>
+            <button type="submit" class="btn">Go</button>
+            <a href="/modules" class="btn btn-secondary" style="margin-left: 0.5rem;">Clear</a>
         </div>
     </form>
 </div>
@@ -51,24 +53,13 @@
     <table>
         <thead>
             <tr>
+                <th>Disease Name</th>
                 <th>Module (Developed By)</th>
-                <th>Disease</th>
-                <th>Number of Practices</th>
-                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for module in modules %}
             <tr>
-                <td>
-                    {% if module.paper_link %}
-                        <a href="{{ module.paper_link }}" target="_blank" class="module-link">
-                            {{ module.developed_by or 'N/A' }}
-                        </a>
-                    {% else %}
-                        <strong>{{ module.developed_by or 'N/A' }}</strong>
-                    {% endif %}
-                </td>
                 <td>
                     {% if module.disease %}
                         <a href="/disease/{{ module.disease.id }}" style="color: #495057; text-decoration: none;">
@@ -78,10 +69,17 @@
                         N/A
                     {% endif %}
                 </td>
-                <td>{{ module.practices|length if module.practices else 0 }} practices</td>
                 <td>
-                    <a href="/module/{{ module.id }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">View</a>
-                    <a href="/module/{{ module.id }}/edit" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Edit</a>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        {% if module.paper_link %}
+                            <a href="{{ module.paper_link }}" target="_blank" class="module-link">
+                                {{ module.developed_by or 'N/A' }}
+                            </a>
+                        {% else %}
+                            <strong>{{ module.developed_by or 'N/A' }}</strong>
+                        {% endif %}
+                        <a href="/module/{{ module.id }}" class="btn" style="padding: 0.35rem 0.9rem; font-size: 0.8rem;">View</a>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -89,84 +87,83 @@
     </table>
 {% else %}
     <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
-        <p>No modules found in the database.</p>
+        <p>No such modules found in the database.</p>
         <p style="margin-top: 1rem;">
-            <a href="/module/add" class="btn">Add Your First Module</a>
+            <a href="/module/add" class="btn">Add Module</a>
         </p>
     </div>
 {% endif %}
 
 <script>
-// Autocomplete for module search
-let searchTimeout;
-const searchInput = document.getElementById('module-search');
-const searchAutocompleteDiv = document.getElementById('module-search-autocomplete');
-let searchSelectedIndex = -1;
-let searchCurrentModules = [];
+// Autocomplete for disease search
+let diseaseTimeout;
+const diseaseInput = document.getElementById('disease-search');
+const diseaseIdInput = document.getElementById('disease_id');
+const diseaseAutocompleteDiv = document.getElementById('disease-search-autocomplete');
+let diseaseSelectedIndex = -1;
+let diseaseResults = [];
 
-searchInput.addEventListener('input', function() {
-    clearTimeout(searchTimeout);
+diseaseInput.addEventListener('input', function() {
+    clearTimeout(diseaseTimeout);
     const query = this.value.trim();
-    searchSelectedIndex = -1;
+    diseaseSelectedIndex = -1;
+    diseaseIdInput.value = '';
     
     if (query.length < 1) {
-        searchAutocompleteDiv.innerHTML = '';
-        searchCurrentModules = [];
+        diseaseAutocompleteDiv.innerHTML = '';
+        diseaseResults = [];
         return;
     }
     
-    searchTimeout = setTimeout(() => {
-        fetch(`/api/module/search/all?q=${encodeURIComponent(query)}`)
+    diseaseTimeout = setTimeout(() => {
+        fetch(`/api/disease/search?q=${encodeURIComponent(query)}`)
             .then(response => response.json())
             .then(data => {
-                searchCurrentModules = data;
-                displayModuleSearchAutocompleteResults(data);
+                diseaseResults = data;
+                displayDiseaseAutocompleteResults(data);
             });
-    }, 300);
+    }, 250);
 });
 
-searchInput.addEventListener('keydown', function(e) {
+diseaseInput.addEventListener('keydown', function(e) {
+    if (diseaseResults.length === 0) return;
+    
     if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (searchSelectedIndex < searchCurrentModules.length - 1) {
-            searchSelectedIndex++;
-            updateSearchHighlight();
-        }
+        diseaseSelectedIndex = Math.min(diseaseSelectedIndex + 1, diseaseResults.length - 1);
+        updateDiseaseHighlight();
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (searchSelectedIndex > 0) {
-            searchSelectedIndex--;
-            updateSearchHighlight();
-        }
-    } else if (e.key === 'Enter' && searchSelectedIndex >= 0) {
+        diseaseSelectedIndex = Math.max(diseaseSelectedIndex - 1, 0);
+        updateDiseaseHighlight();
+    } else if (e.key === 'Enter' && diseaseSelectedIndex >= 0) {
         e.preventDefault();
-        selectModuleSearch(searchSelectedIndex);
+        selectDiseaseResult(diseaseSelectedIndex, true);
     }
 });
 
-function displayModuleSearchAutocompleteResults(modules) {
-    if (modules.length === 0) {
-        searchAutocompleteDiv.innerHTML = '';
+function displayDiseaseAutocompleteResults(results) {
+    if (results.length === 0) {
+        diseaseAutocompleteDiv.innerHTML = '';
         return;
     }
     
-    searchAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
-        modules.map((m, index) => `
+    diseaseAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+        results.map((d, index) => `
             <div class="autocomplete-item" data-index="${index}" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
-                 onclick="selectModuleSearch(${index})"
-                 onmouseover="searchSelectedIndex = ${index}; updateSearchHighlight();">
-                <strong>${m.name}</strong><br>
-                <small style="color: #666;">${m.disease || 'N/A'}</small>
+                 onclick="selectDiseaseResult(${index}, true)"
+                 onmouseover="diseaseSelectedIndex = ${index}; updateDiseaseHighlight();">
+                <strong>${d.name}</strong>
             </div>
         `).join('') +
         '</div>';
-    updateSearchHighlight();
+    updateDiseaseHighlight();
 }
 
-function updateSearchHighlight() {
-    const items = searchAutocompleteDiv.querySelectorAll('.autocomplete-item');
+function updateDiseaseHighlight() {
+    const items = diseaseAutocompleteDiv.querySelectorAll('.autocomplete-item');
     items.forEach((item, index) => {
-        if (index === searchSelectedIndex) {
+        if (index === diseaseSelectedIndex) {
             item.style.background = '#f0f0f0';
         } else {
             item.style.background = 'white';
@@ -174,20 +171,22 @@ function updateSearchHighlight() {
     });
 }
 
-function selectModuleSearch(index) {
-    if (index >= 0 && index < searchCurrentModules.length) {
-        const module = searchCurrentModules[index];
-        searchInput.value = module.name;
-        searchAutocompleteDiv.innerHTML = '';
-        // Submit the form
-        searchInput.form.submit();
+function selectDiseaseResult(index, submitForm = false) {
+    if (index >= 0 && index < diseaseResults.length) {
+        const disease = diseaseResults[index];
+        diseaseInput.value = disease.name;
+        diseaseIdInput.value = disease.id;
+        diseaseAutocompleteDiv.innerHTML = '';
+        if (submitForm) {
+            diseaseInput.form.submit();
+        }
     }
 }
 
 // Close autocomplete when clicking outside
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('#module-search') && !e.target.closest('#module-search-autocomplete')) {
-        searchAutocompleteDiv.innerHTML = '';
+    if (!e.target.closest('#disease-search') && !e.target.closest('#disease-search-autocomplete')) {
+        diseaseAutocompleteDiv.innerHTML = '';
     }
 });
 </script>

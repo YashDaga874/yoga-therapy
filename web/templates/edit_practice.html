@@ -3,10 +3,64 @@
 {% block title %}Edit Practice{% endblock %}
 
 {% block content %}
+<style>
+.compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.9rem;
+}
+
+.compact-grid.three {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-grid .form-group input,
+.compact-grid .form-group select {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.text-toolbar {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.format-btn {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.85rem;
+    min-width: 2.2rem;
+}
+
+.format-btn:hover {
+    background: #e2e8f0;
+}
+
+.rich-text-editor {
+    min-height: 140px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 0.65rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: white;
+}
+
+.rich-text-editor:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+</style>
+
 <h2>Edit Practice</h2>
 
 <form method="POST" enctype="multipart/form-data" style="max-width: 900px;">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="practice_sanskrit">Sanskrit Name</label>
             <div style="position: relative;">
@@ -23,7 +77,7 @@
         </div>
     </div>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="practice_segment">Category *</label>
             <select id="practice_segment" name="practice_segment" required>
@@ -46,9 +100,6 @@
             <input type="text" id="sub_category" name="sub_category" 
                    value="{{ practice.sub_category or '' }}" placeholder="e.g., standing_asana, pranayama_practices">
         </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem;">
         <div class="form-group">
             <label for="kosha">Kosha *</label>
             <select id="kosha" name="kosha" required>
@@ -62,7 +113,7 @@
         </div>
     </div>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="rounds">Rounds</label>
             <input type="number" id="rounds" name="rounds" value="{{ practice.rounds or '' }}" placeholder="e.g., 5">
@@ -73,39 +124,28 @@
             <input type="number" step="0.5" id="time_minutes" name="time_minutes" 
                    value="{{ practice.time_minutes or '' }}" placeholder="e.g., 2">
         </div>
+        <div class="form-group">
+            <label for="strokes_per_min">Strokes</label>
+            <input type="number" id="strokes_per_min" name="strokes_per_min" 
+                   value="{{ practice.strokes_per_min or '' }}" placeholder="If applicable">
+        </div>
     </div>
-    
+
     <div class="form-group">
-        <label for="strokes_per_min">Strokes</label>
-        <input type="number" id="strokes_per_min" name="strokes_per_min" 
-               value="{{ practice.strokes_per_min or '' }}" placeholder="If applicable">
-    </div>
-    
-    <div class="form-group">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" 
-                  placeholder="Brief description of the practice">{{ practice.description or '' }}</textarea>
+        <label>Description</label>
+        <div class="text-toolbar">
+            <button type="button" class="format-btn" data-target="description-editor" data-format="bold"><strong>B</strong></button>
+            <button type="button" class="format-btn" data-target="description-editor" data-format="italic"><em>I</em></button>
+            <button type="button" class="format-btn" data-target="description-editor" data-format="underline"><span style="text-decoration: underline;">U</span></button>
+        </div>
+        <div id="description-editor" class="rich-text-editor" contenteditable="true" data-hidden-input="description">{{ (practice.description or '')|safe }}</div>
+        <input type="hidden" id="description" name="description" value="{{ (practice.description or '')|escape }}">
     </div>
     
     <div class="form-group" id="variations-container">
         <label>How to do!</label>
         <button type="button" class="btn btn-secondary" onclick="addVariationField()" style="margin-bottom: 1rem;">Add Variation</button>
-        <div id="variations">
-            {% if practice.variations %}
-                {% set vars = (practice.variations|from_json) if practice.variations else [] %}
-                {% for var in vars %}
-                    <div id="variation-{{ loop.index }}" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div>
-                            <input type="text" name="variation_{{ loop.index }}" value="{{ var.text if var is mapping else var }}">
-                        </div>
-                        <div>
-                            <input type="text" name="variation_ref_{{ loop.index }}" value="{{ var.referred_in if var is mapping else '' }}">
-                            <button type="button" onclick="removeVariation({{ loop.index }})" class="btn btn-secondary" style="margin-left: 0.5rem;">Remove</button>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        </div>
+        <div id="variations"></div>
     </div>
     
     <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem;">
@@ -128,51 +168,6 @@
         </div>
     </div>
     
-    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem;">
-        <h4 style="margin-bottom: 1rem;">Associate with Diseases</h4>
-        <p style="color: #666; margin-bottom: 1rem;">Select which diseases use this practice and their modules:</p>
-        
-        {% for disease in diseases %}
-        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
-            <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 0.5rem;">
-                <input type="checkbox" name="diseases" value="{{ disease.id }}" 
-                       class="disease-checkbox" data-disease-id="{{ disease.id }}"
-                       {% if disease in practice.diseases %}checked{% endif %}
-                       style="margin-right: 0.5rem;">
-                <strong>{{ disease.name }}</strong>
-            </label>
-            <div id="module-selection-{{ disease.id }}" style="display: {% if disease in practice.diseases %}block{% else %}none{% endif %}; margin-left: 1.5rem; margin-top: 0.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #666; font-weight: 500;">
-                    Modules Referred From:
-                </label>
-                <div id="modules-container-{{ disease.id }}">
-                    {% if modules_by_disease and disease.id in modules_by_disease %}
-                        {% for module_id, developed_by, practice_id in modules_by_disease[disease.id] %}
-                        <div class="module-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
-                            <input type="text" name="module_name_{{ disease.id }}_{{ loop.index0 }}" 
-                                   class="module-input" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}"
-                                   value="{{ developed_by }}"
-                                   placeholder="Type module name (e.g., Naveen et al., 2013)" 
-                                   autocomplete="off" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                            <input type="hidden" name="module_id_{{ disease.id }}_{{ loop.index0 }}" 
-                                   class="module-id-input" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}"
-                                   value="{{ module_id }}">
-                            <div class="module-autocomplete" data-disease-id="{{ disease.id }}" data-index="{{ loop.index0 }}" style="position: relative; flex: 1;"></div>
-                            <button type="button" class="remove-module-btn" data-disease-id="{{ disease.id }}" 
-                                    style="padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">Remove</button>
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                <button type="button" class="add-module-btn" data-disease-id="{{ disease.id }}" 
-                        style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
-                    + Add Module
-                </button>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    
     <div style="display: flex; gap: 1rem;">
         <button type="submit" class="btn">Update Practice</button>
         <a href="/practices" class="btn btn-secondary">Cancel</a>
@@ -180,32 +175,155 @@
 </form>
 
 <script>
-let variationCount = {{ (practice.variations|from_json)|length if practice.variations else 0 }};
+const descriptionEditor = document.getElementById('description-editor');
+const descriptionHiddenInput = document.getElementById('description');
 
-function addVariationField() {
-    variationCount++;
-    const container = document.getElementById('variations');
-    const div = document.createElement('div');
-    div.id = `variation-${variationCount}`;
-    div.style.display = 'grid';
-    div.style.gridTemplateColumns = '2fr 1fr';
-    div.style.gap = '1rem';
-    div.style.marginBottom = '1rem';
-    div.innerHTML = `
-        <div>
-            <input type="text" name="variation_${variationCount}" placeholder="Variation description">
-        </div>
-        <div>
-            <input type="text" name="variation_ref_${variationCount}" placeholder="Referred in (paper/book)">
-            <button type="button" onclick="removeVariation(${variationCount})" class="btn btn-secondary" style="margin-left: 0.5rem;">Remove</button>
-        </div>
-    `;
-    container.appendChild(div);
+function initializeRichTextEditor(editor, hiddenInput, initialHtml = '') {
+    if (!editor || !hiddenInput) return;
+    editor.innerHTML = initialHtml || editor.innerHTML || '';
+    editor.dataset.hiddenInput = hiddenInput.id;
+    hiddenInput.value = editor.innerHTML.trim();
+    editor.addEventListener('input', () => syncEditorValue(editor));
 }
 
-function removeVariation(id) {
-    const elem = document.getElementById(`variation-${id}`);
-    if (elem) elem.remove();
+function syncEditorValue(editor) {
+    if (!editor) return;
+    const hiddenId = editor.dataset.hiddenInput;
+    if (!hiddenId) return;
+    const hiddenInput = document.getElementById(hiddenId);
+    if (hiddenInput) {
+        hiddenInput.value = editor.innerHTML.trim();
+    }
+}
+
+initializeRichTextEditor(descriptionEditor, descriptionHiddenInput, descriptionHiddenInput ? descriptionHiddenInput.value : '');
+
+let variationCount = {{ (practice.variations|from_json)|length if practice.variations else 0 }};
+const variationsContainer = document.getElementById('variations');
+
+function addVariationField(prefillHtml = '', prefillRef = '') {
+    if (!variationsContainer) return;
+    variationCount++;
+    const editorId = `variation_editor_${variationCount}`;
+    const hiddenId = `variation_hidden_${variationCount}`;
+    const refId = `variation_ref_${variationCount}`;
+
+    const row = document.createElement('div');
+    row.className = 'variation-row';
+    row.id = `variation-${variationCount}`;
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '2fr 1fr';
+    row.style.gap = '1rem';
+    row.style.marginBottom = '1rem';
+    row.innerHTML = `
+        <div>
+            <div class="text-toolbar">
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="bold"><strong>B</strong></button>
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="italic"><em>I</em></button>
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="underline"><span style="text-decoration: underline;">U</span></button>
+            </div>
+            <div id="${editorId}" class="rich-text-editor" contenteditable="true" data-hidden-input="${hiddenId}"></div>
+            <input type="hidden" id="${hiddenId}" name="variation_${variationCount}">
+        </div>
+        <div>
+            <input type="text" id="${refId}" name="variation_ref_${variationCount}" placeholder="Referred in (paper/book)">
+            <button type="button" class="btn btn-secondary remove-variation-btn" data-variation-index="${variationCount}" style="margin-left: 0.5rem; margin-top: 0.5rem;">Remove</button>
+        </div>
+    `;
+    variationsContainer.appendChild(row);
+
+    const editor = document.getElementById(editorId);
+    const hiddenInput = document.getElementById(hiddenId);
+    initializeRichTextEditor(editor, hiddenInput, prefillHtml);
+    if (prefillRef) {
+        document.getElementById(refId).value = prefillRef;
+    }
+}
+
+function reindexVariations() {
+    if (!variationsContainer) return;
+    const rows = variationsContainer.querySelectorAll('.variation-row');
+    variationCount = rows.length;
+    rows.forEach((row, index) => {
+        const newIndex = index + 1;
+        row.id = `variation-${newIndex}`;
+
+        const editor = row.querySelector('.rich-text-editor');
+        const hiddenInput = row.querySelector('input[type="hidden"]');
+        const refInput = row.querySelector('input[id^="variation_ref_"]');
+        const toolbarButtons = row.querySelectorAll('.format-btn');
+
+        if (editor && hiddenInput) {
+            const editorId = `variation_editor_${newIndex}`;
+            const hiddenId = `variation_hidden_${newIndex}`;
+            editor.id = editorId;
+            editor.dataset.hiddenInput = hiddenId;
+            hiddenInput.id = hiddenId;
+            hiddenInput.name = `variation_${newIndex}`;
+            syncEditorValue(editor);
+            toolbarButtons.forEach(btn => btn.dataset.target = editorId);
+        }
+
+        if (refInput) {
+            refInput.id = `variation_ref_${newIndex}`;
+            refInput.name = `variation_ref_${newIndex}`;
+        }
+
+        const removeBtn = row.querySelector('.remove-variation-btn');
+        if (removeBtn) {
+            removeBtn.dataset.variationIndex = newIndex;
+        }
+    });
+}
+
+function syncAllVariationEditors() {
+    if (!variationsContainer) return;
+    variationsContainer.querySelectorAll('.rich-text-editor').forEach(editor => syncEditorValue(editor));
+}
+
+if (variationsContainer) {
+    if (variationCount > 0) {
+        variationsContainer.innerHTML = '';
+        variationCount = 0;
+        const vars = {{ (practice.variations|from_json)|tojson if practice.variations else '[]' }};
+        vars.forEach(varItem => {
+            const textValue = (typeof varItem === 'object' && varItem !== null) ? (varItem.text || '') : varItem;
+            const refValue = (typeof varItem === 'object' && varItem !== null) ? (varItem.referred_in || '') : '';
+            addVariationField(textValue, refValue);
+        });
+    }
+    syncAllVariationEditors();
+}
+
+document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('.remove-variation-btn');
+    if (removeBtn) {
+        event.preventDefault();
+        const row = removeBtn.closest('.variation-row');
+        if (row) {
+            row.remove();
+            reindexVariations();
+        }
+        return;
+    }
+
+    const formatBtn = event.target.closest('.format-btn');
+    if (!formatBtn) return;
+
+    event.preventDefault();
+    const editor = document.getElementById(formatBtn.dataset.target);
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(formatBtn.dataset.format, false, null);
+    syncEditorValue(editor);
+});
+
+const editPracticeForm = document.querySelector('form');
+if (editPracticeForm) {
+    editPracticeForm.addEventListener('submit', () => {
+        syncEditorValue(descriptionEditor);
+        syncAllVariationEditors();
+    });
 }
 
 // Category to Kosha mapping
@@ -219,17 +337,15 @@ const categoryToKosha = {
     'Meditation': 'Manomaya Kosha',
     'Chanting': 'Manomaya Kosha',
     'Yogic Counselling': 'Vijnanamaya Kosha',
-    'Additional Practices': ''  // Can be left empty or determined by user
+    'Additional Practices': ''
 };
 
-// Auto-fill Kosha based on Category selection
 const categorySelect = document.getElementById('practice_segment');
 const koshaSelect = document.getElementById('kosha');
 
 if (categorySelect && koshaSelect) {
     categorySelect.addEventListener('change', function() {
-        const selectedCategory = this.value;
-        const mappedKosha = categoryToKosha[selectedCategory];
+        const mappedKosha = categoryToKosha[this.value];
         if (mappedKosha) {
             koshaSelect.value = mappedKosha;
         }
@@ -243,62 +359,61 @@ let selectedIndex = -1;
 const sanskritInput = document.getElementById('practice_sanskrit');
 const autocompleteDiv = document.getElementById('autocomplete-results');
 
-sanskritInput.addEventListener('input', function() {
-    clearTimeout(autocompleteTimeout);
-    const query = this.value.trim();
-    selectedIndex = -1;
-    
-    if (query.length < 1) {
-        autocompleteDiv.innerHTML = '';
-        currentPractices = [];
-        return;
-    }
-    
-    autocompleteTimeout = setTimeout(() => {
-        fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                currentPractices = data;
-                displayAutocompleteResults(data);
-            });
-    }, 300);
-});
-
-// Keyboard navigation
-sanskritInput.addEventListener('keydown', function(e) {
-    if (autocompleteDiv.innerHTML === '') return;
-    
-    const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
-    
-    switch(e.key) {
-        case 'ArrowDown':
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-            updateSelection();
-            break;
-        case 'ArrowUp':
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, -1);
-            updateSelection();
-            break;
-        case 'Enter':
-            e.preventDefault();
-            if (selectedIndex >= 0 && selectedIndex < items.length) {
-                selectPractice(currentPractices[selectedIndex].id);
-                // Move focus to the next field (English Name)
-                document.getElementById('practice_english').focus();
-            }
-            break;
-        case 'Escape':
+if (sanskritInput) {
+    sanskritInput.addEventListener('input', function() {
+        clearTimeout(autocompleteTimeout);
+        const query = this.value.trim();
+        selectedIndex = -1;
+        
+        if (query.length < 1) {
             autocompleteDiv.innerHTML = '';
             currentPractices = [];
-            selectedIndex = -1;
-            break;
-    }
-});
+            return;
+        }
+        
+        autocompleteTimeout = setTimeout(() => {
+            fetch(`/api/practice/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentPractices = data;
+                    displayAutocompleteResults(data);
+                });
+        }, 300);
+    });
+    
+    sanskritInput.addEventListener('keydown', function(e) {
+        if (autocompleteDiv.innerHTML === '') return;
+        
+        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < items.length) {
+                    selectPractice(currentPractices[selectedIndex].id);
+                    document.getElementById('practice_english').focus();
+                }
+                break;
+            case 'Escape':
+                autocompleteDiv.innerHTML = '';
+                currentPractices = [];
+                selectedIndex = -1;
+                break;
+        }
+    });
+}
 
-function updateSelection() {
-    const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+function updateSelection(items) {
     items.forEach((item, index) => {
         if (index === selectedIndex) {
             item.style.backgroundColor = '#e3f2fd';
@@ -330,57 +445,54 @@ function displayAutocompleteResults(practices) {
 function selectPractice(id) {
     const practice = currentPractices.find(p => p.id === id);
     if (practice) {
-        // Fill all fields except media attachments
         document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
         document.getElementById('practice_english').value = practice.practice_english;
-        document.getElementById('kosa').value = practice.kosa;
+        document.getElementById('practice_segment').value = practice.practice_segment || '';
         document.getElementById('sub_category').value = practice.sub_category || '';
         document.getElementById('rounds').value = practice.rounds || '';
         document.getElementById('time_minutes').value = practice.time_minutes || '';
-        document.getElementById('strokes_per_min').value = practice.strokes_per_min || '';
-        document.getElementById('strokes_per_cycle').value = practice.strokes_per_cycle || '';
-        document.getElementById('rest_between_cycles_sec').value = practice.rest_between_cycles_sec || '';
-        document.getElementById('description').value = practice.description || '';
-        
-        // Clear existing variations first
-        const variationsContainer = document.getElementById('variations');
-        variationsContainer.innerHTML = '';
-        variationCount = 0;
-        
-        // Handle variations
-        if (practice.variations) {
-            try {
-                const variations = JSON.parse(practice.variations);
-                if (variations && variations.length > 0) {
-                    variations.forEach((v, idx) => {
-                        addVariationField();
-                        document.getElementsByName(`variation_${variationCount}`)[0].value = v.text || v;
-                        document.getElementsByName(`variation_ref_${variationCount}`)[0].value = v.referred_in || '';
-                    });
-                }
-            } catch (e) {
-                // Old format - simple array
-                const variations = typeof practice.variations === 'string' ? JSON.parse(practice.variations) : [];
-                if (variations && variations.length > 0) {
-                    variations.forEach((v, idx) => {
-                        addVariationField();
-                        document.getElementsByName(`variation_${variationCount}`)[0].value = v;
-                    });
+        const strokesField = document.getElementById('strokes_per_min');
+        if (strokesField) {
+            strokesField.value = practice.strokes_per_min || '';
+        }
+        const koshaField = document.getElementById('kosha');
+        if (koshaField) {
+            koshaField.value = practice.kosha || '';
+        }
+        if (descriptionEditor) {
+            descriptionEditor.innerHTML = practice.description || '';
+            syncEditorValue(descriptionEditor);
+        }
+
+        if (variationsContainer) {
+            variationsContainer.innerHTML = '';
+            variationCount = 0;
+            if (practice.variations) {
+                try {
+                    const variations = JSON.parse(practice.variations);
+                    if (variations && variations.length > 0) {
+                        variations.forEach(v => {
+                            const textValue = (typeof v === 'object' && v !== null) ? (v.text || '') : v;
+                            const refValue = (typeof v === 'object' && v !== null) ? (v.referred_in || '') : '';
+                            addVariationField(textValue, refValue);
+                        });
+                    }
+                } catch (e) {
+                    const variations = typeof practice.variations === 'string' ? JSON.parse(practice.variations) : [];
+                    if (variations && variations.length > 0) {
+                        variations.forEach(v => addVariationField(v, ''));
+                    }
                 }
             }
+            syncAllVariationEditors();
         }
-        
-        // Clear autocomplete and reset
+
         autocompleteDiv.innerHTML = '';
         currentPractices = [];
         selectedIndex = -1;
-        
-        // Move focus to the next field (English Name)
-        document.getElementById('practice_english').focus();
     }
 }
 
-// Close autocomplete when clicking outside
 document.addEventListener('click', function(e) {
     if (!e.target.closest('#practice_sanskrit') && !e.target.closest('#autocomplete-results')) {
         autocompleteDiv.innerHTML = '';
@@ -388,242 +500,6 @@ document.addEventListener('click', function(e) {
         selectedIndex = -1;
     }
 });
-
-// Track module counts per disease
-const moduleCounts = {};
-document.querySelectorAll('.disease-checkbox').forEach(checkbox => {
-    const diseaseId = checkbox.dataset.diseaseId;
-    const container = document.getElementById(`modules-container-${diseaseId}`);
-    if (container) {
-        moduleCounts[diseaseId] = container.querySelectorAll('.module-row').length;
-    } else {
-        moduleCounts[diseaseId] = 0;
-    }
-});
-
-// Add module button functionality
-document.querySelectorAll('.add-module-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const diseaseId = this.dataset.diseaseId;
-        const container = document.getElementById(`modules-container-${diseaseId}`);
-        const index = moduleCounts[diseaseId];
-        
-        const moduleRow = document.createElement('div');
-        moduleRow.className = 'module-row';
-        moduleRow.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
-        moduleRow.innerHTML = `
-            <input type="text" name="module_name_${diseaseId}_${index}" 
-                   class="module-input" data-disease-id="${diseaseId}" data-index="${index}"
-                   placeholder="Type module name (e.g., Naveen et al., 2013)" 
-                   autocomplete="off" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-            <input type="hidden" name="module_id_${diseaseId}_${index}" 
-                   class="module-id-input" data-disease-id="${diseaseId}" data-index="${index}" value="">
-            <div class="module-autocomplete" data-disease-id="${diseaseId}" data-index="${index}" style="position: relative; flex: 1;"></div>
-            <button type="button" class="remove-module-btn" data-disease-id="${diseaseId}" 
-                    style="padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">Remove</button>
-        `;
-        
-        container.appendChild(moduleRow);
-        moduleCounts[diseaseId]++;
-        
-        // Initialize autocomplete for the new field
-        const moduleInput = moduleRow.querySelector('.module-input');
-        const moduleIdInput = moduleRow.querySelector('.module-id-input');
-        const autocompleteDiv = moduleRow.querySelector('.module-autocomplete');
-        initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
-    });
-});
-
-// Remove module button functionality
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('remove-module-btn')) {
-        const diseaseId = e.target.dataset.diseaseId;
-        const moduleRow = e.target.closest('.module-row');
-        if (moduleRow) {
-            moduleRow.remove();
-            // Reindex remaining modules
-            const container = document.getElementById(`modules-container-${diseaseId}`);
-            const rows = container.querySelectorAll('.module-row');
-            rows.forEach((row, index) => {
-                const inputs = row.querySelectorAll('input, .module-autocomplete');
-                inputs.forEach(input => {
-                    if (input.name) {
-                        input.name = input.name.replace(/_\d+$/, `_${index}`);
-                    }
-                    if (input.dataset.index !== undefined) {
-                        input.dataset.index = index;
-                    }
-                });
-            });
-            moduleCounts[diseaseId] = rows.length;
-        }
-    }
-});
-
-// Module selection for each disease
-document.querySelectorAll('.disease-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const diseaseId = this.dataset.diseaseId;
-        const moduleSelection = document.getElementById(`module-selection-${diseaseId}`);
-        
-        if (this.checked) {
-            moduleSelection.style.display = 'block';
-            // Initialize autocomplete for all existing module fields
-            const container = document.getElementById(`modules-container-${diseaseId}`);
-            if (container) {
-                container.querySelectorAll('.module-row').forEach((row, index) => {
-                    const moduleInput = row.querySelector('.module-input');
-                    const moduleIdInput = row.querySelector('.module-id-input');
-                    const autocompleteDiv = row.querySelector('.module-autocomplete');
-                    if (moduleInput && moduleIdInput && autocompleteDiv) {
-                        initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
-                    }
-                });
-            }
-        } else {
-            moduleSelection.style.display = 'none';
-        }
-    });
-    
-    // Initialize autocomplete if disease is already checked
-    if (checkbox.checked) {
-        const diseaseId = checkbox.dataset.diseaseId;
-        const container = document.getElementById(`modules-container-${diseaseId}`);
-        if (container) {
-            container.querySelectorAll('.module-row').forEach((row, index) => {
-                const moduleInput = row.querySelector('.module-input');
-                const moduleIdInput = row.querySelector('.module-id-input');
-                const autocompleteDiv = row.querySelector('.module-autocomplete');
-                if (moduleInput && moduleIdInput && autocompleteDiv) {
-                    initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv, index);
-                }
-            });
-        }
-    }
-});
-
-function initModuleAutocomplete(diseaseId, input, hiddenInput, autocompleteDiv, index) {
-    let autocompleteTimeout;
-    let currentModules = [];
-    let selectedIndex = -1;
-    const uniqueId = `${diseaseId}_${index}`;
-    
-    input.addEventListener('input', function() {
-        clearTimeout(autocompleteTimeout);
-        const query = this.value.trim();
-        selectedIndex = -1;
-        
-        if (query.length < 1) {
-            autocompleteDiv.innerHTML = '';
-            currentModules = [];
-            hiddenInput.value = '';
-            return;
-        }
-        
-        autocompleteTimeout = setTimeout(() => {
-            fetch(`/api/module/search?q=${encodeURIComponent(query)}&disease_id=${diseaseId}`)
-                .then(response => response.json())
-                .then(data => {
-                    currentModules = data;
-                    displayModuleAutocompleteResults(data, autocompleteDiv, diseaseId, index);
-                });
-        }, 300);
-    });
-    
-    input.addEventListener('keydown', function(e) {
-        if (autocompleteDiv.innerHTML === '') return;
-        
-        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
-        
-        switch(e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                updateModuleSelection(items, selectedIndex);
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                selectedIndex = Math.max(selectedIndex - 1, -1);
-                updateModuleSelection(items, selectedIndex);
-                break;
-            case 'Enter':
-                e.preventDefault();
-                if (selectedIndex >= 0 && selectedIndex < items.length) {
-                    selectModuleLocal(currentModules[selectedIndex].id, currentModules[selectedIndex].name);
-                }
-                break;
-            case 'Escape':
-                autocompleteDiv.innerHTML = '';
-                currentModules = [];
-                selectedIndex = -1;
-                break;
-        }
-    });
-    
-    function displayModuleAutocompleteResults(modules, div, diseaseId, idx) {
-        if (modules.length === 0) {
-            div.innerHTML = '';
-            return;
-        }
-        
-        div.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
-            modules.map((m, i) => {
-                const escapedName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                return `
-                <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
-                     onclick="selectModuleForDisease(${diseaseId}, ${idx}, ${m.id}, '${escapedName}')" data-index="${i}">
-                    <strong>${m.name}</strong>
-                </div>
-            `;
-            }).join('') +
-            '</div>';
-    }
-    
-    function updateModuleSelection(items, idx) {
-        items.forEach((item, i) => {
-            if (i === idx) {
-                item.style.backgroundColor = '#e3f2fd';
-                item.style.borderLeft = '3px solid #2196f3';
-            } else {
-                item.style.backgroundColor = '';
-                item.style.borderLeft = '';
-            }
-        });
-    }
-    
-    function selectModuleLocal(id, name) {
-        input.value = name;
-        hiddenInput.value = id;
-        autocompleteDiv.innerHTML = '';
-        currentModules = [];
-        selectedIndex = -1;
-    }
-    
-    // Store the select function for this specific field
-    window[`selectModuleForDisease_${uniqueId}`] = selectModuleLocal;
-    
-    // Close autocomplete when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest(input) && !e.target.closest(autocompleteDiv)) {
-            autocompleteDiv.innerHTML = '';
-            currentModules = [];
-            selectedIndex = -1;
-        }
-    });
-}
-
-// Global function to select module for a disease
-function selectModuleForDisease(diseaseId, index, moduleId, moduleName) {
-    const moduleInput = document.querySelector(`input.module-input[data-disease-id="${diseaseId}"][data-index="${index}"]`);
-    const moduleIdInput = document.querySelector(`input.module-id-input[data-disease-id="${diseaseId}"][data-index="${index}"]`);
-    const autocompleteDiv = document.querySelector(`.module-autocomplete[data-disease-id="${diseaseId}"][data-index="${index}"]`);
-    
-    if (moduleInput && moduleIdInput && autocompleteDiv) {
-        moduleInput.value = moduleName;
-        moduleIdInput.value = moduleId;
-        autocompleteDiv.innerHTML = '';
-    }
-}
 </script>
 
 <style>

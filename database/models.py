@@ -83,6 +83,7 @@ class Practice(Base):
     steps = Column(Text)  # JSON string for steps list
     description = Column(Text)
     how_to_do = Column(Text)  # How to do this practice
+    cvr_score = Column(Float)  # Capacity-Variability-Responsiveness score
     
     # Media attachments
     photo_path = Column(String(500))  # Path to uploaded photo
@@ -197,7 +198,7 @@ class Module(Base):
     disease = relationship('Disease', backref='modules')
     
     # Module identification
-    developed_by = Column(String(500))  # Parenthetical citation (e.g., "Naveen et al., 2013")
+    developed_by = Column(String(500))  # Citation (e.g., "Naveen et al., 2013")
     paper_link = Column(String(1000))  # Link to research paper
     module_description = Column(Text)
     
@@ -261,7 +262,7 @@ class RCT(Base):
     doi = Column(String(500))
     pmic_nmic = Column(String(200))  # PMIC/NMIC or extra option if not available
     title = Column(Text)
-    parenthetical_citation = Column(Text)  # Parenthetical citation/citation
+    parenthetical_citation = Column(Text)  # Citation text (optional)
     citation_full = Column(Text)  # Full citation
     study_type = Column(String(100))  # RCT, Clinical Trial, Others
     

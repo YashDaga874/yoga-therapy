@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Practice in Module{% endblock %}
+
+{% block content %}
+<style>
+.compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.9rem;
+}
+
+.compact-grid.three {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-grid .form-group input,
+.compact-grid .form-group select {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+</style>
+
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
+    <h3 style="margin: 0 0 0.5rem 0; color: #2c3e50;">Editing Practice in Module</h3>
+    <p style="margin: 0; color: #555;">
+        <strong>Module:</strong>
+        {% if module.paper_link %}
+            <a href="{{ module.paper_link }}" target="_blank" style="color: #667eea; text-decoration: none;">
+                {{ module.developed_by or 'N/A' }}
+            </a>
+        {% else %}
+            {{ module.developed_by or 'N/A' }}
+        {% endif %}
+        <br>
+        <strong>Disease:</strong> {{ module.disease.name if module.disease else 'N/A' }}
+    </p>
+</div>
+
+<h2>Edit Practice</h2>
+
+<form method="POST" style="max-width: 900px;">
+    <div class="compact-grid" style="margin-bottom: 1.25rem;">
+        <div class="form-group">
+            <label for="practice_sanskrit">Sanskrit Name</label>
+            <input type="text" id="practice_sanskrit" name="practice_sanskrit"
+                   value="{{ practice.practice_sanskrit or '' }}" placeholder="e.g., Shavasana">
+        </div>
+
+        <div class="form-group">
+            <label for="practice_english">English Name *</label>
+            <input type="text" id="practice_english" name="practice_english" required
+                   value="{{ practice.practice_english }}" placeholder="e.g., Corpse pose">
+        </div>
+    </div>
+
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
+        <div class="form-group">
+            <label for="practice_segment">Category *</label>
+            <select id="practice_segment" name="practice_segment" required>
+                <option value="">Select Category</option>
+                {% for segment in practice_segments %}
+                <option value="{{ segment }}" {% if practice.practice_segment == segment %}selected{% endif %}>{{ segment }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="sub_category">Sub-Category</label>
+            <input type="text" id="sub_category" name="sub_category"
+                   value="{{ practice.sub_category or '' }}" placeholder="e.g., standing_asana, pranayama_practices">
+        </div>
+
+        <div class="form-group">
+            <label for="kosha">Kosha *</label>
+            <select id="kosha" name="kosha" required>
+                <option value="">Select Kosha</option>
+                <option value="Annamaya Kosha" {% if practice.kosha == 'Annamaya Kosha' %}selected{% endif %}>Annamaya Kosha</option>
+                <option value="Pranamaya Kosha" {% if practice.kosha == 'Pranamaya Kosha' %}selected{% endif %}>Pranamaya Kosha</option>
+                <option value="Manomaya Kosha" {% if practice.kosha == 'Manomaya Kosha' %}selected{% endif %}>Manomaya Kosha</option>
+                <option value="Vijnanamaya Kosha" {% if practice.kosha == 'Vijnanamaya Kosha' %}selected{% endif %}>Vijnanamaya Kosha</option>
+                <option value="Anandamaya Kosha" {% if practice.kosha == 'Anandamaya Kosha' %}selected{% endif %}>Anandamaya Kosha</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
+        <div class="form-group">
+            <label for="rounds">Rounds</label>
+            <input type="number" id="rounds" name="rounds" value="{{ practice.rounds or '' }}" placeholder="e.g., 5">
+        </div>
+
+        <div class="form-group">
+            <label for="time_minutes">Duration (minutes)</label>
+            <input type="number" step="0.5" id="time_minutes" name="time_minutes" value="{{ practice.time_minutes or '' }}" placeholder="e.g., 2">
+        </div>
+
+        <div class="form-group">
+            <label for="strokes_per_min">Strokes (if applicable)</label>
+            <input type="number" id="strokes_per_min" name="strokes_per_min" value="{{ practice.strokes_per_min or '' }}" placeholder="If applicable">
+        </div>
+    </div>
+
+    <div class="compact-grid" style="margin-bottom: 1.25rem;">
+        <div class="form-group">
+            <label for="cvr_score">CVR Score</label>
+            <input type="number" step="0.01" id="cvr_score" name="cvr_score" value="{{ practice.cvr_score or '' }}" placeholder="e.g., 0.82">
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+        <button type="submit" class="btn">Save Changes</button>
+        <a href="/module/{{ module.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+// Category to Kosha mapping
+const categoryToKosha = {
+    'Preparatory Practice': 'Annamaya Kosha',
+    'Yogasana': 'Annamaya Kosha',
+    'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Breathing Practice': 'Pranamaya Kosha',
+    'Pranayama': 'Pranamaya Kosha',
+    'Meditation': 'Manomaya Kosha',
+    'Chanting': 'Manomaya Kosha',
+    'Yogic Counselling': 'Vijnanamaya Kosha',
+    'Additional Practices': ''
+};
+
+const categorySelect = document.getElementById('practice_segment');
+const koshaSelect = document.getElementById('kosha');
+
+if (categorySelect && koshaSelect) {
+    categorySelect.addEventListener('change', function() {
+        const mappedKosha = categoryToKosha[this.value];
+        if (mappedKosha) {
+            koshaSelect.value = mappedKosha;
+        }
+    });
+}
+</script>
+{% endblock %}
+

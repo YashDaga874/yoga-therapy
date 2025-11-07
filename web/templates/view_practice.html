@@ -62,7 +62,7 @@
                 {% endif %}
                 {% if practice.strokes_per_min %}
                 <div class="info-item">
-                    <span class="label">Strokes/Min:</span>
+                    <span class="label">Strokes:</span>
                     <span class="value">{{ practice.strokes_per_min }}</span>
                 </div>
                 {% endif %}
@@ -84,7 +84,7 @@
         {% if practice.description %}
         <div class="content-section">
             <h3>Description</h3>
-            <p class="content-text">{{ practice.description }}</p>
+            <div class="content-text">{{ practice.description|safe }}</div>
         </div>
         {% endif %}
 
@@ -110,7 +110,7 @@
                         {% set variations = (practice.variations|from_json) if practice.variations else [] %}
                         {% for var in variations %}
                         <tr>
-                            <td class="variation-text">{{ var.text if var is mapping else var }}</td>
+                            <td class="variation-text">{{ (var.text if var is mapping else var)|safe }}</td>
                             <td class="variation-ref">{{ var.referred_in if var is mapping else '-' }}</td>
                         </tr>
                         {% endfor %}

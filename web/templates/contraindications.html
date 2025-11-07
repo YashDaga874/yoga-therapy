@@ -44,7 +44,7 @@
                     <td><strong>{{ contra.practice_english }}</strong></td>
                     <td>{{ contra.practice_segment }}</td>
                     <td>{{ contra.sub_category or '-' }}</td>
-                    <td>{{ contra.reason or '-' }}</td>
+                    <td>{% if contra.reason %}{{ contra.reason|safe }}{% else %}-{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

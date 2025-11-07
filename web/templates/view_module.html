@@ -51,26 +51,23 @@
 <div class="module-header">
     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
         <div>
-            <h1 class="module-title" style="font-size: 1.8rem; margin: 0 0 1rem 0;">
-                <span style="font-weight: 500; color: #666;">Parenthetical citation - </span>
-                {% if module.paper_link %}
-                    <a href="{{ module.paper_link }}" target="_blank" class="module-link" style="font-size: 1.8rem;">
-                        {{ module.developed_by or 'Module' }}
-                    </a>
-                {% else %}
-                    <span style="color: #667eea; font-weight: 600; font-size: 1.8rem;">
-                        {{ module.developed_by or 'Module' }}
-                    </span>
-                {% endif %}
+            {% if module.disease %}
+            <h1 class="module-title" style="font-size: 2.1rem; margin: 0 0 0.5rem 0;">
+                <a href="/disease/{{ module.disease.id }}" style="color: #2c3e50; text-decoration: none;">
+                    {{ module.disease.name }}
+                </a>
             </h1>
-            <p style="color: #666; margin: 0.5rem 0; font-size: 1.2rem;">
-                <strong>Disease:</strong> 
-                {% if module.disease %}
-                    <a href="/disease/{{ module.disease.id }}" style="color: #495057; text-decoration: none; font-size: 1.2rem;">
-                        {{ module.disease.name }}
+            {% endif %}
+
+            <p style="color: #666; margin: 0.25rem 0 0 0; font-size: 1.1rem;">
+                {% if module.paper_link %}
+                    <a href="{{ module.paper_link }}" target="_blank" class="module-link">
+                        {{ module.developed_by or 'N/A' }}
                     </a>
                 {% else %}
-                    <span style="font-size: 1.2rem;">N/A</span>
+                    <span style="color: #667eea; font-weight: 600;">
+                        {{ module.developed_by or 'N/A' }}
+                    </span>
                 {% endif %}
             </p>
         </div>
@@ -98,50 +95,112 @@
     <a href="/module/{{ module.id }}/practice/add" class="btn">Add Practice to Module</a>
 </div>
 
-{% if practices_by_segment %}
-    {% for segment, practices in practices_by_segment.items() %}
-    <div class="practice-segment">
-        <h3 style="margin: 0 0 1rem 0; color: #495057;">{{ segment }}</h3>
-        
-        {% for practice in practices %}
-        <div class="practice-item">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div style="flex: 1;">
-                    <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50;">
-                        {% if practice.practice_sanskrit %}
-                            {{ practice.practice_sanskrit }} 
-                            <span style="color: #666; font-weight: normal;">({{ practice.practice_english }})</span>
-                        {% else %}
-                            {{ practice.practice_english }}
-                        {% endif %}
-                    </h4>
-                    
-                    {% if practice.sub_category %}
-                    <p style="margin: 0.3rem 0; color: #666; font-size: 0.9rem;">
-                        <em>{{ practice.sub_category }}</em>
-                    </p>
-                    {% endif %}
-                    
-                    <div style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
-                        {% if practice.rounds %}
-                            <span>Rounds: {{ practice.rounds }}</span>
-                        {% endif %}
-                        {% if practice.time_minutes %}
-                            <span style="margin-left: 1rem;">Time: {{ practice.time_minutes }} min</span>
-                        {% endif %}
+{% if practices_by_kosha %}
+    {% for kosha in ordered_koshas %}
+        {% set categories = practices_by_kosha.get(kosha, {}) %}
+        {% if categories %}
+        <div class="practice-segment">
+            <h3 style="margin: 0 0 1rem 0; color: #2c3e50; font-weight: 700;">{{ kosha }}</h3>
+
+            {% for category in category_order %}
+                {% if categories.get(category) %}
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; color: #495057; font-weight: 600;">{{ category }}</h4>
+                        {% for practice in categories.get(category) %}
+                        <div class="practice-item">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <h5 style="margin: 0 0 0.5rem 0; color: #2c3e50; font-size: 1.05rem;">
+                                        {% if practice.practice_sanskrit %}
+                                            {{ practice.practice_sanskrit }}
+                                            <span style="color: #666; font-weight: normal;">({{ practice.practice_english }})</span>
+                                        {% else %}
+                                            {{ practice.practice_english }}
+                                        {% endif %}
+                                    </h5>
+
+                                    {% if practice.sub_category %}
+                                    <p style="margin: 0.3rem 0; color: #666; font-size: 0.9rem;">
+                                        <em>{{ practice.sub_category }}</em>
+                                    </p>
+                                    {% endif %}
+
+                                    <div style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                        {% if practice.rounds %}
+                                            <span>Rounds: {{ practice.rounds }}</span>
+                                        {% endif %}
+                                        {% if practice.time_minutes %}
+                                            <span style="margin-left: 1rem;">Time: {{ practice.time_minutes }} min</span>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if practice.description %}
+                                    <p style="margin-top: 0.5rem; color: #555;">{{ practice.description|safe }}</p>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <a href="/module/{{ module.id }}/practice/{{ practice.id }}/edit" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Edit</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
-                    
-                    {% if practice.description %}
-                    <p style="margin-top: 0.5rem; color: #555;">{{ practice.description }}</p>
-                    {% endif %}
+                {% endif %}
+            {% endfor %}
+
+            {% set remaining_categories = [] %}
+            {% for cat_name, practices in categories.items() %}
+                {% if cat_name not in category_order %}
+                    {% set _ = remaining_categories.append((cat_name, practices)) %}
+                {% endif %}
+            {% endfor %}
+            {% for cat in remaining_categories %}
+                {% set category = cat[0] %}
+                {% set practices = cat[1] %}
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: #495057; font-weight: 600;">{{ category }}</h4>
+                    {% for practice in practices %}
+                    <div class="practice-item">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <h5 style="margin: 0 0 0.5rem 0; color: #2c3e50; font-size: 1.05rem;">
+                                    {% if practice.practice_sanskrit %}
+                                        {{ practice.practice_sanskrit }}
+                                        <span style="color: #666; font-weight: normal;">({{ practice.practice_english }})</span>
+                                    {% else %}
+                                        {{ practice.practice_english }}
+                                    {% endif %}
+                                </h5>
+
+                                {% if practice.sub_category %}
+                                <p style="margin: 0.3rem 0; color: #666; font-size: 0.9rem;">
+                                    <em>{{ practice.sub_category }}</em>
+                                </p>
+                                {% endif %}
+
+                                <div style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+                                    {% if practice.rounds %}
+                                        <span>Rounds: {{ practice.rounds }}</span>
+                                    {% endif %}
+                                    {% if practice.time_minutes %}
+                                        <span style="margin-left: 1rem;">Time: {{ practice.time_minutes }} min</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if practice.description %}
+                                <p style="margin-top: 0.5rem; color: #555;">{{ practice.description|safe }}</p>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="/module/{{ module.id }}/practice/{{ practice.id }}/edit" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Edit</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                <div>
-                    <a href="/practice/{{ practice.id }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">View</a>
-                </div>
-            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
+        {% endif %}
     {% endfor %}
 {% else %}
     <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">

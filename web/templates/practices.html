@@ -37,10 +37,10 @@
     </div>
 </div>
 
-<div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
-    <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Practices:</label>
+<div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; display: grid; gap: 1rem;">
+    <form method="GET" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Practices</label>
             <div style="position: relative;">
                 <input type="text" id="practice-search" name="search" value="{{ search_term }}" 
                        placeholder="Type to search..." autocomplete="off"
@@ -48,11 +48,15 @@
                 <div id="practice-search-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
             </div>
         </div>
-        
-        <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Filter by Segment:</label>
+        <input type="hidden" name="segment" value="{{ current_segment }}">
+        <button type="submit" class="btn">Go</button>
+    </form>
+
+    <form method="GET" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Filter by Category</label>
             <select name="segment" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
-                <option value="">All Segments</option>
+                <option value="">All Categories</option>
                 {% for segment in segments %}
                     <option value="{{ segment }}" {% if current_segment == segment %}selected{% endif %}>
                         {{ segment }}
@@ -60,10 +64,8 @@
                 {% endfor %}
             </select>
         </div>
-        
-        <div style="display: flex; align-items: end;">
-            <button type="submit" class="btn">Filter</button>
-        </div>
+        <input type="hidden" name="search" value="{{ search_term }}">
+        <button type="submit" class="btn">Go</button>
     </form>
 </div>
 
@@ -76,7 +78,7 @@
                 <th>Kosha</th>
                 <th>Sub-Category</th>
                 <th>Positive impact diseases</th>
-                <th>Parenthetical Citations</th>
+                <th>Contraindications</th>
                 <th>RCT Count</th>
             </tr>
         </thead>
@@ -96,19 +98,26 @@
                 <td>{{ practice.kosha or '-' }}</td>
                 <td>{{ practice.sub_category or '-' }}</td>
                 <td>
-                    {% for disease in practice.diseases %}
-                        <span class="disease-tag-small">{{ disease.name }}</span>{% if not loop.last %} {% endif %}
-                    {% endfor %}
+                    {% if group.diseases %}
+                        {% for disease_name in group.diseases %}
+                            <span class="disease-tag-small">{{ disease_name }}</span>{% if not loop.last %} {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
                 </td>
                 <td>
-                    {% if group.modules %}
-                        {% for module_id, developed_by in group.modules %}
-                            <a href="/module/{{ module_id }}" 
-                               onclick="event.stopPropagation();" 
-                               style="color: #667eea; text-decoration: none; font-weight: 500;">
-                                {{ developed_by }}
-                            </a>{% if not loop.last %}, {% endif %}
+                    {% if group.practice.contraindications %}
+                        {% set seen = [] %}
+                        {% for contra in group.practice.contraindications %}
+                            {% for disease in contra.diseases %}
+                                {% if disease.name not in seen %}
+                                    {% set _ = seen.append(disease.name) %}
+                                    <span class="disease-tag-small" style="background: #ffe4e6; color: #9f1239;">{{ disease.name }}</span>
+                                {% endif %}
+                            {% endfor %}
                         {% endfor %}
+                        {% if not seen %}-{% endif %}
                     {% else %}
                         -
                     {% endif %}

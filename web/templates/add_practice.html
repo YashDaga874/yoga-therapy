@@ -3,10 +3,64 @@
 {% block title %}Add Practice{% endblock %}
 
 {% block content %}
+<style>
+.compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.9rem;
+}
+
+.compact-grid.three {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-grid .form-group input,
+.compact-grid .form-group select {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.text-toolbar {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.format-btn {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.85rem;
+    min-width: 2.2rem;
+}
+
+.format-btn:hover {
+    background: #e2e8f0;
+}
+
+.rich-text-editor {
+    min-height: 140px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 0.65rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: white;
+}
+
+.rich-text-editor:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+</style>
+
 <h2>Add New Practice</h2>
 
 <form method="POST" enctype="multipart/form-data" style="max-width: 900px;">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="practice_sanskrit">Sanskrit Name</label>
             <input type="text" id="practice_sanskrit" name="practice_sanskrit" 
@@ -21,7 +75,7 @@
         </div>
     </div>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="practice_segment">Category *</label>
             <select id="practice_segment" name="practice_segment" required>
@@ -44,9 +98,6 @@
             <input type="text" id="sub_category" name="sub_category" 
                    placeholder="e.g., standing_asana, pranayama_practices">
         </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem;">
         <div class="form-group">
             <label for="kosha">Kosha *</label>
             <select id="kosha" name="kosha" required>
@@ -60,7 +111,7 @@
         </div>
     </div>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="compact-grid three" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="rounds">Rounds</label>
             <input type="number" id="rounds" name="rounds" placeholder="e.g., 5">
@@ -72,15 +123,20 @@
         </div>
         
         <div class="form-group">
-            <label for="strokes_per_min">Strokes/Min</label>
+            <label for="strokes_per_min">Strokes</label>
             <input type="number" id="strokes_per_min" name="strokes_per_min" placeholder="If applicable">
         </div>
     </div>
-    
+
     <div class="form-group">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" 
-                  placeholder="Brief description of the practice"></textarea>
+        <label>Description</label>
+        <div class="text-toolbar">
+            <button type="button" class="format-btn" data-target="description-editor" data-format="bold"><strong>B</strong></button>
+            <button type="button" class="format-btn" data-target="description-editor" data-format="italic"><em>I</em></button>
+            <button type="button" class="format-btn" data-target="description-editor" data-format="underline"><span style="text-decoration: underline;">U</span></button>
+        </div>
+        <div id="description-editor" class="rich-text-editor" contenteditable="true" data-hidden-input="description" placeholder="Brief description of the practice"></div>
+        <input type="hidden" id="description" name="description">
     </div>
     
     <div class="form-group">
@@ -103,33 +159,6 @@
         </div>
     </div>
     
-    <div style="padding: 1.5rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 2rem;">
-        <h4 style="margin-bottom: 1rem;">Associate with Diseases</h4>
-        <p style="color: #666; margin-bottom: 1rem;">Select which diseases use this practice:</p>
-        
-        {% for disease in diseases %}
-        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
-            <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 0.5rem;">
-                <input type="checkbox" name="diseases" value="{{ disease.id }}" 
-                       class="disease-checkbox" data-disease-id="{{ disease.id }}"
-                       style="margin-right: 0.5rem;">
-                <strong>{{ disease.name }}</strong>
-            </label>
-            <div id="module-selection-{{ disease.id }}" style="display: none; margin-left: 1.5rem; margin-top: 0.5rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #666;">
-                    Module Referred From:
-                </label>
-                <input type="text" name="module_name_{{ disease.id }}" 
-                       id="module_input_{{ disease.id }}"
-                       placeholder="Type module name (e.g., Naveen et al., 2013)" 
-                       autocomplete="off" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                <input type="hidden" name="module_id_{{ disease.id }}" id="module_id_{{ disease.id }}">
-                <div id="module-autocomplete-{{ disease.id }}" style="position: relative;"></div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    
     <div style="display: flex; gap: 1rem;">
         <button type="submit" class="btn">Add Practice</button>
         <a href="/" class="btn btn-secondary">Cancel</a>
@@ -137,35 +166,143 @@
 </form>
 
 <script>
-let variationCount = 0;
+const descriptionEditor = document.getElementById('description-editor');
+const descriptionHiddenInput = document.getElementById('description');
 
-function addVariationField() {
-    variationCount++;
-    const container = document.getElementById('variations-container');
-    const div = document.createElement('div');
-    div.id = `variation-${variationCount}`;
-    div.style.display = 'grid';
-    div.style.gridTemplateColumns = '2fr 1fr';
-    div.style.gap = '1rem';
-    div.style.marginBottom = '1rem';
-    div.innerHTML = `
-        <div>
-            <input type="text" name="variation_${variationCount}" 
-                   placeholder="Variation description" required>
-        </div>
-        <div>
-            <input type="text" name="variation_ref_${variationCount}" 
-                   placeholder="Referred in (paper/book)">
-            <button type="button" onclick="removeVariation(${variationCount})" 
-                    class="btn btn-secondary" style="margin-left: 0.5rem;">Remove</button>
-        </div>
-    `;
-    container.appendChild(div);
+function initializeRichTextEditor(editor, hiddenInput, initialHtml = '') {
+    if (!editor || !hiddenInput) return;
+    editor.innerHTML = initialHtml || editor.innerHTML || '';
+    editor.dataset.hiddenInput = hiddenInput.id;
+    hiddenInput.value = editor.innerHTML.trim();
+    editor.addEventListener('input', () => syncEditorValue(editor));
 }
 
-function removeVariation(id) {
-    const elem = document.getElementById(`variation-${id}`);
-    if (elem) elem.remove();
+function syncEditorValue(editor) {
+    if (!editor) return;
+    const hiddenId = editor.dataset.hiddenInput;
+    if (!hiddenId) return;
+    const hiddenInput = document.getElementById(hiddenId);
+    if (hiddenInput) {
+        hiddenInput.value = editor.innerHTML.trim();
+    }
+}
+
+initializeRichTextEditor(descriptionEditor, descriptionHiddenInput);
+
+let variationCount = 0;
+const variationsContainer = document.getElementById('variations-container');
+
+function addVariationField(prefillHtml = '', prefillRef = '') {
+    if (!variationsContainer) return;
+    variationCount++;
+    const editorId = `variation_editor_${variationCount}`;
+    const hiddenId = `variation_hidden_${variationCount}`;
+    const refId = `variation_ref_${variationCount}`;
+
+    const row = document.createElement('div');
+    row.className = 'variation-row';
+    row.id = `variation-${variationCount}`;
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '2fr 1fr';
+    row.style.gap = '1rem';
+    row.style.marginBottom = '1rem';
+    row.innerHTML = `
+        <div>
+            <div class="text-toolbar">
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="bold"><strong>B</strong></button>
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="italic"><em>I</em></button>
+                <button type="button" class="format-btn" data-target="${editorId}" data-format="underline"><span style="text-decoration: underline;">U</span></button>
+            </div>
+            <div id="${editorId}" class="rich-text-editor" contenteditable="true" data-hidden-input="${hiddenId}"></div>
+            <input type="hidden" id="${hiddenId}" name="variation_${variationCount}">
+        </div>
+        <div>
+            <input type="text" id="${refId}" name="variation_ref_${variationCount}" 
+                   placeholder="Referred in (paper/book)">
+            <button type="button" class="btn btn-secondary remove-variation-btn" data-variation-index="${variationCount}"
+                    style="margin-left: 0.5rem; margin-top: 0.5rem;">Remove</button>
+        </div>
+    `;
+    variationsContainer.appendChild(row);
+
+    const editor = document.getElementById(editorId);
+    const hiddenInput = document.getElementById(hiddenId);
+    initializeRichTextEditor(editor, hiddenInput, prefillHtml);
+    if (prefillRef) {
+        document.getElementById(refId).value = prefillRef;
+    }
+}
+
+function reindexVariations() {
+    if (!variationsContainer) return;
+    const rows = variationsContainer.querySelectorAll('.variation-row');
+    variationCount = rows.length;
+    rows.forEach((row, index) => {
+        const newIndex = index + 1;
+        row.id = `variation-${newIndex}`;
+
+        const editor = row.querySelector('.rich-text-editor');
+        const hiddenInput = row.querySelector('input[type="hidden"]');
+        const refInput = row.querySelector('input[id^="variation_ref_"]');
+        const toolbarButtons = row.querySelectorAll('.format-btn');
+
+        if (editor && hiddenInput) {
+            const editorId = `variation_editor_${newIndex}`;
+            const hiddenId = `variation_hidden_${newIndex}`;
+            editor.id = editorId;
+            editor.dataset.hiddenInput = hiddenId;
+            hiddenInput.id = hiddenId;
+            hiddenInput.name = `variation_${newIndex}`;
+            syncEditorValue(editor);
+            toolbarButtons.forEach(btn => btn.dataset.target = editorId);
+        }
+
+        if (refInput) {
+            refInput.id = `variation_ref_${newIndex}`;
+            refInput.name = `variation_ref_${newIndex}`;
+        }
+
+        const removeBtn = row.querySelector('.remove-variation-btn');
+        if (removeBtn) {
+            removeBtn.dataset.variationIndex = newIndex;
+        }
+    });
+}
+
+function syncAllVariationEditors() {
+    if (!variationsContainer) return;
+    variationsContainer.querySelectorAll('.rich-text-editor').forEach(editor => syncEditorValue(editor));
+}
+
+document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('.remove-variation-btn');
+    if (removeBtn) {
+        event.preventDefault();
+        const row = removeBtn.closest('.variation-row');
+        if (row) {
+            row.remove();
+            reindexVariations();
+        }
+        return;
+    }
+
+    const formatBtn = event.target.closest('.format-btn');
+    if (!formatBtn) return;
+
+    event.preventDefault();
+    const editor = document.getElementById(formatBtn.dataset.target);
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(formatBtn.dataset.format, false, null);
+    syncEditorValue(editor);
+});
+
+const practiceForm = document.querySelector('form');
+if (practiceForm) {
+    practiceForm.addEventListener('submit', () => {
+        syncEditorValue(descriptionEditor);
+        syncAllVariationEditors();
+    });
 }
 
 // Category to Kosha mapping
@@ -327,13 +464,18 @@ function selectPractice(id) {
             }
         }
         
-        document.getElementById('sub_category').value = practice.sub_category || '';
-        document.getElementById('rounds').value = practice.rounds || '';
-        document.getElementById('time_minutes').value = practice.time_minutes || '';
-        document.getElementById('strokes_per_min').value = practice.strokes_per_min || '';
-        document.getElementById('strokes_per_cycle').value = practice.strokes_per_cycle || '';
-        document.getElementById('rest_between_cycles_sec').value = practice.rest_between_cycles_sec || '';
-        document.getElementById('description').value = practice.description || '';
+        const subCategoryField = document.getElementById('sub_category');
+        if (subCategoryField) subCategoryField.value = practice.sub_category || '';
+        const roundsField = document.getElementById('rounds');
+        if (roundsField) roundsField.value = practice.rounds || '';
+        const durationField = document.getElementById('time_minutes');
+        if (durationField) durationField.value = practice.time_minutes || '';
+        const strokesField = document.getElementById('strokes_per_min');
+        if (strokesField) strokesField.value = practice.strokes_per_min || '';
+        if (descriptionEditor) {
+            descriptionEditor.innerHTML = practice.description || '';
+            syncEditorValue(descriptionEditor);
+        }
         
         // Clear existing variations first
         const variationsContainer = document.getElementById('variations-container');
@@ -346,12 +488,10 @@ function selectPractice(id) {
                 try {
                     const variations = JSON.parse(practice.variations);
                     if (variations && variations.length > 0) {
-                        variations.forEach((v, idx) => {
-                            addVariationField();
-                            const variationInput = document.getElementsByName(`variation_${variationCount}`)[0];
-                            const refInput = document.getElementsByName(`variation_ref_${variationCount}`)[0];
-                            if (variationInput) variationInput.value = v.text || v;
-                            if (refInput) refInput.value = v.referred_in || '';
+                        variations.forEach((v) => {
+                            const textValue = (typeof v === 'object' && v !== null) ? (v.text || '') : v;
+                            const refValue = (typeof v === 'object' && v !== null) ? (v.referred_in || '') : '';
+                            addVariationField(textValue, refValue);
                         });
                     }
                 } catch (e) {
@@ -359,10 +499,8 @@ function selectPractice(id) {
                     try {
                         const variations = typeof practice.variations === 'string' ? JSON.parse(practice.variations) : [];
                         if (variations && variations.length > 0) {
-                            variations.forEach((v, idx) => {
-                                addVariationField();
-                                const variationInput = document.getElementsByName(`variation_${variationCount}`)[0];
-                                if (variationInput) variationInput.value = v;
+                            variations.forEach((v) => {
+                                addVariationField(v, '');
                             });
                         }
                     } catch (e2) {
@@ -371,6 +509,7 @@ function selectPractice(id) {
                 }
             }
         }
+        syncAllVariationEditors();
         
         // Move focus to the next field (English Name)
         document.getElementById('practice_english').focus();
@@ -385,145 +524,6 @@ document.addEventListener('click', function(e) {
         selectedIndex = -1;
     }
 });
-
-// Module selection for each disease
-document.querySelectorAll('.disease-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const diseaseId = this.dataset.diseaseId;
-        const moduleSelection = document.getElementById(`module-selection-${diseaseId}`);
-        const moduleInput = document.getElementById(`module_input_${diseaseId}`);
-        const moduleIdInput = document.getElementById(`module_id_${diseaseId}`);
-        const autocompleteDiv = document.getElementById(`module-autocomplete-${diseaseId}`);
-        
-        if (this.checked) {
-            moduleSelection.style.display = 'block';
-            // Initialize autocomplete for this disease
-            initModuleAutocomplete(diseaseId, moduleInput, moduleIdInput, autocompleteDiv);
-        } else {
-            moduleSelection.style.display = 'none';
-            moduleInput.value = '';
-            moduleIdInput.value = '';
-            autocompleteDiv.innerHTML = '';
-        }
-    });
-});
-
-function initModuleAutocomplete(diseaseId, input, hiddenInput, autocompleteDiv) {
-    let autocompleteTimeout;
-    let currentModules = [];
-    let selectedIndex = -1;
-    
-    input.addEventListener('input', function() {
-        clearTimeout(autocompleteTimeout);
-        const query = this.value.trim();
-        selectedIndex = -1;
-        
-        if (query.length < 1) {
-            autocompleteDiv.innerHTML = '';
-            currentModules = [];
-            hiddenInput.value = '';
-            return;
-        }
-        
-        autocompleteTimeout = setTimeout(() => {
-            fetch(`/api/module/search?q=${encodeURIComponent(query)}&disease_id=${diseaseId}`)
-                .then(response => response.json())
-                .then(data => {
-                    currentModules = data;
-                    displayModuleAutocompleteResults(data, autocompleteDiv);
-                });
-        }, 300);
-    });
-    
-    input.addEventListener('keydown', function(e) {
-        if (autocompleteDiv.innerHTML === '') return;
-        
-        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
-        
-        switch(e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                updateModuleSelection(items, selectedIndex);
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                selectedIndex = Math.max(selectedIndex - 1, -1);
-                updateModuleSelection(items, selectedIndex);
-                break;
-            case 'Enter':
-                e.preventDefault();
-                if (selectedIndex >= 0 && selectedIndex < items.length) {
-                    selectModuleLocal(currentModules[selectedIndex].id, currentModules[selectedIndex].name);
-                }
-                break;
-            case 'Escape':
-                autocompleteDiv.innerHTML = '';
-                currentModules = [];
-                selectedIndex = -1;
-                break;
-        }
-    });
-    
-    function displayModuleAutocompleteResults(modules, div) {
-        if (modules.length === 0) {
-            div.innerHTML = '';
-            return;
-        }
-        
-        div.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
-            modules.map((m, index) => {
-                const escapedName = m.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                return `
-                <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
-                     onclick="selectModuleForDisease(${diseaseId}, ${m.id}, '${escapedName}')" data-index="${index}">
-                    <strong>${m.name}</strong>
-                </div>
-            `;
-            }).join('') +
-            '</div>';
-    }
-    
-    function updateModuleSelection(items, index) {
-        items.forEach((item, idx) => {
-            if (idx === index) {
-                item.style.backgroundColor = '#e3f2fd';
-                item.style.borderLeft = '3px solid #2196f3';
-            } else {
-                item.style.backgroundColor = '';
-                item.style.borderLeft = '';
-            }
-        });
-    }
-    
-    function selectModuleLocal(id, name) {
-        input.value = name;
-        hiddenInput.value = id;
-        autocompleteDiv.innerHTML = '';
-        currentModules = [];
-        selectedIndex = -1;
-    }
-    
-    // Store the select function for this disease
-    window[`selectModuleForDisease_${diseaseId}`] = selectModuleLocal;
-    
-    // Close autocomplete when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest(input) && !e.target.closest(autocompleteDiv)) {
-            autocompleteDiv.innerHTML = '';
-            currentModules = [];
-            selectedIndex = -1;
-        }
-    });
-}
-
-// Global function to select module for a disease
-function selectModuleForDisease(diseaseId, moduleId, moduleName) {
-    const selectFunc = window[`selectModuleForDisease_${diseaseId}`];
-    if (selectFunc) {
-        selectFunc(moduleId, moduleName);
-    }
-}
 </script>
 
 <style>
