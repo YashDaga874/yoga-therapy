@@ -132,27 +132,39 @@
 
     <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
         <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
-        <input type="text" id="practice_sanskrit" placeholder="Select a practice" autocomplete="off" disabled>
+        <input type="text" id="practice_sanskrit" name="practice_sanskrit" placeholder="Start typing practice name" autocomplete="off" disabled>
         <div id="practice-autocomplete" class="autocomplete-list" style="display: none;"></div>
-        <small style="color: #666; display: block; margin-top: 0.4rem;">Only practices from the selected disease's modules are shown.</small>
+        <small style="color: #666; display: block; margin-top: 0.4rem;">Suggestions come from your practices library. You can adjust the fields after selecting.</small>
     </div>
 
     <div class="compact-grid" style="margin-bottom: 1rem;">
         <div class="form-group">
             <label for="practice_english">Practice Name (English)</label>
-            <input type="text" id="practice_english" class="readonly-field" readonly>
+            <input type="text" id="practice_english" name="practice_english">
         </div>
         <div class="form-group">
             <label for="practice_segment">Category</label>
-            <input type="text" id="practice_segment" class="readonly-field" readonly>
+            <select id="practice_segment" name="practice_segment">
+                <option value="">Select Category</option>
+                {% for segment in practice_segments %}
+                <option value="{{ segment }}">{{ segment }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="form-group">
             <label for="sub_category">Sub-Category</label>
-            <input type="text" id="sub_category" class="readonly-field" readonly>
+            <input type="text" id="sub_category" name="sub_category">
         </div>
         <div class="form-group">
             <label for="kosha">Kosha</label>
-            <input type="text" id="kosha" class="readonly-field" readonly>
+            <select id="kosha" name="kosha">
+                <option value="">Select Kosha</option>
+                <option value="Annamaya Kosha">Annamaya Kosha</option>
+                <option value="Pranamaya Kosha">Pranamaya Kosha</option>
+                <option value="Manomaya Kosha">Manomaya Kosha</option>
+                <option value="Vijnanamaya Kosha">Vijnanamaya Kosha</option>
+                <option value="Anandamaya Kosha">Anandamaya Kosha</option>
+            </select>
         </div>
     </div>
 
@@ -162,6 +174,7 @@
             <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
             <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
             <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+            <button type="button" class="format-btn" data-command="insertUnorderedList">&bull;</button>
         </div>
         <div id="reason-editor" class="rich-text-editor" contenteditable="true"></div>
     </div>
@@ -174,6 +187,7 @@
             <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
             <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
             <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+            <button type="button" class="format-btn" data-command="insertUnorderedList">&bull;</button>
             <button type="button" class="format-btn" data-command="link">Link</button>
         </div>
         <div id="reference-editor" class="rich-text-editor" contenteditable="true" placeholder="Enter the formatted reference"></div>
@@ -203,6 +217,7 @@
 let diseaseDebounce;
 let practiceDebounce;
 let availablePractices = [];
+let practicesLoaded = false;
 let diseaseResults = [];
 let diseaseSelectedIndex = -1;
 let practiceResults = [];
@@ -214,8 +229,25 @@ const diseaseAutocomplete = document.getElementById('disease-autocomplete');
 const practiceInput = document.getElementById('practice_sanskrit');
 const practiceAutocomplete = document.getElementById('practice-autocomplete');
 const practiceIdInput = document.getElementById('practice_id');
+const practiceEnglishInput = document.getElementById('practice_english');
+const practiceSegmentInput = document.getElementById('practice_segment');
+const subCategoryInput = document.getElementById('sub_category');
+const koshaInput = document.getElementById('kosha');
 const existingWrapper = document.getElementById('existing-wrapper');
 const existingList = document.getElementById('existing-list');
+
+const categoryToKosha = {
+    'Preparatory Practice': 'Annamaya Kosha',
+    'Yogasana': 'Annamaya Kosha',
+    'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Breathing Practice': 'Pranamaya Kosha',
+    'Pranayama': 'Pranamaya Kosha',
+    'Meditation': 'Manomaya Kosha',
+    'Chanting': 'Manomaya Kosha',
+    'Yogic Counselling': 'Vijnanamaya Kosha',
+    'Additional Practices': ''
+};
 
 const reasonEditor = document.getElementById('reason-editor');
 const reasonHidden = document.getElementById('reason');
@@ -298,35 +330,83 @@ function fetchExistingContraindications(diseaseId) {
         });
 }
 
-function fetchPracticesForDisease(diseaseId) {
-    fetch(`/api/practices/by-disease/${diseaseId}`)
+function resetPracticeFields() {
+    practiceIdInput.value = '';
+    practiceInput.value = '';
+    practiceEnglishInput.value = '';
+    if (practiceSegmentInput) {
+        Array.from(practiceSegmentInput.querySelectorAll('option[data-generated="true"]')).forEach(opt => opt.remove());
+        practiceSegmentInput.value = '';
+    }
+    subCategoryInput.value = '';
+    if (koshaInput) {
+        Array.from(koshaInput.querySelectorAll('option[data-generated="true"]')).forEach(opt => opt.remove());
+        koshaInput.value = '';
+    }
+    practiceAutocomplete.style.display = 'none';
+    practiceResults = [];
+    practiceSelectedIndex = -1;
+}
+
+function fetchAllPractices() {
+    return fetch('/api/practices')
         .then(res => res.json())
         .then(data => {
             availablePractices = data;
-            practiceInput.disabled = false;
-            practiceInput.value = '';
-            practiceIdInput.value = '';
-            document.getElementById('practice_english').value = '';
-            document.getElementById('practice_segment').value = '';
-            document.getElementById('sub_category').value = '';
-            document.getElementById('kosha').value = '';
+            practicesLoaded = true;
         });
+}
+
+function setSelectValue(selectEl, value) {
+    if (!selectEl) return;
+    const normalized = value || '';
+    let optionExists = false;
+    Array.from(selectEl.options).forEach(option => {
+        if (option.value === normalized) {
+            optionExists = true;
+        }
+    });
+    if (!optionExists && normalized) {
+        const newOption = document.createElement('option');
+        newOption.value = normalized;
+        newOption.textContent = normalized;
+        newOption.dataset.generated = 'true';
+        selectEl.appendChild(newOption);
+    }
+    selectEl.value = normalized;
+}
+
+function autoSetKoshaForCategory(category) {
+    if (!koshaInput) return;
+    const mapped = categoryToKosha[category];
+    if (mapped) {
+        setSelectValue(koshaInput, mapped);
+    }
 }
 
 function loadDiseaseContext(diseaseId) {
     if (!diseaseId) {
         practiceInput.disabled = true;
-        availablePractices = [];
-        practiceIdInput.value = '';
-        practiceInput.value = '';
-        document.getElementById('practice_english').value = '';
-        document.getElementById('practice_segment').value = '';
-        document.getElementById('sub_category').value = '';
-        document.getElementById('kosha').value = '';
+        resetPracticeFields();
         renderExistingContraindications([]);
         return;
     }
-    fetchPracticesForDisease(diseaseId);
+
+    resetPracticeFields();
+    practiceInput.disabled = true;
+
+    const ensurePractices = practicesLoaded ? Promise.resolve() : fetchAllPractices();
+
+    ensurePractices
+        .then(() => {
+            practiceInput.disabled = false;
+        })
+        .catch(() => {
+            availablePractices = [];
+            practicesLoaded = false;
+            practiceInput.disabled = false;
+        });
+
     fetchExistingContraindications(diseaseId);
 }
 
@@ -396,7 +476,6 @@ function selectDisease(diseaseId, displayName) {
     diseaseInput.value = displayName;
     diseaseAutocomplete.style.display = 'none';
     practiceInput.disabled = true;
-    availablePractices = [];
     loadDiseaseContext(diseaseId);
 }
 
@@ -435,13 +514,24 @@ function selectPracticeOption(practiceId, label) {
     if (!practice) return;
     practiceIdInput.value = practice.id;
     practiceInput.value = label || practice.practice_sanskrit || practice.practice_english;
-    document.getElementById('practice_english').value = practice.practice_english || '';
-    document.getElementById('practice_segment').value = practice.practice_segment || '';
-    document.getElementById('sub_category').value = practice.sub_category || '';
-    document.getElementById('kosha').value = practice.kosha || '';
+    practiceEnglishInput.value = practice.practice_english || '';
+    setSelectValue(practiceSegmentInput, practice.practice_segment || '');
+    subCategoryInput.value = practice.sub_category || '';
+    if (practice.kosha) {
+        setSelectValue(koshaInput, practice.kosha);
+    } else {
+        autoSetKoshaForCategory(practice.practice_segment);
+    }
     practiceAutocomplete.style.display = 'none';
     practiceResults = [];
     practiceSelectedIndex = -1;
+}
+
+if (practiceSegmentInput) {
+    practiceSegmentInput.addEventListener('change', () => {
+        const selectedCategory = practiceSegmentInput.value;
+        autoSetKoshaForCategory(selectedCategory);
+    });
 }
 
 diseaseInput.addEventListener('input', () => {

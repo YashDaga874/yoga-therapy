@@ -891,6 +891,8 @@ def add_contraindication():
         if request.method == 'POST':
             disease_id = request.form.get('disease_id')
             practice_id = request.form.get('practice_id')
+            reason_html = request.form.get('reason', '')
+            reference_full_html = request.form.get('reference_full', '')
 
             if not disease_id:
                 flash('Please select a disease before adding a contraindication.', 'error')
@@ -910,16 +912,30 @@ def add_contraindication():
                 flash('Selected practice could not be found.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
 
+            practice_sanskrit_input = (request.form.get('practice_sanskrit') or '').strip()
+            practice_english_input = (request.form.get('practice_english') or '').strip()
+            practice_segment_input = (request.form.get('practice_segment') or '').strip()
+            sub_category_input = (request.form.get('sub_category') or '').strip()
+
+            practice_sanskrit_value = practice_sanskrit_input or (practice.practice_sanskrit or '')
+            practice_english_value = practice_english_input or practice.practice_english
+            practice_segment_value = practice_segment_input or practice.practice_segment
+            sub_category_value = sub_category_input or (practice.sub_category or '')
+
+            if not practice_english_value:
+                flash('Practice English name is required.', 'error')
+                return redirect(url_for('add_contraindication', disease_id=disease.id))
+
             contraindication = Contraindication(
-                practice_sanskrit=practice.practice_sanskrit or '',
-                practice_english=practice.practice_english,
-                practice_segment=practice.practice_segment,
-                sub_category=practice.sub_category or '',
-                reason=request.form.get('reason', ''),
+                practice_sanskrit=practice_sanskrit_value,
+                practice_english=practice_english_value,
+                practice_segment=practice_segment_value,
+                sub_category=sub_category_value,
+                reason=reason_html,
                 source_type=request.form.get('parenthetical_citation', ''),
                 source_name=request.form.get('reference_link', ''),
                 page_number='',
-                apa_citation=request.form.get('reference_full', '')
+                apa_citation=reference_full_html
             )
 
             session.add(contraindication)
@@ -938,6 +954,19 @@ def add_contraindication():
         selected_disease = None
         existing_contras = []
 
+        practice_segments = [
+            'Preparatory Practice',
+            'Breathing Practice',
+            'Sequential Yogic Practice',
+            'Yogasana',
+            'Pranayama',
+            'Meditation',
+            'Chanting',
+            'Additional Practices',
+            'Kriya (Cleansing Techniques)',
+            'Yogic Counselling'
+        ]
+
         if disease_id:
             selected_disease = session.query(Disease).get(disease_id)
             if selected_disease:
@@ -946,7 +975,8 @@ def add_contraindication():
         return render_template(
             'add_contraindication.html',
             selected_disease=selected_disease,
-            existing_contras=existing_contras
+            existing_contras=existing_contras,
+            practice_segments=practice_segments
         )
     finally:
         session.close()
@@ -2102,7 +2132,8 @@ def api_practices():
                 'practice_english': practice.practice_english,
                 'practice_sanskrit': practice.practice_sanskrit or '',
                 'practice_segment': practice.practice_segment,
-                'sub_category': practice.sub_category or ''
+                'sub_category': practice.sub_category or '',
+                'kosha': practice.kosha or ''
             })
         return jsonify(results)
     finally:

@@ -81,6 +81,7 @@
             <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
             <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
             <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+            <button type="button" class="format-btn" data-command="insertUnorderedList">&bull;</button>
         </div>
         <div id="reason-editor" class="rich-text-editor" contenteditable="true">{{ (contraindication.reason or '')|safe }}</div>
     </div>
@@ -93,6 +94,7 @@
             <button type="button" class="format-btn" data-command="bold"><strong>B</strong></button>
             <button type="button" class="format-btn" data-command="italic"><em>I</em></button>
             <button type="button" class="format-btn" data-command="underline"><span style="text-decoration: underline;">U</span></button>
+            <button type="button" class="format-btn" data-command="insertUnorderedList">&bull;</button>
             <button type="button" class="format-btn" data-command="link">Link</button>
         </div>
         <div id="reference-editor" class="rich-text-editor" contenteditable="true">{{ (contraindication.apa_citation or '')|safe }}</div>
