@@ -81,13 +81,14 @@ The `Practice` model represents an individual yoga practice with comprehensive d
 *Practice Details:*
 - `rounds`: Number of rounds/repetitions (Integer, optional)
 - `time_minutes`: Duration in minutes (Float, optional)
-- `strokes`: Strokes per minute (Integer, optional, formerly "strokes_per_min")
+- `strokes_per_min`: Strokes per minute (Integer, optional)
 - `strokes_per_cycle`: Strokes per cycle (Integer, optional)
 - `rest_between_cycles_sec`: Rest duration between cycles in seconds (Integer, optional)
 - `variations`: JSON string containing practice variations with references (Text, optional)
 - `steps`: JSON string containing step-by-step instructions (Text, optional)
 - `description`: Brief description of the practice (Text, optional)
 - `how_to_do`: Detailed instructions (Text, optional)
+- `cvr_score`: Capacity-Variability-Responsiveness score (Float, optional)
 
 *Media Attachments:*
 - `photo_path`: Path to practice photo (String, optional)
@@ -96,7 +97,7 @@ The `Practice` model represents an individual yoga practice with comprehensive d
 *Relationships and Evidence:*
 - `citation_id`: Foreign key to Citation (Integer, optional)
 - `module_id`: Foreign key to Module (Integer, optional)
-- `rct_count`: Number of RCTs supporting this practice (Integer, default=0)
+- `rct_count`: Number of RCTs supporting this practice (Integer, default=0, automatically calculated)
 
 **Relationships:**
 - Many-to-many with `Disease` (a practice can treat multiple diseases)
@@ -347,9 +348,15 @@ When adding practices within a module:
    - Rounds, Duration, Strokes
    - Description
    - Variations (in "How to do!" section)
-   - Media attachments
-4. **No "How to Do" Field**: The detailed instruction field is removed in module-based addition
-5. **Variations**: Entered directly in the "How to do!" section with reference sources
+   - CVR Score (optional)
+   - Media attachments (photos and videos)
+4. **File Uploads**:
+   - Photo upload: Supported formats (png, jpg, jpeg, gif), max 16MB
+   - Video upload: Supported formats (mp4, avi, mov, wmv), max 16MB
+   - Files are stored in `web/static/uploads/photos/` and `web/static/uploads/videos/`
+   - Files are named with practice ID prefix for uniqueness
+5. **No "How to Do" Field**: The detailed instruction field is removed in module-based addition
+6. **Variations**: Entered directly in the "How to do!" section with reference sources
 
 #### 4.2.2 Adding Practices from Practices Tab
 
@@ -359,8 +366,9 @@ When adding practices from the main Practices tab:
 2. **Module Selection**: For each selected disease, user can specify the module the practice is referred from
    - Autocomplete functionality searches modules for that specific disease
    - User can select from existing modules or leave blank
-3. **All Fields Available**: Including "How to Do" detailed instructions
+3. **All Fields Available**: Including "How to Do" detailed instructions, CVR score, and media uploads
 4. **Multiple Module Support**: A practice can be associated with different modules for different diseases
+5. **File Uploads**: Same photo and video upload support as module-based addition
 
 ### 4.3 Practice Editing System
 
@@ -432,12 +440,17 @@ The system matches RCTs to practices through:
 
 1. **Disease Association**: RCT must be associated with at least one disease that the practice treats
 2. **Practice Matching**:
-   - **Specific Match**: RCT mentions the practice by name (Sanskrit or English)
-   - **Category Match**: RCT mentions the practice category (e.g., "Pranayama")
+   - **Specific Match**: RCT mentions the practice by name (Sanskrit or English) - exact match required
+   - **Category Match**: RCT mentions the practice category (e.g., "Pranayama") - all practices in that category for the associated disease are counted
 3. **RCT Count Calculation**: 
    - For each practice-disease combination, count all matching RCTs
    - Higher count = stronger evidence
-   - Count is recalculated when practice category or disease associations change
+   - Count is automatically recalculated when:
+     - A new RCT is added with matching practices
+     - An RCT is deleted or modified
+     - Practice category or disease associations change
+   - The system uses `recalculate_practice_rct_count()` function to maintain accuracy
+4. **Automatic Increment/Decrement**: When RCTs are added or removed, practice RCT counts are automatically updated
 
 ### 5.3 Evidence-Based Prioritization
 
@@ -453,8 +466,12 @@ The RCT count serves as an evidence score:
 The RCTSymptom model enables detailed analysis:
 
 - **Symptom Tracking**: Each symptom measured in an RCT is stored separately
-- **Statistical Significance**: P-values and significance indicators are tracked
-- **Scale Information**: Assessment scales are recorded
+- **Statistical Significance**: 
+  - P-values with operators (<, >, <=, >=, =) are tracked
+  - Automatic significance calculation (p ≤ 0.05 = significant)
+  - Significance indicator stored as integer (1 = significant, 0 = not significant)
+- **Scale Information**: Assessment scales are recorded per symptom
+- **RCT Association**: Symptoms are linked to RCTs through many-to-many relationship
 - **Future Enhancement**: Can support symptom-specific practice recommendations
 
 ---
@@ -569,7 +586,7 @@ The web interface provides:
 1. **Home Page**: 
    - System title: "Personalized Yoga Therapy Management System"
    - Subtitle: "Evidence Based Database Based on IAYT Module"
-   - Statistics dashboard
+   - Statistics dashboard (diseases, practices, RCTs, contraindications)
    - Purpose statement
    - Confidentiality disclaimer
    - System logic explanation
@@ -581,39 +598,60 @@ The web interface provides:
    - Practices
    - Contraindications
    - RCT Database
+   - Recommendations
 
 3. **Module Management**:
-   - List all modules
+   - List all modules (with filtering by disease)
    - Add new module
    - View module details
-   - Edit module
+   - Edit module (including paper link and description)
    - Delete module
    - Add practices to module
+   - Module-wise practice organization
 
 4. **Practice Management**:
    - List all practices (grouped by attributes, showing all modules)
-   - Add new practice
-   - Edit practice
+   - Add new practice (with file upload support)
+   - Edit practice (with synchronized updates to related practices)
    - Delete practice
    - Search and filter practices
+   - Upload photos and videos for practices
+   - CVR score entry and editing
 
 5. **Disease Management**:
    - List all diseases with modules
    - View disease details
    - Module-wise and segment-wise practice display
+   - Disease filtering in module list
 
 6. **Contraindication Management**:
    - List all contraindications
    - Add new contraindication
    - Edit contraindication
    - Delete contraindication
+   - Link contraindications to multiple diseases
 
 7. **RCT Database**:
-   - List all RCTs
-   - Add new RCT
+   - List all RCTs (with comprehensive study information)
+   - Add new RCT (with intervention practices, symptoms, demographics)
    - Edit RCT
-   - Delete RCT
+   - Delete RCT (with automatic RCT count updates)
    - View RCT details
+   - Automatic RCT count calculation for practices
+   - Symptom-level data with p-values and significance indicators
+
+8. **Recommendations**:
+   - Generate recommendations for multiple diseases
+   - Module-based practice selection
+   - RCT count display
+   - Contraindication filtering
+   - Organized by Kosha and Category
+
+9. **Export Functionality**:
+   - Export diseases to CSV
+   - Export practices to CSV (excluding media files)
+   - Export contraindications to CSV
+   - Export RCTs to CSV (with all study details)
 
 ### 8.2 Autocomplete Functionality
 
@@ -746,19 +784,39 @@ The system provides autocomplete for:
 - `/api/disease/search?q=<query>`: Search diseases by name
 - `/api/module/search?q=<query>&disease_id=<id>`: Search modules by name for a specific disease
 - `/api/module/search/all?q=<query>`: Search all modules by name
+- `/api/practices`: Get all practices (for RCT form)
+- `/api/practices/by-disease/<disease_id>`: Get practices belonging to modules for a specific disease
+- `/api/rct-count?disease=<name>&practice=<name>`: Get RCT count for a disease-practice combination
+
+### 11.4 Export APIs
+
+- `/export/diseases/csv`: Export all diseases to CSV format
+- `/export/practices/csv`: Export all practices to CSV format (excluding media files)
+- `/export/contraindications/csv`: Export all contraindications to CSV format
+- `/export/rcts/csv`: Export all RCTs to CSV format with comprehensive study details
 
 ---
 
 ## 12. Future Enhancements
 
-### 12.1 CVR (Capacity-Variability-Responsiveness) Logic
+### 12.1 CVR (Capacity-Variability-Responsiveness) Score
 
-The system architecture supports future CVR enhancement:
+The system now includes CVR score support:
 
-1. **Database Extension**: Add CVR fields to Practice model
-2. **Filtering Logic**: Add CVR-based filtering in recommendation engine
-3. **User Interface**: Add CVR assessment and selection in web interface
-4. **Backward Compatibility**: Existing data remains valid (CVR fields optional)
+1. **Database Implementation**: 
+   - `cvr_score` field added to Practice model (Float, optional)
+   - Migration script (`add_cvr_score_field.py`) ensures database compatibility
+   - Backward compatible - existing data remains valid (CVR fields optional)
+
+2. **User Interface**: 
+   - CVR score field available in practice addition forms
+   - CVR score editing in practice edit forms
+   - Displayed in practice lists and detail views
+
+3. **Future Enhancement**: 
+   - CVR-based filtering in recommendation engine (architecture ready)
+   - Patient assessment integration for personalized practice selection
+   - Practice prioritization based on CVR scores
 
 ### 12.2 Advanced Evidence Scoring
 
@@ -772,11 +830,18 @@ The system architecture supports future CVR enhancement:
 - **Symptom Prioritization**: Prioritize practices based on symptom improvement
 - **Personalized Protocols**: Generate protocols targeting specific symptoms
 
-### 12.4 Advanced Search and Filtering
+### 12.4 Data Export and Backup
 
-- **Multi-criteria Search**: Search by multiple attributes simultaneously
-- **Advanced Filters**: Filter by Kosha, Category, RCT count, etc.
-- **Export Functionality**: Export recommendations in various formats
+The system now includes comprehensive export functionality:
+
+- **CSV Export**: Export all major entities to CSV format
+  - Diseases export includes module information
+  - Practices export includes all details except media files
+  - Contraindications export includes disease associations
+  - RCTs export includes comprehensive study details, symptoms, and demographics
+- **Data Portability**: CSV exports enable data analysis in external tools
+- **Backup Strategy**: Regular CSV exports serve as data backups
+- **Future Enhancement**: Additional export formats (JSON, Excel) can be added
 
 ---
 
@@ -798,7 +863,18 @@ This methodology document describes the system architecture and implementation. 
 
 ---
 
-**Document Version**: 2.0  
+**Document Version**: 2.1  
 **Last Updated**: 2024  
-**System Version**: Based on IAYT Module Framework with Pancha Kosha Integration
+**System Version**: Based on IAYT Module Framework with Pancha Kosha Integration, RCT Database, CVR Scores, and Export Functionality
+
+### Version 2.1 Updates
+
+- **CVR Score Implementation**: Added CVR score field to practices with migration support
+- **RCT Database Enhancement**: Complete RCT management with automatic practice matching and count calculation
+- **File Upload Support**: Photo and video uploads for practices with file management
+- **Export Functionality**: CSV export for diseases, practices, contraindications, and RCTs
+- **Enhanced RCT-Practice Matching**: Automatic increment/decrement of RCT counts when RCTs are added/removed
+- **Symptom-Level Data**: Detailed symptom tracking with p-values and significance indicators
+- **Module Enhancements**: Paper link and description fields added to modules
+- **Recommendation System**: Integration of RCT counts and evidence-based prioritization in recommendations
 
