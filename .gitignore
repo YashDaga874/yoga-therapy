@@ -10,6 +10,8 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
+# Exception: Include the main database file so users get it when cloning
+!yoga_therapy.db
 
 # OS/editor
 .DS_Store

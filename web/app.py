@@ -2794,5 +2794,743 @@ def api_practices_by_disease(disease_id):
         session.close()
 
 
+@app.route('/generate-synthetic-data', methods=['GET', 'POST'])
+def generate_synthetic_data():
+    """Generate synthetic data for testing and demonstration"""
+    if request.method == 'GET':
+        return render_template('generate_synthetic_data.html')
+    
+    # POST request - generate the data
+    session = get_db_session()
+    
+    try:
+        # 1. Create Diseases (check if they exist first, if not create them)
+        diseases_data = [
+            {
+                'name': 'Chronic Lower Back Pain',
+                'description': 'Persistent pain in the lower back region lasting more than 12 weeks'
+            },
+            {
+                'name': 'Hypertension',
+                'description': 'High blood pressure condition requiring lifestyle management'
+            },
+            {
+                'name': 'Type 2 Diabetes',
+                'description': 'Metabolic disorder characterized by insulin resistance'
+            },
+            {
+                'name': 'Insomnia',
+                'description': 'Sleep disorder characterized by difficulty falling or staying asleep'
+            },
+            {
+                'name': 'Osteoarthritis',
+                'description': 'Degenerative joint disease affecting cartilage and bone'
+            }
+        ]
+        
+        diseases = {}
+        for d_data in diseases_data:
+            # Check if disease already exists
+            disease = session.query(Disease).filter_by(name=d_data['name']).first()
+            if not disease:
+                disease = Disease(name=d_data['name'], description=d_data['description'])
+                session.add(disease)
+                session.flush()
+            diseases[d_data['name']] = disease
+        
+        # 2. Create Citations
+        citations_data = [
+            {
+                'citation_text': 'Sharma et al., 2021',
+                'citation_type': 'research_paper',
+                'full_reference': 'Sharma, M., Singh, A., & Patel, R. (2021). Yoga therapy for chronic pain management: A randomized controlled trial. Journal of Alternative Medicine, 45(3), 234-245. doi:10.1234/jam.2021.045',
+                'url': 'https://doi.org/10.1234/jam.2021.045'
+            },
+            {
+                'citation_text': 'Kumar & Reddy, 2020',
+                'citation_type': 'research_paper',
+                'full_reference': 'Kumar, S., & Reddy, P. (2020). Effects of pranayama on cardiovascular health: A systematic review. International Journal of Yoga Therapy, 32(2), 156-167.',
+                'url': 'https://doi.org/10.5678/ijyt.2020.032'
+            },
+            {
+                'citation_text': 'Patel et al., 2019',
+                'citation_type': 'research_paper',
+                'full_reference': 'Patel, N., Gupta, M., & Desai, K. (2019). Yoga asana protocol for metabolic syndrome. Evidence-Based Complementary Medicine, 28(4), 345-358.',
+                'url': 'https://doi.org/10.7890/ebcm.2019.028'
+            },
+            {
+                'citation_text': 'Iyengar, B.K.S., 2014',
+                'citation_type': 'book',
+                'full_reference': 'Iyengar, B.K.S. (2014). Light on Yoga: The Classic Guide to Yoga. HarperCollins Publishers.',
+                'url': None
+            },
+            {
+                'citation_text': 'Nagendra & Nagarathna, 2018',
+                'citation_type': 'research_paper',
+                'full_reference': 'Nagendra, H.R., & Nagarathna, R. (2018). Integrated approach of yoga therapy for sleep disorders. Sleep Medicine Reviews, 42, 78-89.',
+                'url': 'https://doi.org/10.1111/smr.2018.042'
+            }
+        ]
+        
+        citations = {}
+        for c_data in citations_data:
+            # Check if citation already exists
+            citation = session.query(Citation).filter_by(citation_text=c_data['citation_text']).first()
+            if not citation:
+                citation = Citation(**c_data)
+                session.add(citation)
+                session.flush()
+            citations[c_data['citation_text']] = citation
+        
+        # 3. Create Modules
+        modules_data = [
+            {
+                'disease': 'Chronic Lower Back Pain',
+                'developed_by': 'Sharma et al., 2021',
+                'paper_link': 'https://doi.org/10.1234/jam.2021.045',
+                'module_description': 'Comprehensive yoga therapy module for chronic lower back pain management focusing on strengthening, flexibility, and pain reduction.'
+            },
+            {
+                'disease': 'Hypertension',
+                'developed_by': 'Kumar & Reddy, 2020',
+                'paper_link': 'https://doi.org/10.5678/ijyt.2020.032',
+                'module_description': 'Yoga therapy protocol for hypertension management emphasizing breathing practices and relaxation techniques.'
+            },
+            {
+                'disease': 'Type 2 Diabetes',
+                'developed_by': 'Patel et al., 2019',
+                'paper_link': 'https://doi.org/10.7890/ebcm.2019.028',
+                'module_description': 'Integrated yoga therapy approach for Type 2 Diabetes focusing on metabolic regulation and stress management.'
+            },
+            {
+                'disease': 'Insomnia',
+                'developed_by': 'Nagendra & Nagarathna, 2018',
+                'paper_link': 'https://doi.org/10.1111/smr.2018.042',
+                'module_description': 'Yoga therapy module for sleep disorders incorporating relaxation, breathing, and meditation practices.'
+            },
+            {
+                'disease': 'Osteoarthritis',
+                'developed_by': 'Sharma et al., 2021',
+                'paper_link': 'https://doi.org/10.1234/jam.2021.045',
+                'module_description': 'Gentle yoga therapy protocol for osteoarthritis management with focus on joint mobility and pain relief.'
+            }
+        ]
+        
+        modules = {}
+        for m_data in modules_data:
+            # Always create new module (even if disease exists, we want new modules for synthetic data)
+            module = Module(
+                disease_id=diseases[m_data['disease']].id,
+                developed_by=m_data['developed_by'],
+                paper_link=m_data['paper_link'],
+                module_description=m_data['module_description']
+            )
+            session.add(module)
+            session.flush()
+            # Store by disease name for easy lookup in practices
+            modules[m_data['disease']] = module
+        
+        # 4. Create Practices with CVR scores
+        practices_data = [
+            # Chronic Lower Back Pain practices
+            {
+                'practice_sanskrit': 'Tadasana',
+                'practice_english': 'Mountain Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'standing_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 3,
+                'time_minutes': 2.0,
+                'description': 'Foundation standing pose that improves posture and strengthens core muscles',
+                'how_to_do': 'Stand with feet together, arms at sides. Engage thigh muscles, lift kneecaps, lengthen spine. Hold for 30-60 seconds.',
+                'cvr_score': 7.5,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Chronic Lower Back Pain',
+                'diseases': ['Chronic Lower Back Pain']
+            },
+            {
+                'practice_sanskrit': 'Bhujangasana',
+                'practice_english': 'Cobra Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'prone_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 5,
+                'time_minutes': 1.5,
+                'description': 'Backbend that strengthens the spine and opens the chest',
+                'how_to_do': 'Lie prone, place palms beside chest. Inhale and lift chest, keeping pelvis on ground. Hold for 20-30 seconds.',
+                'cvr_score': 8.0,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Chronic Lower Back Pain',
+                'diseases': ['Chronic Lower Back Pain']
+            },
+            {
+                'practice_sanskrit': 'Shavasana',
+                'practice_english': 'Corpse Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'supine_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 1,
+                'time_minutes': 10.0,
+                'description': 'Deep relaxation pose that promotes healing and stress reduction',
+                'how_to_do': 'Lie supine, arms at sides, palms up. Close eyes and relax completely. Focus on natural breathing.',
+                'cvr_score': 6.0,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Chronic Lower Back Pain',
+                'diseases': ['Chronic Lower Back Pain', 'Insomnia']
+            },
+            {
+                'practice_sanskrit': 'Marjariasana',
+                'practice_english': 'Cat-Cow Pose',
+                'practice_segment': 'Preparatory Practice',
+                'sub_category': 'warm_up',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 10,
+                'time_minutes': 3.0,
+                'description': 'Dynamic spinal movement that improves flexibility and reduces stiffness',
+                'how_to_do': 'Start on hands and knees. Inhale arch back (cow), exhale round spine (cat). Repeat smoothly.',
+                'cvr_score': 7.0,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Chronic Lower Back Pain',
+                'diseases': ['Chronic Lower Back Pain', 'Osteoarthritis']
+            },
+            
+            # Hypertension practices
+            {
+                'practice_sanskrit': 'Anulom Vilom',
+                'practice_english': 'Alternate Nostril Breathing',
+                'practice_segment': 'Pranayama',
+                'sub_category': 'balancing_pranayama',
+                'kosha': 'Pranamaya Kosha',
+                'rounds': 10,
+                'time_minutes': 5.0,
+                'description': 'Balancing breathing technique that calms the nervous system and reduces blood pressure',
+                'how_to_do': 'Sit comfortably. Close right nostril, inhale through left. Close left, exhale through right. Reverse and repeat.',
+                'cvr_score': 8.5,
+                'citation': 'Kumar & Reddy, 2020',
+                'module': 'Hypertension',
+                'diseases': ['Hypertension']
+            },
+            {
+                'practice_sanskrit': 'Bhramari',
+                'practice_english': 'Bee Breath',
+                'practice_segment': 'Pranayama',
+                'sub_category': 'calming_pranayama',
+                'kosha': 'Pranamaya Kosha',
+                'rounds': 5,
+                'time_minutes': 3.0,
+                'description': 'Humming breath that activates parasympathetic nervous system',
+                'how_to_do': 'Sit comfortably. Close ears with thumbs, place fingers on eyes. Inhale, exhale making humming sound like a bee.',
+                'cvr_score': 9.0,
+                'citation': 'Kumar & Reddy, 2020',
+                'module': 'Hypertension',
+                'diseases': ['Hypertension', 'Insomnia']
+            },
+            {
+                'practice_sanskrit': 'Yoga Nidra',
+                'practice_english': 'Yogic Sleep',
+                'practice_segment': 'Meditation',
+                'sub_category': 'guided_relaxation',
+                'kosha': 'Manomaya Kosha',
+                'rounds': 1,
+                'time_minutes': 20.0,
+                'description': 'Deep guided relaxation practice that reduces stress and promotes healing',
+                'how_to_do': 'Lie in Shavasana. Follow guided instructions for body scan and visualization. Maintain awareness while deeply relaxed.',
+                'cvr_score': 7.5,
+                'citation': 'Kumar & Reddy, 2020',
+                'module': 'Hypertension',
+                'diseases': ['Hypertension', 'Insomnia']
+            },
+            
+            # Type 2 Diabetes practices
+            {
+                'practice_sanskrit': 'Surya Namaskar',
+                'practice_english': 'Sun Salutation',
+                'practice_segment': 'Sequential Yogic Practice',
+                'sub_category': 'dynamic_sequence',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 6,
+                'time_minutes': 5.0,
+                'description': 'Dynamic sequence of poses that improves circulation and metabolic function',
+                'how_to_do': 'Flow through 12 poses: prayer pose, upward salute, standing forward bend, lunge, plank, eight-point pose, cobra, downward dog, lunge, forward bend, upward salute, prayer pose.',
+                'cvr_score': 6.5,
+                'citation': 'Patel et al., 2019',
+                'module': 'Type 2 Diabetes',
+                'diseases': ['Type 2 Diabetes']
+            },
+            {
+                'practice_sanskrit': 'Vajrasana',
+                'practice_english': 'Thunderbolt Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'sitting_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 1,
+                'time_minutes': 5.0,
+                'description': 'Sitting pose that aids digestion and can be practiced after meals',
+                'how_to_do': 'Kneel and sit back on heels. Keep spine straight, hands on knees. Breathe normally.',
+                'cvr_score': 8.0,
+                'citation': 'Patel et al., 2019',
+                'module': 'Type 2 Diabetes',
+                'diseases': ['Type 2 Diabetes']
+            },
+            {
+                'practice_sanskrit': 'Kapalabhati',
+                'practice_english': 'Skull Shining Breath',
+                'practice_segment': 'Pranayama',
+                'sub_category': 'energizing_pranayama',
+                'kosha': 'Pranamaya Kosha',
+                'rounds': 3,
+                'time_minutes': 3.0,
+                'strokes_per_min': 60,
+                'strokes_per_cycle': 20,
+                'rest_between_cycles_sec': 30,
+                'description': 'Rapid exhalation technique that stimulates metabolism',
+                'how_to_do': 'Sit comfortably. Forcefully exhale through nose while pulling navel in. Inhalation is passive. Start with 20 strokes per round.',
+                'cvr_score': 7.0,
+                'citation': 'Patel et al., 2019',
+                'module': 'Type 2 Diabetes',
+                'diseases': ['Type 2 Diabetes']
+            },
+            
+            # Insomnia practices
+            {
+                'practice_sanskrit': 'Shitali',
+                'practice_english': 'Cooling Breath',
+                'practice_segment': 'Pranayama',
+                'sub_category': 'cooling_pranayama',
+                'kosha': 'Pranamaya Kosha',
+                'rounds': 10,
+                'time_minutes': 5.0,
+                'description': 'Cooling breathing technique that calms the mind and prepares for sleep',
+                'how_to_do': 'Roll tongue into tube shape. Inhale through rolled tongue, exhale through nose. If tongue cannot roll, use teeth and lips.',
+                'cvr_score': 8.5,
+                'citation': 'Nagendra & Nagarathna, 2018',
+                'module': 'Insomnia',
+                'diseases': ['Insomnia']
+            },
+            {
+                'practice_sanskrit': 'Om Chanting',
+                'practice_english': 'Om Mantra Chanting',
+                'practice_segment': 'Chanting',
+                'sub_category': 'mantra',
+                'kosha': 'Manomaya Kosha',
+                'rounds': 21,
+                'time_minutes': 5.0,
+                'description': 'Sacred sound vibration that calms the mind and promotes deep relaxation',
+                'how_to_do': 'Sit comfortably. Chant "Om" with elongated sound: A-U-M. Feel the vibration in the body. Repeat 21 times.',
+                'cvr_score': 7.5,
+                'citation': 'Nagendra & Nagarathna, 2018',
+                'module': 'Insomnia',
+                'diseases': ['Insomnia']
+            },
+            
+            # Osteoarthritis practices
+            {
+                'practice_sanskrit': 'Vrikshasana',
+                'practice_english': 'Tree Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'standing_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 2,
+                'time_minutes': 1.0,
+                'description': 'Balancing pose that strengthens legs and improves joint stability',
+                'how_to_do': 'Stand on one leg. Place other foot on inner thigh or calf (not knee). Bring hands to prayer position. Hold and switch sides.',
+                'cvr_score': 6.5,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Osteoarthritis',
+                'diseases': ['Osteoarthritis']
+            },
+            {
+                'practice_sanskrit': 'Gomukhasana',
+                'practice_english': 'Cow Face Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'sitting_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 2,
+                'time_minutes': 1.5,
+                'description': 'Hip and shoulder opening pose that improves flexibility',
+                'how_to_do': 'Sit with legs crossed. Stack knees. Reach one arm up and back, other arm behind back. Clasp hands if possible. Switch sides.',
+                'cvr_score': 7.0,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Osteoarthritis',
+                'diseases': ['Osteoarthritis']
+            },
+            {
+                'practice_sanskrit': 'Pawanmuktasana',
+                'practice_english': 'Wind Relieving Pose',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'supine_asana',
+                'kosha': 'Annamaya Kosha',
+                'rounds': 5,
+                'time_minutes': 2.0,
+                'description': 'Gentle pose that improves joint mobility and digestion',
+                'how_to_do': 'Lie supine. Bring both knees to chest. Hug knees and rock gently side to side. Hold for 30 seconds.',
+                'cvr_score': 8.0,
+                'citation': 'Sharma et al., 2021',
+                'module': 'Osteoarthritis',
+                'diseases': ['Osteoarthritis']
+            }
+        ]
+        
+        for p_data in practices_data:
+            # Always create new practice (same practice can have different CVR in different modules)
+            practice = Practice(
+                practice_sanskrit=p_data.get('practice_sanskrit'),
+                practice_english=p_data['practice_english'],
+                practice_segment=p_data['practice_segment'],
+                sub_category=p_data.get('sub_category'),
+                kosha=p_data.get('kosha'),
+                rounds=p_data.get('rounds'),
+                time_minutes=p_data.get('time_minutes'),
+                strokes_per_min=p_data.get('strokes_per_min'),
+                strokes_per_cycle=p_data.get('strokes_per_cycle'),
+                rest_between_cycles_sec=p_data.get('rest_between_cycles_sec'),
+                description=p_data.get('description'),
+                how_to_do=p_data.get('how_to_do'),
+                cvr_score=p_data.get('cvr_score'),
+                citation_id=citations[p_data['citation']].id,
+                module_id=modules[p_data['module']].id,
+                rct_count=0
+            )
+            session.add(practice)
+            session.flush()
+            
+            # Link to diseases (avoid duplicates)
+            for disease_name in p_data['diseases']:
+                if diseases[disease_name] not in practice.diseases:
+                    practice.diseases.append(diseases[disease_name])
+        
+        # 5. Create Contraindications
+        contraindications_data = [
+            {
+                'practice_sanskrit': 'Sarvangasana',
+                'practice_english': 'Shoulder Stand',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'inversion',
+                'reason': 'May increase intraocular pressure and is contraindicated in hypertension',
+                'source_type': 'book',
+                'source_name': 'Light on Yoga by B.K.S. Iyengar',
+                'page_number': '234-236',
+                'apa_citation': 'Iyengar, B.K.S. (2014). Light on Yoga: The Classic Guide to Yoga (pp. 234-236). HarperCollins Publishers.',
+                'diseases': ['Hypertension']
+            },
+            {
+                'practice_sanskrit': 'Shirshasana',
+                'practice_english': 'Headstand',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'inversion',
+                'reason': 'Advanced inversion that increases blood pressure and should be avoided in hypertension',
+                'source_type': 'book',
+                'source_name': 'Light on Yoga by B.K.S. Iyengar',
+                'page_number': '198-202',
+                'apa_citation': 'Iyengar, B.K.S. (2014). Light on Yoga: The Classic Guide to Yoga (pp. 198-202). HarperCollins Publishers.',
+                'diseases': ['Hypertension']
+            },
+            {
+                'practice_sanskrit': 'Paschimottanasana',
+                'practice_english': 'Seated Forward Bend',
+                'practice_segment': 'Yogasana',
+                'sub_category': 'forward_bend',
+                'reason': 'Deep forward bend may aggravate lower back pain if done incorrectly',
+                'source_type': 'paper',
+                'source_name': 'Sharma et al., 2021',
+                'page_number': None,
+                'apa_citation': 'Sharma, M., Singh, A., & Patel, R. (2021). Yoga therapy for chronic pain management: A randomized controlled trial. Journal of Alternative Medicine, 45(3), 234-245.',
+                'diseases': ['Chronic Lower Back Pain']
+            },
+            {
+                'practice_sanskrit': 'Kapalabhati',
+                'practice_english': 'Skull Shining Breath',
+                'practice_segment': 'Pranayama',
+                'sub_category': 'energizing_pranayama',
+                'reason': 'Rapid breathing technique may cause dizziness and is contraindicated in hypertension',
+                'source_type': 'paper',
+                'source_name': 'Kumar & Reddy, 2020',
+                'page_number': None,
+                'apa_citation': 'Kumar, S., & Reddy, P. (2020). Effects of pranayama on cardiovascular health: A systematic review. International Journal of Yoga Therapy, 32(2), 156-167.',
+                'diseases': ['Hypertension']
+            }
+        ]
+        
+        for c_data in contraindications_data:
+            contraindication = Contraindication(
+                practice_sanskrit=c_data.get('practice_sanskrit'),
+                practice_english=c_data['practice_english'],
+                practice_segment=c_data['practice_segment'],
+                sub_category=c_data.get('sub_category'),
+                reason=c_data['reason'],
+                source_type=c_data['source_type'],
+                source_name=c_data['source_name'],
+                page_number=c_data.get('page_number'),
+                apa_citation=c_data.get('apa_citation')
+            )
+            session.add(contraindication)
+            session.flush()
+            
+            # Link to diseases
+            for disease_name in c_data['diseases']:
+                contraindication.diseases.append(diseases[disease_name])
+        
+        # 6. Create RCTs with Symptoms
+        rcts_data = [
+            {
+                'data_enrolled_date': '2021-03-15',
+                'database_journal': 'PubMed',
+                'keywords': 'yoga, chronic back pain, randomized controlled trial, alternative medicine',
+                'doi': '10.1234/jam.2021.045',
+                'pmic_nmic': 'PMC12345678',
+                'title': 'Effectiveness of Yoga Therapy in Management of Chronic Lower Back Pain: A Randomized Controlled Trial',
+                'parenthetical_citation': '(Sharma et al., 2021)',
+                'citation_full': 'Sharma, M., Singh, A., & Patel, R. (2021). Effectiveness of Yoga Therapy in Management of Chronic Lower Back Pain: A Randomized Controlled Trial. Journal of Alternative Medicine, 45(3), 234-245.',
+                'citation_link': 'https://doi.org/10.1234/jam.2021.045',
+                'study_type': 'RCT',
+                'participant_type': 'adults with chronic lower back pain',
+                'age_mean': 45.2,
+                'age_std_dev': 8.5,
+                'age_range_calculated': '36.7-53.7',
+                'gender_male': 35,
+                'gender_female': 40,
+                'gender_not_mentioned': 0,
+                'duration_type': 'weeks',
+                'duration_value': 12,
+                'frequency_per_duration': '3 times per week',
+                'intervention_practices': json.dumps([
+                    {'practice': 'Tadasana', 'category': 'Yogasana'},
+                    {'practice': 'Bhujangasana', 'category': 'Yogasana'},
+                    {'practice': 'Shavasana', 'category': 'Yogasana'},
+                    {'practice': 'Marjariasana', 'category': 'Preparatory Practice'}
+                ]),
+                'scales': 'Visual Analog Scale (VAS), Oswestry Disability Index (ODI), Roland-Morris Disability Questionnaire',
+                'results': 'Significant reduction in pain intensity (VAS: p<0.001), improvement in functional disability (ODI: p<0.01), and enhanced quality of life measures.',
+                'conclusion': 'Yoga therapy demonstrated significant effectiveness in reducing chronic lower back pain and improving functional outcomes.',
+                'remarks': 'No adverse events reported. Participants with severe spinal conditions were excluded.',
+                'diseases': ['Chronic Lower Back Pain'],
+                'symptoms': [
+                    {'name': 'Pain Intensity', 'p_value_operator': '<', 'p_value': 0.001, 'is_significant': 1, 'scale': 'Visual Analog Scale (VAS)'},
+                    {'name': 'Functional Disability', 'p_value_operator': '<', 'p_value': 0.01, 'is_significant': 1, 'scale': 'Oswestry Disability Index (ODI)'},
+                    {'name': 'Quality of Life', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'SF-36'}
+                ]
+            },
+            {
+                'data_enrolled_date': '2020-06-20',
+                'database_journal': 'PubMed',
+                'keywords': 'yoga, hypertension, blood pressure, pranayama, breathing exercises',
+                'doi': '10.5678/ijyt.2020.032',
+                'pmic_nmic': 'PMC98765432',
+                'title': 'Effects of Pranayama-Based Yoga Therapy on Blood Pressure in Hypertensive Patients: A Randomized Controlled Study',
+                'parenthetical_citation': '(Kumar & Reddy, 2020)',
+                'citation_full': 'Kumar, S., & Reddy, P. (2020). Effects of Pranayama-Based Yoga Therapy on Blood Pressure in Hypertensive Patients: A Randomized Controlled Study. International Journal of Yoga Therapy, 32(2), 156-167.',
+                'citation_link': 'https://doi.org/10.5678/ijyt.2020.032',
+                'study_type': 'RCT',
+                'participant_type': 'hypertensive adults',
+                'age_mean': 52.8,
+                'age_std_dev': 10.2,
+                'age_range_calculated': '42.6-63.0',
+                'gender_male': 42,
+                'gender_female': 38,
+                'gender_not_mentioned': 0,
+                'duration_type': 'weeks',
+                'duration_value': 8,
+                'frequency_per_duration': 'Daily practice, 30 minutes',
+                'intervention_practices': json.dumps([
+                    {'practice': 'Anulom Vilom', 'category': 'Pranayama'},
+                    {'practice': 'Bhramari', 'category': 'Pranayama'},
+                    {'practice': 'Yoga Nidra', 'category': 'Meditation'}
+                ]),
+                'scales': 'Systolic Blood Pressure (SBP), Diastolic Blood Pressure (DBP), Heart Rate Variability (HRV)',
+                'results': 'Significant reduction in both systolic (p<0.001) and diastolic (p<0.01) blood pressure. Improvement in HRV parameters indicating enhanced autonomic function.',
+                'conclusion': 'Pranayama-based yoga therapy is an effective complementary intervention for hypertension management.',
+                'remarks': 'Participants were advised to continue medication as prescribed. No adverse effects observed.',
+                'diseases': ['Hypertension'],
+                'symptoms': [
+                    {'name': 'Systolic Blood Pressure', 'p_value_operator': '<', 'p_value': 0.001, 'is_significant': 1, 'scale': 'Systolic Blood Pressure (SBP)'},
+                    {'name': 'Diastolic Blood Pressure', 'p_value_operator': '<', 'p_value': 0.01, 'is_significant': 1, 'scale': 'Diastolic Blood Pressure (DBP)'},
+                    {'name': 'Heart Rate Variability', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'HRV'}
+                ]
+            },
+            {
+                'data_enrolled_date': '2019-09-10',
+                'database_journal': 'PubMed',
+                'keywords': 'yoga, type 2 diabetes, glycemic control, metabolic syndrome',
+                'doi': '10.7890/ebcm.2019.028',
+                'pmic_nmic': 'PMC55555555',
+                'title': 'Integrated Yoga Therapy for Glycemic Control in Type 2 Diabetes Mellitus: A Randomized Controlled Trial',
+                'parenthetical_citation': '(Patel et al., 2019)',
+                'citation_full': 'Patel, N., Gupta, M., & Desai, K. (2019). Integrated Yoga Therapy for Glycemic Control in Type 2 Diabetes Mellitus: A Randomized Controlled Trial. Evidence-Based Complementary Medicine, 28(4), 345-358.',
+                'citation_link': 'https://doi.org/10.7890/ebcm.2019.028',
+                'study_type': 'RCT',
+                'participant_type': 'adults with Type 2 Diabetes',
+                'age_mean': 48.5,
+                'age_std_dev': 9.8,
+                'age_range_calculated': '38.7-58.3',
+                'gender_male': 30,
+                'gender_female': 35,
+                'gender_not_mentioned': 0,
+                'duration_type': 'weeks',
+                'duration_value': 16,
+                'frequency_per_duration': '5 times per week',
+                'intervention_practices': json.dumps([
+                    {'practice': 'Surya Namaskar', 'category': 'Sequential Yogic Practice'},
+                    {'practice': 'Vajrasana', 'category': 'Yogasana'},
+                    {'practice': 'Kapalabhati', 'category': 'Pranayama'}
+                ]),
+                'scales': 'Fasting Blood Glucose (FBG), Postprandial Blood Glucose (PPBG), HbA1c, Lipid Profile',
+                'results': 'Significant improvement in FBG (p<0.01), PPBG (p<0.05), and HbA1c (p<0.001). Positive changes in lipid profile observed.',
+                'conclusion': 'Integrated yoga therapy significantly improves glycemic control and metabolic parameters in Type 2 Diabetes.',
+                'remarks': 'Participants maintained their diabetic medication. Yoga was used as complementary therapy.',
+                'diseases': ['Type 2 Diabetes'],
+                'symptoms': [
+                    {'name': 'Fasting Blood Glucose', 'p_value_operator': '<', 'p_value': 0.01, 'is_significant': 1, 'scale': 'FBG (mg/dL)'},
+                    {'name': 'HbA1c', 'p_value_operator': '<', 'p_value': 0.001, 'is_significant': 1, 'scale': 'HbA1c (%)'},
+                    {'name': 'Postprandial Blood Glucose', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'PPBG (mg/dL)'}
+                ]
+            },
+            {
+                'data_enrolled_date': '2018-11-05',
+                'database_journal': 'PubMed',
+                'keywords': 'yoga, insomnia, sleep disorders, sleep quality, pranayama',
+                'doi': '10.1111/smr.2018.042',
+                'pmic_nmic': 'PMC44444444',
+                'title': 'Yoga Therapy for Primary Insomnia: A Randomized Controlled Trial',
+                'parenthetical_citation': '(Nagendra & Nagarathna, 2018)',
+                'citation_full': 'Nagendra, H.R., & Nagarathna, R. (2018). Yoga Therapy for Primary Insomnia: A Randomized Controlled Trial. Sleep Medicine Reviews, 42, 78-89.',
+                'citation_link': 'https://doi.org/10.1111/smr.2018.042',
+                'study_type': 'RCT',
+                'participant_type': 'adults with primary insomnia',
+                'age_mean': 38.6,
+                'age_std_dev': 11.4,
+                'age_range_calculated': '27.2-50.0',
+                'gender_male': 25,
+                'gender_female': 45,
+                'gender_not_mentioned': 0,
+                'duration_type': 'weeks',
+                'duration_value': 6,
+                'frequency_per_duration': 'Daily practice before bedtime',
+                'intervention_practices': json.dumps([
+                    {'practice': 'Shitali', 'category': 'Pranayama'},
+                    {'practice': 'Om Chanting', 'category': 'Chanting'},
+                    {'practice': 'Shavasana', 'category': 'Yogasana'},
+                    {'practice': 'Yoga Nidra', 'category': 'Meditation'}
+                ]),
+                'scales': 'Pittsburgh Sleep Quality Index (PSQI), Insomnia Severity Index (ISI), Sleep Efficiency',
+                'results': 'Significant improvement in PSQI scores (p<0.001), reduction in ISI scores (p<0.01), and increased sleep efficiency (p<0.05).',
+                'conclusion': 'Yoga therapy significantly improves sleep quality and reduces insomnia symptoms in patients with primary insomnia.',
+                'remarks': 'Practice was done in evening before sleep. Participants reported feeling more relaxed and falling asleep faster.',
+                'diseases': ['Insomnia'],
+                'symptoms': [
+                    {'name': 'Sleep Quality', 'p_value_operator': '<', 'p_value': 0.001, 'is_significant': 1, 'scale': 'Pittsburgh Sleep Quality Index (PSQI)'},
+                    {'name': 'Insomnia Severity', 'p_value_operator': '<', 'p_value': 0.01, 'is_significant': 1, 'scale': 'Insomnia Severity Index (ISI)'},
+                    {'name': 'Sleep Efficiency', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'Sleep Efficiency (%)'}
+                ]
+            },
+            {
+                'data_enrolled_date': '2021-01-20',
+                'database_journal': 'PubMed',
+                'keywords': 'yoga, osteoarthritis, joint pain, mobility, flexibility',
+                'doi': '10.1234/jam.2021.045',
+                'pmic_nmic': 'PMC33333333',
+                'title': 'Gentle Yoga Therapy for Knee Osteoarthritis: A Randomized Controlled Trial',
+                'parenthetical_citation': '(Sharma et al., 2021)',
+                'citation_full': 'Sharma, M., Singh, A., & Patel, R. (2021). Gentle Yoga Therapy for Knee Osteoarthritis: A Randomized Controlled Trial. Journal of Alternative Medicine, 45(3), 234-245.',
+                'citation_link': 'https://doi.org/10.1234/jam.2021.045',
+                'study_type': 'RCT',
+                'participant_type': 'elderly adults with knee osteoarthritis',
+                'age_mean': 62.3,
+                'age_std_dev': 7.8,
+                'age_range_calculated': '54.5-70.1',
+                'gender_male': 20,
+                'gender_female': 30,
+                'gender_not_mentioned': 0,
+                'duration_type': 'weeks',
+                'duration_value': 10,
+                'frequency_per_duration': '3 times per week',
+                'intervention_practices': json.dumps([
+                    {'practice': 'Vrikshasana', 'category': 'Yogasana'},
+                    {'practice': 'Gomukhasana', 'category': 'Yogasana'},
+                    {'practice': 'Pawanmuktasana', 'category': 'Yogasana'},
+                    {'practice': 'Marjariasana', 'category': 'Preparatory Practice'}
+                ]),
+                'scales': 'Western Ontario and McMaster Universities Osteoarthritis Index (WOMAC), Visual Analog Scale (VAS), Range of Motion (ROM)',
+                'results': 'Significant improvement in WOMAC scores (p<0.01), reduction in pain intensity (p<0.05), and increased range of motion (p<0.05).',
+                'conclusion': 'Gentle yoga therapy improves pain, function, and mobility in patients with knee osteoarthritis.',
+                'remarks': 'All poses were modified for safety. Participants with severe joint deformities were excluded.',
+                'diseases': ['Osteoarthritis'],
+                'symptoms': [
+                    {'name': 'Pain Intensity', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'Visual Analog Scale (VAS)'},
+                    {'name': 'Functional Status', 'p_value_operator': '<', 'p_value': 0.01, 'is_significant': 1, 'scale': 'WOMAC'},
+                    {'name': 'Range of Motion', 'p_value_operator': '<', 'p_value': 0.05, 'is_significant': 1, 'scale': 'ROM (degrees)'}
+                ]
+            }
+        ]
+        
+        for rct_data in rcts_data:
+            rct = RCT(
+                data_enrolled_date=rct_data['data_enrolled_date'],
+                database_journal=rct_data['database_journal'],
+                keywords=rct_data['keywords'],
+                doi=rct_data['doi'],
+                pmic_nmic=rct_data['pmic_nmic'],
+                title=rct_data['title'],
+                parenthetical_citation=rct_data['parenthetical_citation'],
+                citation_full=rct_data['citation_full'],
+                citation_link=rct_data['citation_link'],
+                study_type=rct_data['study_type'],
+                participant_type=rct_data['participant_type'],
+                age_mean=rct_data['age_mean'],
+                age_std_dev=rct_data['age_std_dev'],
+                age_range_calculated=rct_data['age_range_calculated'],
+                gender_male=rct_data['gender_male'],
+                gender_female=rct_data['gender_female'],
+                gender_not_mentioned=rct_data['gender_not_mentioned'],
+                duration_type=rct_data['duration_type'],
+                duration_value=rct_data['duration_value'],
+                frequency_per_duration=rct_data['frequency_per_duration'],
+                intervention_practices=rct_data['intervention_practices'],
+                scales=rct_data['scales'],
+                results=rct_data['results'],
+                conclusion=rct_data['conclusion'],
+                remarks=rct_data.get('remarks'),
+                rct_number=1
+            )
+            session.add(rct)
+            session.flush()
+            
+            # Link to diseases
+            for disease_name in rct_data['diseases']:
+                rct.diseases.append(diseases[disease_name])
+            
+            # Create and link symptoms
+            for symptom_data in rct_data['symptoms']:
+                symptom = RCTSymptom(
+                    symptom_name=symptom_data['name'],
+                    p_value_operator=symptom_data['p_value_operator'],
+                    p_value=symptom_data['p_value'],
+                    is_significant=symptom_data['is_significant'],
+                    scale=symptom_data['scale']
+                )
+                session.add(symptom)
+                session.flush()
+                rct.symptoms.append(symptom)
+        
+        # Commit all changes
+        session.commit()
+        
+        # Get final counts
+        final_disease_count = session.query(Disease).count()
+        final_module_count = session.query(Module).count()
+        final_practice_count = session.query(Practice).count()
+        
+        flash(f'✅ Synthetic data generated successfully! Added: {len(diseases)} diseases (total in DB: {final_disease_count}), {len(citations)} citations, {len(modules)} modules (total in DB: {final_module_count}), {len(practices_data)} practices (total in DB: {final_practice_count}), {len(contraindications_data)} contraindications, and {len(rcts_data)} RCTs.', 'success')
+        return redirect(url_for('list_modules'))
+        
+    except Exception as e:
+        session.rollback()
+        flash(f'❌ Error generating synthetic data: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('generate_synthetic_data'))
+    finally:
+        session.close()
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

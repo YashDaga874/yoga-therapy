@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Generate Synthetic Data</h2>
+<p style="font-size: 1.1rem; color: #667eea; font-weight: 600; margin-bottom: 2rem;">Populate database with realistic sample data for testing and demonstration</p>
+
+<div style="margin-top: 2rem; padding: 2rem; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+    <h3 style="margin-bottom: 1rem; color: #856404;">⚠️ Important Notice</h3>
+    <p style="line-height: 1.8; color: #856404; margin-bottom: 1rem;">
+        This tool will generate comprehensive synthetic data including:
+    </p>
+    <ul style="line-height: 2; color: #856404; margin-left: 2rem;">
+        <li><strong>5 Diseases:</strong> Chronic Lower Back Pain, Hypertension, Type 2 Diabetes, Insomnia, Osteoarthritis</li>
+        <li><strong>5 Citations:</strong> Research papers and books with full references</li>
+        <li><strong>5 Modules:</strong> One module per disease with developer information</li>
+        <li><strong>13 Practices:</strong> Complete yoga practices with CVR scores, descriptions, and instructions</li>
+        <li><strong>4 Contraindications:</strong> Practices to avoid for specific diseases</li>
+        <li><strong>5 RCTs:</strong> Randomized controlled trials with symptoms, demographics, and results</li>
+    </ul>
+    <p style="line-height: 1.8; color: #856404; margin-top: 1rem;">
+        <strong>Note:</strong> If diseases, citations, or modules already exist with the same names, they will be reused. New practices, contraindications, and RCTs will always be added.
+    </p>
+</div>
+
+<div style="margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+    <h3 style="margin-bottom: 1rem; color: #2c3e50;">What Will Be Created</h3>
+    
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">Diseases</h4>
+        <ul style="line-height: 1.8; color: #555; margin-left: 2rem;">
+            <li>Chronic Lower Back Pain</li>
+            <li>Hypertension</li>
+            <li>Type 2 Diabetes</li>
+            <li>Insomnia</li>
+            <li>Osteoarthritis</li>
+        </ul>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">Sample Practices</h4>
+        <ul style="line-height: 1.8; color: #555; margin-left: 2rem;">
+            <li>Tadasana (Mountain Pose) - CVR: 7.5</li>
+            <li>Bhujangasana (Cobra Pose) - CVR: 8.0</li>
+            <li>Anulom Vilom (Alternate Nostril Breathing) - CVR: 8.5</li>
+            <li>Bhramari (Bee Breath) - CVR: 9.0</li>
+            <li>Surya Namaskar (Sun Salutation) - CVR: 6.5</li>
+            <li>And 8 more practices...</li>
+        </ul>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: #495057; margin-bottom: 0.8rem;">RCT Studies</h4>
+        <ul style="line-height: 1.8; color: #555; margin-left: 2rem;">
+            <li>Chronic Lower Back Pain RCT (12 weeks, 75 participants)</li>
+            <li>Hypertension RCT (8 weeks, 80 participants)</li>
+            <li>Type 2 Diabetes RCT (16 weeks, 65 participants)</li>
+            <li>Insomnia RCT (6 weeks, 70 participants)</li>
+            <li>Osteoarthritis RCT (10 weeks, 50 participants)</li>
+        </ul>
+    </div>
+</div>
+
+<div style="margin-top: 3rem; padding: 2rem; background: #d1ecf1; border-radius: 8px; border-left: 4px solid #0c5460;">
+    <h3 style="margin-bottom: 1rem; color: #0c5460;">Data Quality</h3>
+    <p style="line-height: 1.8; color: #0c5460;">
+        All synthetic data is carefully crafted to be realistic and follow yoga therapy principles:
+    </p>
+    <ul style="line-height: 1.8; color: #0c5460; margin-left: 2rem; margin-top: 1rem;">
+        <li>✅ Proper Sanskrit and English names for practices</li>
+        <li>✅ Correct practice segments and Kosha classifications</li>
+        <li>✅ Realistic CVR scores (6.0 - 9.0 range)</li>
+        <li>✅ Complete practice descriptions and instructions</li>
+        <li>✅ Proper citations with full references</li>
+        <li>✅ RCT data with demographics, interventions, and statistical results</li>
+        <li>✅ Appropriate contraindications with source citations</li>
+    </ul>
+</div>
+
+<form method="POST" action="{{ url_for('generate_synthetic_data') }}" style="margin-top: 3rem;">
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
+        <p style="margin-bottom: 2rem; color: #555; font-size: 1.1rem;">
+            Click the button below to generate and add synthetic data to your database.
+        </p>
+        <button type="submit" 
+                style="padding: 1rem 3rem; font-size: 1.1rem; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.3s;"
+                onmouseover="this.style.background='#5568d3'"
+                onmouseout="this.style.background='#667eea'">
+            🚀 Generate Synthetic Data
+        </button>
+        <div style="margin-top: 1.5rem;">
+            <a href="{{ url_for('index') }}" 
+               style="color: #667eea; text-decoration: none; font-weight: 500;">
+                ← Back to Home
+            </a>
+        </div>
+    </div>
+</form>
+
+{% endblock %}
+

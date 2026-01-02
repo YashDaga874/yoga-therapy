@@ -24,10 +24,7 @@
    - Installing dependencies
    - Running database migration (ensures database schema is up-to-date)
 
-3. (Optional) Initialize database with sample data:
-   ```bash
-   python utils/import_data.py
-   ```
+3. **That's it!** The database file (`yoga_therapy.db`) is already included in the repository with sample data, so you can start using the app immediately.
 
 ### ▶️ Running the App (Every Time After Setup)
 
@@ -98,7 +95,7 @@ Troubleshooting:
 **Other Issues**:
 - Activate the venv and run from the repo root if you see import errors.
 - If port 5000 is busy, Flask prints the actual port—use that.
-- If the database is missing/empty, re-run `python utils/import_data.py` (make sure venv is activated).
+- The database file (`yoga_therapy.db`) is included in the repository. If you need to import your own JSON data, you can use `python utils/import_data.py` (make sure venv is activated).
 - If dependencies fail to install, try: `pip install --upgrade pip` then `pip install -r requirements.txt`.
 
 ---
@@ -131,13 +128,17 @@ First, navigate to the system directory in your terminal. You'll want to create 
 
 Next, install the required Python packages by running `pip install -r requirements.txt`. This command reads the requirements file and installs Flask for the web interface, SQLAlchemy for database operations, and other necessary dependencies. The installation should complete within a minute or two depending on your internet connection.
 
-## Populating Your Database with Sample Data
+## Database
 
-Now that dependencies are installed, you need to populate your database with the sample therapy data. I've created an import script that automatically processes your JSON data and creates a properly structured database. Run this script by executing `python utils/import_data.py` from the main directory.
+The database file (`yoga_therapy.db`) is already included in the repository with sample data, so you can start using the app immediately after setup.
 
-Watch the output as the script runs. You'll see it processing each disease and its associated practices. The script is intelligent about handling the nested structure of your therapy modules, correctly identifying which practices belong to which practice segment, and properly linking everything together through the database relationships. When the script completes successfully, you'll see a success message and you'll have a new file called `yoga_therapy.db` in your directory. This file contains your entire research database in a portable format.
+### Importing Your Own Data
 
-If you encounter any errors during import, they typically stem from issues in the JSON structure. The script will tell you exactly where the problem occurred so you can fix it. Common issues include missing required fields or inconsistent data types, but the sample data I've provided should import cleanly.
+If you want to import your own JSON data, you can use the import script. The script automatically processes JSON data and creates a properly structured database. Run this script by executing `python utils/import_data.py` from the main directory.
+
+Watch the output as the script runs. You'll see it processing each disease and its associated practices. The script is intelligent about handling the nested structure of your therapy modules, correctly identifying which practices belong to which practice segment, and properly linking everything together through the database relationships.
+
+If you encounter any errors during import, they typically stem from issues in the JSON structure. The script will tell you exactly where the problem occurred so you can fix it. Common issues include missing required fields or inconsistent data types.
 
 ## Using the Web Interface
 
@@ -159,7 +160,7 @@ Before integrating with your RAG chatbot, you should thoroughly test the recomme
 
 The test script runs several important checks. First, it tests getting recommendations for a single disease to verify basic functionality. Then it tests combining multiple diseases to demonstrate the deduplication and contraindication logic. It shows you both the JSON format (which your API will use) and the text summary format (which the RAG chatbot will present to doctors). By examining the test output, you can verify that practices are being combined correctly, duplicates are being removed, and the output includes proper citations.
 
-Pay close attention to the test results. If all tests pass, your system is working correctly and ready for integration with your RAG chatbot. If any tests fail, the script will show you detailed error messages that help identify the problem. The most common issue is running the tests before importing the sample data, so make sure you've run the import script first.
+Pay close attention to the test results. If all tests pass, your system is working correctly and ready for integration with your RAG chatbot. If any tests fail, the script will show you detailed error messages that help identify the problem.
 
 ## How RAG Integration Will Work
 
@@ -211,7 +212,7 @@ When duplicate practices aren't being removed correctly in combined recommendati
 
 If contraindications aren't being applied, verify that the contraindication entry exactly matches the practice name and practice segment. The system uses string matching to identify contraindicated practices, so even small differences like extra spaces or different capitalization in the practice segment name will prevent matching. The practice name matching is case-insensitive, but the practice segment name must match exactly.
 
-Database errors typically occur during the import process if the JSON structure doesn't match what the script expects. Read the error message carefully because it will tell you which disease and which section of the data caused the problem. Often it's a matter of missing required fields or incorrectly nested structures. Compare the problematic section to the working examples in the sample data to identify the difference.
+Database errors typically occur during the import process (if importing your own JSON data) if the JSON structure doesn't match what the script expects. Read the error message carefully because it will tell you which disease and which section of the data caused the problem. Often it's a matter of missing required fields or incorrectly nested structures.
 
 Web interface issues often stem from the Flask server not running or running on a different port than expected. Make sure you see the "Running on http://127.0.0.1:5000" message before trying to access the web interface. If the port is already in use, Flask will assign a different port, so check the console output to see which address to use.
 

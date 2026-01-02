@@ -31,12 +31,7 @@
      - Install dependencies
      - Run database migration (ensures database schema is up-to-date)
 
-5. **(Optional) Initialize the database with sample data:**
-   ```bash
-   python utils/import_data.py
-   ```
-
-**✅ Setup Complete!** You only need to do this once.
+**✅ Setup Complete!** The database file (`yoga_therapy.db`) is already included in the repository with sample data, so you're ready to go!
 
 ---
 
