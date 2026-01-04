@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from collections import defaultdict
 from database.models import Disease, Practice, Contraindication, DiseaseCombination, Module, get_session
+from sqlalchemy.orm import joinedload, selectinload
 import json
 
 
@@ -79,11 +80,15 @@ class YogaTherapyRecommendationEngine:
     
     def _fetch_diseases(self, disease_names):
         """
-        Fetch disease objects from database
+        Fetch disease objects from database with eager loading
         """
+        # Use eager loading to prevent N+1 queries
         diseases = []
         for name in disease_names:
-            disease = self.session.query(Disease).filter(
+            disease = self.session.query(Disease).options(
+                selectinload(Disease.practices),
+                selectinload(Disease.contraindications)
+            ).filter(
                 Disease.name.ilike(f'%{name}%')
             ).first()
             

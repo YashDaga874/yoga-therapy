@@ -5,10 +5,12 @@ This defines the complete database schema using SQLAlchemy ORM
 Updated to support disease combinations for contraindications
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, ForeignKey, Table
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, ForeignKey, Table, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.pool import QueuePool, StaticPool
 from datetime import datetime
+import os
 
 Base = declarative_base()
 
@@ -54,6 +56,10 @@ class Disease(Base):
     
     def __repr__(self):
         return f"<Disease(name='{self.name}')>"
+
+
+# Indexes for Disease table
+Index('idx_disease_name', Disease.name)
 
 
 class Practice(Base):
@@ -111,6 +117,17 @@ class Practice(Base):
         return f"<Practice(english='{self.practice_english}', segment='{self.practice_segment}')>"
 
 
+# Indexes for Practice table - critical for performance
+Index('idx_practice_english', Practice.practice_english)
+Index('idx_practice_sanskrit', Practice.practice_sanskrit)
+Index('idx_practice_segment', Practice.practice_segment)
+Index('idx_practice_module_id', Practice.module_id)
+Index('idx_practice_citation_id', Practice.citation_id)
+Index('idx_practice_kosha', Practice.kosha)
+# Composite index for common query patterns
+Index('idx_practice_segment_kosha', Practice.practice_segment, Practice.kosha)
+
+
 class Citation(Base):
     """
     Stores research paper/book references for practices
@@ -128,6 +145,10 @@ class Citation(Base):
     
     def __repr__(self):
         return f"<Citation(text='{self.citation_text}')>"
+
+
+# Indexes for Citation table
+Index('idx_citation_text', Citation.citation_text)
 
 
 class DiseaseCombination(Base):
@@ -185,6 +206,11 @@ class Contraindication(Base):
         return f"<Contraindication(practice='{self.practice_english}', segment='{self.practice_segment}')>"
 
 
+# Indexes for Contraindication table
+Index('idx_contraindication_english', Contraindication.practice_english)
+Index('idx_contraindication_segment', Contraindication.practice_segment)
+
+
 class Module(Base):
     """
     Stores metadata about therapy modules for each disease
@@ -207,6 +233,11 @@ class Module(Base):
     
     def __repr__(self):
         return f"<Module(disease='{self.disease.name if self.disease else 'N/A'}', developed_by='{self.developed_by}')>"
+
+
+# Indexes for Module table
+Index('idx_module_disease_id', Module.disease_id)
+Index('idx_module_developed_by', Module.developed_by)
 
 
 # Association table for RCT and symptoms (many-to-many)
@@ -314,20 +345,135 @@ class RCT(Base):
         return f"<RCT(title='{self.title[:50] if self.title else 'N/A'}...', doi='{self.doi}')>"
 
 
+# Indexes for RCT table
+Index('idx_rct_doi', RCT.doi)
+Index('idx_rct_study_type', RCT.study_type)
+
+
+# Database configuration
+def get_database_url():
+    """
+    Get database URL from environment variable or use default SQLite.
+    Supports both SQLite and PostgreSQL.
+    
+    Environment variables:
+    - DATABASE_URL: Full database URL (e.g., 'postgresql://user:pass@localhost/dbname')
+    - DB_TYPE: 'sqlite' or 'postgresql'
+    - DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME: For PostgreSQL
+    
+    Returns:
+        Database URL string
+    """
+    # Check for explicit DATABASE_URL
+    db_url = os.getenv('DATABASE_URL')
+    if db_url:
+        return db_url
+    
+    # Check for PostgreSQL configuration
+    db_type = os.getenv('DB_TYPE', 'sqlite').lower()
+    
+    if db_type == 'postgresql':
+        db_host = os.getenv('DB_HOST', 'localhost')
+        db_port = os.getenv('DB_PORT', '5432')
+        db_user = os.getenv('DB_USER', 'yoga_therapy')
+        db_password = os.getenv('DB_PASSWORD', '')
+        db_name = os.getenv('DB_NAME', 'yoga_therapy')
+        
+        return f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+    
+    # Default to SQLite
+    return 'sqlite:///yoga_therapy.db'
+
+
+def create_engine_with_pooling(db_url):
+    """
+    Create database engine with appropriate pooling configuration.
+    
+    SQLite: Uses StaticPool (single connection)
+    PostgreSQL: Uses QueuePool (connection pooling)
+    """
+    if db_url.startswith('sqlite'):
+        # SQLite configuration
+        engine = create_engine(
+            db_url,
+            echo=False,
+            poolclass=StaticPool,
+            connect_args={
+                'check_same_thread': False,
+                'timeout': 20
+            },
+            pool_pre_ping=True
+        )
+    else:
+        # PostgreSQL configuration with connection pooling
+        engine = create_engine(
+            db_url,
+            echo=False,
+            poolclass=QueuePool,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=3600
+        )
+    return engine
+
+
+# Global engine instance (created on first use)
+_engine = None
+_session_factory = None
+
+
+def get_engine():
+    """Get or create the global database engine"""
+    global _engine
+    if _engine is None:
+        db_url = get_database_url()
+        _engine = create_engine_with_pooling(db_url)
+    return _engine
+
+
 # Database setup functions
-def create_database(db_path='sqlite:///yoga_therapy.db'):
+def create_database(db_path=None):
     """
-    Creates the database and all tables
+    Creates the database and all tables with indexes.
+    
+    Args:
+        db_path: Optional database URL. If None, uses get_database_url()
     """
-    engine = create_engine(db_path, echo=False)
+    if db_path is None:
+        db_path = get_database_url()
+    
+    engine = create_engine_with_pooling(db_path)
     Base.metadata.create_all(engine)
     return engine
 
 
-def get_session(db_path='sqlite:///yoga_therapy.db'):
+def get_session(db_path=None):
     """
-    Returns a database session for performing operations
+    Returns a database session for performing operations.
+    Uses connection pooling for better performance.
+    
+    Args:
+        db_path: Optional database URL. If None, uses get_database_url()
+    
+    Returns:
+        SQLAlchemy session
     """
-    engine = create_engine(db_path, echo=False)
-    Session = sessionmaker(bind=engine)
-    return Session()
+    global _engine, _session_factory
+    
+    if db_path is None:
+        db_path = get_database_url()
+    
+    # Use global engine if paths match, otherwise create new
+    current_url = get_database_url()
+    if db_path == current_url and _engine is not None:
+        engine = _engine
+    else:
+        engine = create_engine_with_pooling(db_path)
+        if db_path == current_url:
+            _engine = engine
+    
+    if _session_factory is None or _session_factory.kw['bind'] != engine:
+        _session_factory = sessionmaker(bind=engine)
+    
+    return _session_factory()

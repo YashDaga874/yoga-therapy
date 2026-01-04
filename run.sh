@@ -50,6 +50,14 @@ if [ $? -ne 0 ]; then
     echo "If you encounter database errors, run: python add_kosha_field.py"
 fi
 
+# Add database indexes for performance
+echo ""
+echo "Optimizing database indexes..."
+python add_database_indexes.py
+if [ $? -ne 0 ]; then
+    echo "WARNING: Index creation had issues, but continuing..."
+fi
+
 # Run the app from the web directory
 echo ""
 echo "Starting Flask application..."

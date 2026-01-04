@@ -24,6 +24,7 @@ from werkzeug.datastructures import FileStorage
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
+from sqlalchemy.orm import joinedload, selectinload
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
     RCT, RCTSymptom,
@@ -70,6 +71,40 @@ def get_db_session():
     return get_session(DB_PATH)
 
 
+class Pagination:
+    """Simple pagination class to mimic Flask-SQLAlchemy's pagination object"""
+    def __init__(self, query, page, per_page, total, items):
+        self.query = query
+        self.page = page
+        self.per_page = per_page
+        self.total = total
+        self.items = items
+        self.pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+        self.has_prev = page > 1
+        self.has_next = page < self.pages
+        self.prev_num = page - 1 if self.has_prev else None
+        self.next_num = page + 1 if self.has_next else None
+
+
+def paginate_query(query, page, per_page, error_out=False):
+    """Manually paginate a SQLAlchemy query"""
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 20
+    
+    # Get total count
+    total = query.count()
+    
+    # Calculate offset
+    offset = (page - 1) * per_page
+    
+    # Get items for current page
+    items = query.offset(offset).limit(per_page).all()
+    
+    return Pagination(query, page, per_page, total, items)
+
+
 @app.route('/')
 def index():
     """Home page showing overview of the system"""
@@ -92,19 +127,28 @@ def index():
 
 @app.route('/diseases')
 def list_diseases():
-    """List all diseases"""
+    """List all diseases with pagination and eager loading"""
     session = get_db_session()
     try:
-        diseases = session.query(Disease).all()
-        # Force load the practices and modules relationships before closing session
-        for disease in diseases:
-            _ = len(disease.practices)  # This loads the relationship
-            _ = len(disease.modules)  # This loads the modules relationship
-            # Force load module details
-            for module in disease.modules:
-                _ = module.developed_by
-                _ = module.paper_link
-        return render_template('diseases.html', diseases=diseases)
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
+        
+        # Use eager loading to prevent N+1 queries
+        query = session.query(Disease).options(
+            selectinload(Disease.practices),
+            selectinload(Disease.modules)
+        )
+        
+        # Paginate results
+        pagination = paginate_query(query, page, per_page)
+        
+        diseases = pagination.items
+        
+        return render_template('diseases.html', 
+                             diseases=diseases,
+                             pagination=pagination)
     finally:
         session.close()
 
@@ -281,7 +325,7 @@ def delete_disease(disease_id):
 
 @app.route('/practices')
 def list_practices():
-    """List all practices, grouped by all fields except module"""
+    """List all practices, grouped by all fields except module, with pagination"""
     session = get_db_session()
     
     try:
@@ -289,7 +333,17 @@ def list_practices():
         segment_filter = request.args.get('segment', '')
         search_term = request.args.get('search', '')
         
-        query = session.query(Practice)
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
+        
+        # Use eager loading to prevent N+1 queries
+        query = session.query(Practice).options(
+            selectinload(Practice.diseases),
+            joinedload(Practice.module).joinedload(Module.disease),
+            joinedload(Practice.citation)
+        )
         
         if segment_filter:
             query = query.filter(Practice.practice_segment == segment_filter)
@@ -300,20 +354,10 @@ def list_practices():
                 (Practice.practice_sanskrit.ilike(f'%{search_term}%'))
             )
         
-        practices = query.all()
+        # Paginate before grouping (more efficient)
+        pagination = paginate_query(query, page, per_page)
         
-        # Force load relationships before closing session
-        for practice in practices:
-            _ = len(practice.diseases)  # Load diseases relationship
-            # Force load module and citation
-            if practice.module:
-                _ = practice.module.id  # Load module ID
-                _ = practice.module.developed_by
-                _ = practice.module.paper_link
-                if practice.module.disease:
-                    _ = practice.module.disease.name
-            if practice.citation:
-                _ = practice.citation.citation_text  # Load citation
+        practices = pagination.items
         
         # Group practices by all fields except module_id
         # Create a key based on all fields except module_id
@@ -380,6 +424,7 @@ def list_practices():
         
         return render_template('practices.html',
                              practices=grouped_list,
+                             pagination=pagination,
                              segments=segments,
                              current_segment=segment_filter,
                              search_term=search_term)
@@ -861,23 +906,32 @@ def view_practice(practice_id):
 
 @app.route('/contraindications')
 def list_contraindications():
-    """List all contraindications grouped by disease"""
+    """List all contraindications grouped by disease with pagination"""
     session = get_db_session()
     try:
-        # Get all diseases with their contraindications
-        diseases = session.query(Disease).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
+        
+        # Use eager loading
+        query = session.query(Disease).options(
+            selectinload(Disease.contraindications)
+        )
+        
+        # Paginate diseases
+        pagination = paginate_query(query, page, per_page)
+        
+        diseases = pagination.items
         disease_contraindications = {}
         
         for disease in diseases:
-            contraindications = session.query(Contraindication).join(
-                disease_contraindication_association
-            ).filter(disease_contraindication_association.c.disease_id == disease.id).all()
-            
-            if contraindications:
-                disease_contraindications[disease] = contraindications
+            if disease.contraindications:
+                disease_contraindications[disease] = disease.contraindications
         
         return render_template('contraindications.html', 
-                             disease_contraindications=disease_contraindications)
+                             disease_contraindications=disease_contraindications,
+                             pagination=pagination)
     finally:
         session.close()
 
@@ -1042,14 +1096,27 @@ def delete_contraindication(contraindication_id):
 
 @app.route('/citations')
 def list_citations():
-    """List all citations"""
+    """List all citations with pagination and eager loading"""
     session = get_db_session()
     try:
-        citations = session.query(Citation).all()
-        # Force load practices relationship
-        for citation in citations:
-            _ = len(citation.practices)
-        return render_template('citations.html', citations=citations)
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
+        
+        # Use eager loading to prevent N+1 queries
+        query = session.query(Citation).options(
+            selectinload(Citation.practices)
+        )
+        
+        # Paginate results
+        pagination = paginate_query(query, page, per_page)
+        
+        citations = pagination.items
+        
+        return render_template('citations.html', 
+                             citations=citations,
+                             pagination=pagination)
     finally:
         session.close()
 
@@ -1081,14 +1148,22 @@ def add_citation():
 
 @app.route('/modules')
 def list_modules():
-    """List all modules"""
+    """List all modules with pagination and eager loading"""
     session = get_db_session()
     try:
         # Get filter parameters
         disease_id = request.args.get('disease_id')
         disease_name = request.args.get('disease_name', '').strip()
+        
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
 
-        query = session.query(Module).outerjoin(Disease, Module.disease)
+        # Use eager loading to prevent N+1 queries
+        query = session.query(Module).options(
+            joinedload(Module.disease)
+        ).outerjoin(Disease, Module.disease)
 
         selected_disease_name = ''
         selected_disease_id = ''
@@ -1107,19 +1182,17 @@ def list_modules():
             query = query.filter(Disease.name.ilike(f'%{disease_name}%'))
             selected_disease_name = disease_name
 
-        modules = query.order_by(Disease.name.asc(), Module.developed_by.asc()).all()
-
-        # Force load relationships before closing session
-        module_rows = []
-        for module in modules:
-            disease = module.disease
-            if disease:
-                _ = disease.name
-            module_rows.append(module)
+        query = query.order_by(Disease.name.asc(), Module.developed_by.asc())
+        
+        # Paginate results
+        pagination = paginate_query(query, page, per_page)
+        
+        modules = pagination.items
 
         return render_template(
             'modules.html',
-            modules=module_rows,
+            modules=modules,
+            pagination=pagination,
             selected_disease_name=selected_disease_name,
             selected_disease_id=selected_disease_id
         )
@@ -1876,16 +1949,33 @@ def recommendations():
                 if practice_key not in contraindicated_keys:
                     filtered_practices.append(practice)
             
-            # Get RCTs for practices
-            # We need to get all RCTs and match them to practices
-            all_rcts = session.query(RCT).all()
+            # Get RCTs for practices - optimized with database joins
+            # Collect all disease IDs from filtered practices
+            all_practice_disease_ids = set()
+            practice_disease_map = {}  # practice_id -> list of disease_ids
+            for practice in filtered_practices:
+                practice_disease_ids = [d.id for d in practice.diseases]
+                practice_disease_map[practice.id] = practice_disease_ids
+                all_practice_disease_ids.update(practice_disease_ids)
+            
+            # Query only RCTs that match our diseases (much more efficient)
+            matching_rcts = []
+            if all_practice_disease_ids:
+                matching_rcts = session.query(RCT).join(
+                    rct_disease_association
+                ).filter(
+                    rct_disease_association.c.disease_id.in_(list(all_practice_disease_ids))
+                ).options(
+                    selectinload(RCT.diseases)
+                ).all()
+            
             practice_rcts = {}  # practice_id -> list of RCT parenthetical citations
             
             for practice in filtered_practices:
                 practice_rcts[practice.id] = []
-                practice_disease_ids = [d.id for d in practice.diseases]
+                practice_disease_ids = practice_disease_map[practice.id]
                 
-                for rct in all_rcts:
+                for rct in matching_rcts:
                     rct_disease_ids = [d.id for d in rct.diseases]
                     # Check if RCT is for any of the practice's diseases
                     if any(did in practice_disease_ids for did in rct_disease_ids):
@@ -2105,16 +2195,37 @@ def increment_rct_counts(session, practice_data, disease_ids):
 
 @app.route('/rcts')
 def list_rcts():
-    """List all RCT entries"""
+    """List all RCT entries with pagination and eager loading"""
     session = get_db_session()
     try:
-        rcts = session.query(RCT).order_by(RCT.id.desc()).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        per_page = min(per_page, 100)  # Cap at 100 per page
+        
+        # Use eager loading for RCTs
+        query = session.query(RCT).options(
+            selectinload(RCT.diseases),
+            selectinload(RCT.symptoms)
+        ).order_by(RCT.id.desc())
+        
+        # Paginate RCTs
+        pagination = paginate_query(query, page, per_page)
+        
+        rcts = pagination.items
+        
+        # Get all diseases and practices for filters (these are small, no pagination needed)
         diseases = session.query(Disease).order_by(Disease.name).all()
-        practices = session.query(Practice).order_by(Practice.practice_english).all()
-        return render_template('rcts.html', rcts=rcts, diseases=diseases, practices=practices)
+        practices = session.query(Practice).order_by(Practice.practice_english).limit(1000).all()
+        
+        return render_template('rcts.html', 
+                             rcts=rcts,
+                             pagination=pagination,
+                             diseases=diseases, 
+                             practices=practices)
     except Exception as e:
         flash(f'Error loading RCTs: {str(e)}', 'error')
-        return render_template('rcts.html', rcts=[], diseases=[], practices=[])
+        return render_template('rcts.html', rcts=[], pagination=None, diseases=[], practices=[])
     finally:
         session.close()
 

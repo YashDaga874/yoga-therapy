@@ -52,6 +52,14 @@ if errorlevel 1 (
     echo If you encounter database errors, run: python add_kosha_field.py
 )
 
+REM Add database indexes for performance
+echo.
+echo Optimizing database indexes...
+python add_database_indexes.py
+if errorlevel 1 (
+    echo WARNING: Index creation had issues, but continuing...
+)
+
 REM Run the app from the web directory
 echo.
 echo Starting Flask application...

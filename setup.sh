@@ -70,6 +70,17 @@ fi
 
 echo ""
 echo "========================================"
+echo "Adding database indexes for performance..."
+echo "========================================"
+echo ""
+# Add database indexes
+python add_database_indexes.py
+if [ $? -ne 0 ]; then
+    echo "WARNING: Index creation had issues, but continuing..."
+fi
+
+echo ""
+echo "========================================"
 echo "Setup completed successfully!"
 echo "========================================"
 echo ""

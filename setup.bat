@@ -67,6 +67,17 @@ if errorlevel 1 (
 
 echo.
 echo ========================================
+echo Adding database indexes for performance...
+echo ========================================
+echo.
+REM Add database indexes
+python add_database_indexes.py
+if errorlevel 1 (
+    echo WARNING: Index creation had issues, but continuing...
+)
+
+echo.
+echo ========================================
 echo Setup completed successfully!
 echo ========================================
 echo.

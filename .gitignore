@@ -20,3 +20,7 @@ Thumbs.db
 
 # Node (if web has npm deps)
 web/node_modules/
+
+# User uploaded files (keep directory structure)
+web/static/uploads/*
+!web/static/uploads/.gitkeep
