@@ -3,62 +3,63 @@
 {% block title %}Practice Recommendations{% endblock %}
 
 {% block content %}
-<h2>Practice Recommendations</h2>
+<h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Practice Recommendations</h2>
 
-<div style="margin-bottom: 3rem;">
+<div style="margin-bottom: 1.5rem;">
     <!-- Disease Names -->
-    <div style="margin-bottom: 2rem; padding: 1.5rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
-        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Disease Information</h3>
-        <div style="margin-bottom: 1rem;">
-            <strong style="font-size: 1.1rem; color: #495057;">Major Disease:</strong>
-            <span style="font-size: 1.1rem; color: #667eea; margin-left: 0.5rem;">{{ major_disease_name }}</span>
-        </div>
-        {% if comorbid_disease_names %}
-        <div>
-            <strong style="font-size: 1.1rem; color: #495057;">Co-morbid Diseases:</strong>
-            <div style="margin-top: 0.5rem;">
-                {% for disease_name in comorbid_disease_names %}
-                <span style="display: inline-block; padding: 0.5rem 1rem; background: #667eea; color: white; border-radius: 20px; margin-right: 0.5rem; margin-bottom: 0.5rem; font-size: 1rem;">
-                    {{ disease_name }}
-                </span>
-                {% endfor %}
+    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #e7f3ff; border-radius: 4px; border-left: 3px solid #2196F3;">
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: start;">
+            <div>
+                <strong style="font-size: 0.95rem; color: #495057;">Major Disease:</strong>
+                <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">{{ major_disease_name }}</span>
             </div>
+            {% if comorbid_disease_names %}
+            <div>
+                <strong style="font-size: 0.95rem; color: #495057;">Co-morbid Diseases:</strong>
+                <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">
+                    {% for disease_name in comorbid_disease_names %}
+                        {{ disease_name }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
     
     <!-- Contraindications -->
     {% if contraindications %}
-    <div style="margin-bottom: 2rem; padding: 1.5rem; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-        <h3 style="margin-bottom: 1rem; color: #856404;">Contraindications</h3>
-        <p style="color: #856404; margin-bottom: 1rem;">The following practices should be avoided:</p>
-        <table style="width: 100%; border-collapse: collapse;">
+    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fff3cd; border-radius: 4px; border-left: 3px solid #ffc107;">
+        <div style="margin-bottom: 0.5rem;">
+            <strong style="font-size: 0.9rem; color: #856404;">Contraindications:</strong>
+            <span style="font-size: 0.85rem; color: #856404; margin-left: 0.3rem;">The following practices should be avoided</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
             <thead>
                 <tr style="background: #ffc107; color: #856404;">
-                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd;">Practice</th>
-                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd;">Category</th>
-                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd;">Citation</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Category</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Citation</th>
                 </tr>
             </thead>
             <tbody>
                 {% for contra in contraindications %}
                 <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 0.75rem; border: 1px solid #ddd;">
-                        <strong>{{ contra.practice_english }}</strong>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <strong style="font-size: 0.85rem;">{{ contra.practice_english }}</strong>
                         {% if contra.practice_sanskrit %}
-                        <br><small style="color: #666;">({{ contra.practice_sanskrit }})</small>
+                        <br><small style="color: #666; font-size: 0.8rem;">({{ contra.practice_sanskrit }})</small>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.75rem; border: 1px solid #ddd;">{{ contra.practice_segment }}</td>
-                    <td style="padding: 0.75rem; border: 1px solid #ddd;">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">{{ contra.practice_segment }}</td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
                         {% if contra.apa_citation %}
-                            {{ contra.apa_citation|safe }}
+                            <span style="font-size: 0.8rem;">{{ contra.apa_citation|safe }}</span>
                         {% elif contra.source_type %}
-                            {{ contra.source_type }}
+                            <span style="font-size: 0.8rem;">{{ contra.source_type }}</span>
                         {% elif contra.source_name %}
-                            <a href="{{ contra.source_name }}" target="_blank" style="color: #667eea; text-decoration: none;">{{ contra.source_name }}</a>
+                            <a href="{{ contra.source_name }}" target="_blank" style="color: #667eea; text-decoration: none; font-size: 0.8rem;">{{ contra.source_name }}</a>
                         {% else %}
-                            N/A
+                            <span style="color: #999; font-size: 0.8rem;">N/A</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -70,29 +71,31 @@
 </div>
 
 <!-- Practices Organized by Kosha -->
-<div style="margin-bottom: 2rem;">
-    <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">Recommended Practices</h3>
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="margin-bottom: 0.75rem; color: #2c3e50; font-size: 1.2rem;">Recommended Practices</h3>
     
     {% if organized_practices %}
         {% for kosha in sorted_koshas %}
-        <div style="margin-bottom: 2.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
-            <h4 style="margin-bottom: 1rem; color: #667eea; font-size: 1.3rem;">{{ kosha }}</h4>
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #667eea;">
+            <h4 style="margin-bottom: 0.5rem; color: #667eea; font-size: 1.05rem; font-weight: 600;">{{ kosha }}</h4>
             
             {% for category, subcategories in organized_practices[kosha].items()|sort %}
-            <div style="margin-bottom: 1.5rem; margin-left: 1rem;">
-                <h5 style="margin-bottom: 0.75rem; color: #495057; font-size: 1.1rem;">{{ category }}</h5>
+            <div style="margin-bottom: 0.75rem; margin-left: 0.5rem;">
+                <h5 style="margin-bottom: 0.4rem; color: #495057; font-size: 0.95rem; font-weight: 600;">{{ category }}</h5>
                 
                 {% for subcategory, practices_list in subcategories.items()|sort %}
-                <div style="margin-bottom: 1rem; margin-left: 1rem;">
+                <div style="margin-bottom: 0.5rem; margin-left: 0.5rem;">
                     {% if subcategory != 'None' %}
-                    <h6 style="margin-bottom: 0.5rem; color: #666; font-size: 1rem; font-style: italic;">{{ subcategory }}</h6>
+                    <h6 style="margin-bottom: 0.3rem; color: #666; font-size: 0.9rem; font-style: italic;">{{ subcategory }}</h6>
                     {% endif %}
                     
-                    <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden;">
+                    <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden; font-size: 0.85rem;">
                         <thead>
                             <tr style="background: #667eea; color: white;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd;">Practice</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd;">RCTs</th>
+                                <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
+                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">RCT</th>
+                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">CVR</th>
+                                <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">RCT Citations</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -100,19 +103,29 @@
                             {% set practice = item.practice %}
                             {% set rcts = item.rcts %}
                             <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 0.75rem; border: 1px solid #ddd;">
-                                    <strong>{{ practice.practice_english }}</strong>
+                                <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                                    <strong style="font-size: 0.9rem;">{{ practice.practice_english }}</strong>
                                     {% if practice.practice_sanskrit %}
-                                    <br><small style="color: #666;">({{ practice.practice_sanskrit }})</small>
+                                    <br><small style="color: #666; font-size: 0.8rem;">({{ practice.practice_sanskrit }})</small>
                                     {% endif %}
                                 </td>
-                                <td style="padding: 0.75rem; border: 1px solid #ddd;">
+                                <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
+                                    <span style="font-weight: 600; color: #667eea; font-size: 0.9rem;">{{ practice.rct_count if practice.rct_count is not none else 0 }}</span>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
+                                    {% if practice.cvr_score is not none %}
+                                    <span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">{{ "%.2f"|format(practice.cvr_score) }}</span>
+                                    {% else %}
+                                    <span style="color: #999; font-size: 0.85rem;">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.5rem; border: 1px solid #ddd;">
                                     {% if rcts %}
                                         {% for rct_citation in rcts %}
-                                        <div style="margin-bottom: 0.25rem;">{{ rct_citation }}</div>
+                                        <div style="margin-bottom: 0.2rem; font-size: 0.8rem;">{{ rct_citation }}</div>
                                         {% endfor %}
                                     {% else %}
-                                        <span style="color: #999;">No RCT citations available</span>
+                                        <span style="color: #999; font-size: 0.8rem;">No RCT citations</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -126,14 +139,14 @@
         </div>
         {% endfor %}
     {% else %}
-    <div style="padding: 2rem; text-align: center; background: #f8f9fa; border-radius: 8px;">
-        <p style="color: #666; font-size: 1.1rem;">No practices found for the selected modules.</p>
+    <div style="padding: 1rem; text-align: center; background: #f8f9fa; border-radius: 4px;">
+        <p style="color: #666; font-size: 0.9rem;">No practices found for the selected modules.</p>
     </div>
     {% endif %}
 </div>
 
-<div style="margin-top: 2rem;">
-    <a href="/recommendations" class="btn" style="padding: 0.75rem 2rem; font-size: 1rem;">
+<div style="margin-top: 1rem;">
+    <a href="/recommendations" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">
         Generate New Recommendations
     </a>
 </div>

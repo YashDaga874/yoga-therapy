@@ -3,59 +3,83 @@
 {% block title %}Recommendation System{% endblock %}
 
 {% block content %}
-<h2>Recommendation System</h2>
+<h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Recommendation System</h2>
 
-<form method="POST" id="recommendation-form" style="max-width: 1200px;">
-    <div style="display: grid; grid-template-columns: 1fr; gap: 2rem; margin-bottom: 2rem;">
+<form method="POST" id="recommendation-form" style="max-width: 1400px;">
+    <!-- Major Disease and Co-morbid Disease Side by Side -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
         <!-- Major Disease -->
         <div class="form-group">
-            <label for="major_module" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">
+            <label for="major_module" style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
                 Major Disease *
             </label>
             <div style="position: relative;">
                 <input type="text" id="major_module" name="major_module_display" 
                        placeholder="Type disease name (e.g., Depression (Naveen et al., 2013))" 
                        autocomplete="off" required
-                       style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 6px; font-size: 1rem;">
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem;">
                 <input type="hidden" id="major_module_id" name="major_module_id">
                 <div id="major-autocomplete-results" style="position: absolute; width: 100%; z-index: 1000;"></div>
             </div>
-            <small style="color: #666; display: block; margin-top: 0.5rem;">
-                Select one module for the major disease
-            </small>
         </div>
         
         <!-- Co-morbid Diseases -->
         <div class="form-group">
-            <label style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">
+            <label style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
                 Co-morbid Disease
             </label>
-            <label for="comorbid_module" style="font-size: 0.9rem; color: #666; margin-bottom: 0.5rem; display: block;">
-                Disease wise Customized Module
-            </label>
-            
             <!-- Tag container -->
             <div id="comorbid-tags-container" 
-                 style="min-height: 60px; padding: 0.75rem; border: 2px solid #ddd; border-radius: 6px; 
-                        background: #f8f9fa; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
-                        margin-bottom: 0.5rem;">
+                 style="min-height: 38px; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; 
+                        background: #f8f9fa; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;">
                 <input type="text" id="comorbid_module" 
                        placeholder="Type disease name (e.g., GAD (Naveen et al., 2017))" 
                        autocomplete="off"
-                       style="border: none; outline: none; background: transparent; flex: 1; min-width: 200px; font-size: 1rem; padding: 0.25rem;">
+                       style="border: none; outline: none; background: transparent; flex: 1; min-width: 150px; font-size: 0.85rem; padding: 0.2rem;">
             </div>
             <div id="comorbid-autocomplete-results" style="position: relative; z-index: 1000;"></div>
-            <small style="color: #666; display: block; margin-top: 0.5rem;">
-                Add multiple co-morbid diseases by selecting modules. Click the 'x' to remove a disease.
-            </small>
         </div>
     </div>
     
-    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-        <button type="submit" class="btn" style="padding: 0.75rem 2rem; font-size: 1rem;">
+    <!-- Dynamic Practice Count Display -->
+    <div id="practice-counts-display" style="margin-top: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; display: none;">
+        <div id="practice-counts-content" style="color: #495057; font-size: 0.85rem;">
+            <!-- Content will be dynamically updated -->
+        </div>
+    </div>
+    
+    <!-- Number of Practices Input and Proportion Slider -->
+    <div id="practice-selection-panel" style="margin-top: 1rem; padding: 0.75rem; background: #fff; border-radius: 4px; border: 1px solid #dee2e6; display: none;">
+        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 1rem; align-items: start;">
+            <div class="form-group">
+                <label for="num_practices" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
+                    Number of Practices *
+                </label>
+                <input type="number" id="num_practices" name="num_practices" min="1" 
+                       placeholder="e.g., 6"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem;">
+            </div>
+            
+            <div class="form-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
+                    Proportion Split
+                </label>
+                <div id="proportion-slider-container" style="margin-bottom: 0.4rem;">
+                    <!-- Slider will be dynamically generated -->
+                </div>
+                <div id="proportion-display" style="padding: 0.4rem; background: #e7f3ff; border-radius: 4px;">
+                    <span id="proportion-text" style="font-size: 0.8rem; color: #495057;"></span>
+                </div>
+                <input type="hidden" id="proportion_percentage" name="proportion_percentage" value="50">
+            </div>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+        <button type="submit" id="generate-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" disabled>
             Generate Practice Plan
         </button>
-        <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+        <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">
             Clear
         </button>
     </div>
@@ -79,6 +103,7 @@ majorInput.addEventListener('input', function() {
         majorAutocompleteDiv.innerHTML = '';
         currentMajorModules = [];
         majorIdInput.value = '';
+        updatePracticeCounts(); // Clear practice counts when major module is cleared
         return;
     }
     
@@ -129,11 +154,11 @@ function displayMajorAutocompleteResults(modules) {
         return;
     }
     
-    majorAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">' +
+    majorAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 0.85rem;">' +
         modules.map((m, index) => {
             const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
             return `
-            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;" 
                  onclick="selectMajorModuleFromString('${escaped}')" data-index="${index}">
                 <strong>${m.display_name}</strong>
             </div>
@@ -160,6 +185,7 @@ function selectMajorModule(module) {
     majorAutocompleteDiv.innerHTML = '';
     currentMajorModules = [];
     selectedMajorIndex = -1;
+    updatePracticeCounts();
 }
 
 function selectMajorModuleFromString(moduleStr) {
@@ -236,11 +262,11 @@ function displayComorbidAutocompleteResults(modules) {
         return;
     }
     
-    comorbidAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; margin-top: 0.5rem;">' +
+    comorbidAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: absolute; width: 100%; margin-top: 0.3rem; font-size: 0.85rem;">' +
         modules.map((m, index) => {
             const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
             return `
-            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;" 
                  onclick="selectComorbidModuleFromString('${escaped}')" data-index="${index}">
                 <strong>${m.display_name}</strong>
             </div>
@@ -269,11 +295,11 @@ function selectComorbidModule(module) {
     const tag = document.createElement('div');
     tag.className = 'comorbid-tag';
     tag.dataset.moduleId = module.module_id;
-    tag.style.cssText = 'display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #667eea; color: white; border-radius: 20px; font-size: 0.9rem;';
+    tag.style.cssText = 'display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.5rem; background: #667eea; color: white; border-radius: 12px; font-size: 0.75rem;';
     tag.innerHTML = `
         <span>${module.display_name}</span>
         <button type="button" onclick="removeComorbidModule(${module.module_id})" 
-                style="background: rgba(255,255,255,0.3); border: none; color: white; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0;">
+                style="background: rgba(255,255,255,0.3); border: none; color: white; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; font-size: 0.7rem; line-height: 1; padding: 0;">
             ×
         </button>
     `;
@@ -289,6 +315,9 @@ function selectComorbidModule(module) {
     
     // Update hidden inputs
     updateComorbidHiddenInputs();
+    
+    // Update practice counts
+    updatePracticeCounts();
     
     // Refocus input
     setTimeout(() => comorbidInput.focus(), 100);
@@ -309,6 +338,7 @@ function removeComorbidModule(moduleId) {
     }
     
     updateComorbidHiddenInputs();
+    updatePracticeCounts();
 }
 
 function updateComorbidHiddenInputs() {
@@ -334,6 +364,10 @@ function clearForm() {
     updateComorbidHiddenInputs();
     majorAutocompleteDiv.innerHTML = '';
     comorbidAutocompleteDiv.innerHTML = '';
+    document.getElementById('practice-counts-display').style.display = 'none';
+    document.getElementById('practice-selection-panel').style.display = 'none';
+    document.getElementById('generate-btn').disabled = true;
+    document.getElementById('num_practices').value = '';
 }
 
 // Close autocomplete when clicking outside
@@ -349,6 +383,357 @@ document.addEventListener('click', function(e) {
         currentComorbidModules = [];
         selectedComorbidIndex = -1;
     }
+});
+
+// Initialize: Check if modules are already selected on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if major module is already selected
+    if (majorIdInput.value) {
+        updatePracticeCounts();
+    }
+});
+
+// Practice counts and proportion management
+let practiceCountsData = null;
+
+function updatePracticeCounts() {
+    const majorModuleId = majorIdInput.value;
+    const comorbidModuleIds = comorbidModules.map(m => m.module_id);
+    
+    if (!majorModuleId) {
+        document.getElementById('practice-counts-display').style.display = 'none';
+        document.getElementById('practice-selection-panel').style.display = 'none';
+        document.getElementById('generate-btn').disabled = true;
+        return;
+    }
+    
+    fetch('/api/module/practice-counts', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            major_module_id: parseInt(majorModuleId),
+            comorbid_module_ids: comorbidModuleIds.map(id => parseInt(id))
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            console.error('Error fetching practice counts:', data.error);
+            alert('Error fetching practice counts: ' + data.error);
+            return;
+        }
+        
+        practiceCountsData = data;
+        displayPracticeCounts(data);
+        updateProportionSlider();
+        
+        // Enable/disable generate button based on available practices
+        if (data.total_practices > 0) {
+            document.getElementById('practice-selection-panel').style.display = 'block';
+        } else {
+            document.getElementById('practice-selection-panel').style.display = 'none';
+            document.getElementById('generate-btn').disabled = true;
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching practice counts:', error);
+        alert('Error fetching practice counts. Please check console for details.');
+    });
+}
+
+function displayPracticeCounts(data) {
+    const displayDiv = document.getElementById('practice-counts-display');
+    const contentDiv = document.getElementById('practice-counts-content');
+    
+    const totalComorbid = data.comorbid_modules && data.comorbid_modules.length > 0 
+        ? data.comorbid_modules.reduce((sum, m) => sum + m.practice_count, 0) 
+        : 0;
+    
+    let html = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; align-items: start;">
+            <div>
+                <strong style="font-size: 0.85rem;">Total Practices:</strong>
+                <span style="font-size: 0.85rem; color: #667eea; margin-left: 0.3rem; font-weight: 600;">${data.total_practices}</span>
+            </div>
+            <div>
+                <strong style="font-size: 0.85rem;">Contraindications:</strong>
+                <span style="font-size: 0.85rem; color: #dc3545; margin-left: 0.3rem; font-weight: 600;">${data.total_contraindications}</span>
+            </div>
+            <div>
+                <strong style="font-size: 0.85rem;">Major:</strong>
+                <span style="font-size: 0.85rem; color: #495057; margin-left: 0.3rem;">${data.major_module.practice_count} practices</span>
+            </div>
+            ${totalComorbid > 0 ? `
+            <div>
+                <strong style="font-size: 0.85rem;">Co-morbid:</strong>
+                <span style="font-size: 0.85rem; color: #495057; margin-left: 0.3rem;">${totalComorbid} practices</span>
+            </div>
+            ` : ''}
+        </div>
+    `;
+    
+    contentDiv.innerHTML = html;
+    displayDiv.style.display = 'block';
+}
+
+let numPracticesInputListener = null;
+
+function updateProportionSlider() {
+    if (!practiceCountsData) {
+        const sliderContainer = document.getElementById('proportion-slider-container');
+        sliderContainer.innerHTML = '<div style="color: #666; padding: 0.3rem; font-size: 0.8rem;">Please select modules first</div>';
+        return;
+    }
+    
+    const numPracticesInput = document.getElementById('num_practices');
+    
+    // Remove old event listener if it exists
+    if (numPracticesInputListener) {
+        numPracticesInput.removeEventListener('input', numPracticesInputListener);
+    }
+    
+    // Add new event listener
+    numPracticesInputListener = function() {
+        generateProportionSlider();
+    };
+    numPracticesInput.addEventListener('input', numPracticesInputListener);
+    
+    // Only generate slider if a number is already entered
+    const currentValue = parseInt(numPracticesInput.value) || 0;
+    if (currentValue > 0) {
+        generateProportionSlider();
+    } else {
+        const sliderContainer = document.getElementById('proportion-slider-container');
+        sliderContainer.innerHTML = '<div style="color: #666; padding: 0.3rem; font-size: 0.8rem;">Enter number of practices above to see proportion options</div>';
+        document.getElementById('proportion-text').textContent = '';
+        document.getElementById('generate-btn').disabled = true;
+    }
+}
+
+function generateProportionSlider() {
+    if (!practiceCountsData) {
+        return;
+    }
+    
+    const numPractices = parseInt(document.getElementById('num_practices').value) || 0;
+    const majorCount = practiceCountsData.major_module.practice_count;
+    const comorbidCount = (practiceCountsData.comorbid_modules && practiceCountsData.comorbid_modules.length > 0) 
+        ? practiceCountsData.comorbid_modules.reduce((sum, m) => sum + m.practice_count, 0) 
+        : 0;
+    
+    const sliderContainer = document.getElementById('proportion-slider-container');
+    const proportionDisplay = document.getElementById('proportion-text');
+    const proportionInput = document.getElementById('proportion_percentage');
+    const generateBtn = document.getElementById('generate-btn');
+    
+    if (numPractices <= 0 || numPractices > practiceCountsData.total_practices) {
+        sliderContainer.innerHTML = '<div style="color: #dc3545; padding: 0.3rem; font-size: 0.8rem;">Please enter a valid number of practices (1-' + practiceCountsData.total_practices + ')</div>';
+        proportionDisplay.textContent = '';
+        generateBtn.disabled = true;
+        return;
+    }
+    
+    // Calculate achievable percentages based on available practices
+    const achievablePercentages = [];
+    
+    // If no comorbid modules, only 100% from major is possible
+    if (comorbidCount === 0 || practiceCountsData.comorbid_modules.length === 0) {
+        if (numPractices <= majorCount) {
+            achievablePercentages.push({
+                percentage: 100,
+                major: numPractices,
+                comorbid: 0
+            });
+        }
+    } else {
+        // Normal case: both major and comorbid available
+        for (let majorPractices = 0; majorPractices <= numPractices; majorPractices++) {
+            const comorbidPractices = numPractices - majorPractices;
+            
+            // Check if this split is achievable
+            if (majorPractices <= majorCount && comorbidPractices <= comorbidCount) {
+                const percentage = Math.round((majorPractices / numPractices) * 100 * 100) / 100;
+                achievablePercentages.push({
+                    percentage: percentage,
+                    major: majorPractices,
+                    comorbid: comorbidPractices
+                });
+            }
+        }
+    }
+    
+    if (achievablePercentages.length === 0) {
+        sliderContainer.innerHTML = '<div style="color: #dc3545; padding: 0.3rem; font-size: 0.8rem;">Cannot generate plan with ' + numPractices + ' practices. Available: Major=' + majorCount + ', Co-morbid=' + comorbidCount + '</div>';
+        proportionDisplay.textContent = '';
+        generateBtn.disabled = true;
+        return;
+    }
+    
+    // Create range input slider with step based on achievable percentages
+    // For simplicity, we'll use a continuous slider but validate on the backend
+    // Alternatively, we can create a custom slider with only valid points
+    const minPercentage = achievablePercentages[0].percentage;
+    const maxPercentage = achievablePercentages[achievablePercentages.length - 1].percentage;
+    
+    // Use a step that ensures we can hit each achievable percentage
+    // Calculate step size: find the smallest difference between consecutive percentages
+    let minStep = 100;
+    for (let i = 1; i < achievablePercentages.length; i++) {
+        const step = achievablePercentages[i].percentage - achievablePercentages[i - 1].percentage;
+        if (step > 0 && step < minStep) {
+            minStep = step;
+        }
+    }
+    
+    // If minStep is too small (like 0.01), use a larger step for usability
+    // If only one option, use that directly
+    let actualStep = 1;
+    let defaultValue = minPercentage;
+    
+    if (achievablePercentages.length === 1) {
+        defaultValue = achievablePercentages[0].percentage;
+    } else if (achievablePercentages.length > 1) {
+        actualStep = minStep < 1 ? Math.max(0.01, 100 / (achievablePercentages.length - 1)) : minStep;
+        defaultValue = Math.round((minPercentage + maxPercentage) / 2);
+        // Find closest achievable percentage to the calculated default
+        let closestToDefault = achievablePercentages[0];
+        let minDiffFromDefault = Math.abs(defaultValue - closestToDefault.percentage);
+        for (const ap of achievablePercentages) {
+            const diff = Math.abs(defaultValue - ap.percentage);
+            if (diff < minDiffFromDefault) {
+                minDiffFromDefault = diff;
+                closestToDefault = ap;
+            }
+        }
+        defaultValue = closestToDefault.percentage;
+    }
+    
+    const maxLabel = achievablePercentages.length > 0 ? achievablePercentages[achievablePercentages.length - 1] : achievablePercentages[0];
+    const minLabel = achievablePercentages[0];
+    
+    let sliderHtml = '';
+    if (achievablePercentages.length === 1) {
+        // Only one option, show as fixed value
+        sliderHtml = `
+            <div style="padding: 0.4rem; background: #e7f3ff; border-radius: 4px; text-align: center; font-size: 0.8rem;">
+                <strong>Fixed Split:</strong> ${minLabel.major} practices from Major Disease (100%) and 0 from Co-morbid Diseases
+            </div>
+        `;
+    } else {
+        sliderHtml = `
+            <input type="range" id="proportion-slider" min="${minPercentage}" max="${maxPercentage}" 
+                   step="${actualStep}" value="${defaultValue}" 
+                   style="width: 100%; height: 6px; border-radius: 3px; outline: none; background: #ddd;">
+            <div style="display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: 0.75rem; color: #666;">
+                <span>${minPercentage.toFixed(2)}% (${minLabel.major} major, ${minLabel.comorbid} co-morbid)</span>
+                <span>${maxPercentage.toFixed(2)}% (${maxLabel.major} major, ${maxLabel.comorbid} co-morbid)</span>
+            </div>
+        `;
+    }
+    
+    sliderContainer.innerHTML = sliderHtml;
+    
+    // Store achievable percentages for validation
+    window.achievablePercentages = achievablePercentages;
+    
+    const slider = document.getElementById('proportion-slider');
+    if (slider) {
+        // Remove old listeners if any
+        const newSlider = slider.cloneNode(true);
+        slider.parentNode.replaceChild(newSlider, slider);
+        
+        // Add event listener to new slider
+        document.getElementById('proportion-slider').addEventListener('input', function() {
+            updateProportionDisplay(this.value, achievablePercentages, numPractices, majorCount, comorbidCount);
+        });
+        
+        // Initialize display
+        updateProportionDisplay(defaultValue, achievablePercentages, numPractices, majorCount, comorbidCount);
+    } else {
+        // Single option case - set values directly
+        if (achievablePercentages.length === 1) {
+            const ap = achievablePercentages[0];
+            document.getElementById('proportion_percentage').value = ap.percentage;
+            document.getElementById('proportion-text').innerHTML = `
+                <strong>Split:</strong> ${ap.major} major (${ap.percentage.toFixed(2)}%) / ${ap.comorbid} co-morbid (${(100 - ap.percentage).toFixed(2)}%)
+            `;
+            generateBtn.disabled = false;
+        }
+    }
+}
+
+function updateProportionDisplay(sliderValue, achievablePercentages, numPractices, majorCount, comorbidCount) {
+    const proportionDisplay = document.getElementById('proportion-text');
+    const proportionInput = document.getElementById('proportion_percentage');
+    const generateBtn = document.getElementById('generate-btn');
+    
+    // Find the closest achievable percentage
+    const targetPercentage = parseFloat(sliderValue);
+    let closest = achievablePercentages[0];
+    let minDiff = Math.abs(targetPercentage - closest.percentage);
+    
+    for (const ap of achievablePercentages) {
+        const diff = Math.abs(targetPercentage - ap.percentage);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closest = ap;
+        }
+    }
+    
+    // Validate the closest split
+    if (closest.major <= majorCount && closest.comorbid <= comorbidCount) {
+        proportionInput.value = closest.percentage;
+        proportionDisplay.innerHTML = `
+            <strong>Split:</strong> ${closest.major} major (${closest.percentage.toFixed(2)}%) / ${closest.comorbid} co-morbid (${(100 - closest.percentage).toFixed(2)}%)
+        `;
+        proportionDisplay.style.color = '#495057';
+        generateBtn.disabled = false;
+    } else {
+        proportionDisplay.innerHTML = `
+            <span style="color: #dc3545;">Cannot generate plan with this split. 
+            Available: Major=${majorCount}, Co-morbid=${comorbidCount}</span>
+        `;
+        generateBtn.disabled = true;
+    }
+}
+
+// Form submission validation
+document.getElementById('recommendation-form').addEventListener('submit', function(e) {
+    const numPractices = parseInt(document.getElementById('num_practices').value);
+    const majorModuleId = document.getElementById('major_module_id').value;
+    
+    if (!majorModuleId) {
+        e.preventDefault();
+        alert('Please select a major disease module');
+        return false;
+    }
+    
+    if (!numPractices || numPractices <= 0) {
+        e.preventDefault();
+        alert('Please enter a valid number of practices');
+        const numPracticesInput = document.getElementById('num_practices');
+        if (numPracticesInput) {
+            numPracticesInput.focus();
+        }
+        return false;
+    }
+    
+    const proportionPercentage = document.getElementById('proportion_percentage').value;
+    if (!proportionPercentage) {
+        e.preventDefault();
+        alert('Please select a proportion split by entering a number of practices first');
+        return false;
+    }
+    
+    // Additional validation can be added here
+    return true;
 });
 </script>
 
