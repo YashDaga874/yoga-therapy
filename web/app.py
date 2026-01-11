@@ -305,12 +305,27 @@ def delete_disease(disease_id):
             return redirect(url_for('list_diseases'))
         
         disease_name = disease.name
-        session.delete(disease)
         
-        # Also delete associated module if exists
-        module = session.query(Module).filter_by(disease_id=disease_id).first()
-        if module:
+        # Delete all modules associated with this disease FIRST
+        # This is critical because modules.disease_id is NOT NULL
+        # and SQLAlchemy will try to set it to NULL when deleting the disease
+        modules = session.query(Module).filter_by(disease_id=disease_id).all()
+        for module in modules:
+            # Practices will be deleted via cascade (delete-orphan)
             session.delete(module)
+        
+        # Clear many-to-many associations
+        # These are handled automatically when deleting the disease,
+        # but we clear them explicitly to prevent autoflush issues
+        disease.practices = []
+        disease.contraindications = []
+        
+        # Clear RCT associations if they exist
+        if hasattr(disease, 'rcts'):
+            disease.rcts = []
+        
+        # Now delete the disease itself
+        session.delete(disease)
         
         session.commit()
         session.close()
@@ -318,6 +333,7 @@ def delete_disease(disease_id):
         flash(f'Disease "{disease_name}" deleted successfully!', 'success')
         return redirect(url_for('list_diseases'))
     except Exception as e:
+        session.rollback()
         session.close()
         flash(f'Error deleting disease: {str(e)}', 'error')
         return redirect(url_for('list_diseases'))

@@ -70,16 +70,17 @@
 </div>
 
 {% if practices %}
-    <table>
+    <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+    <table style="min-width: 100%; width: 100%;">
         <thead>
             <tr>
-                <th>Practice Name</th>
-                <th>Category</th>
-                <th>Kosha</th>
-                <th>Sub-Category</th>
-                <th>Positive impact diseases</th>
-                <th>Contraindications</th>
-                <th>RCT Count</th>
+                <th style="min-width: 180px;">Practice Name</th>
+                <th style="min-width: 120px;">Category</th>
+                <th style="min-width: 120px;">Kosha</th>
+                <th style="min-width: 120px;">Sub-Category</th>
+                <th style="min-width: 180px;">Positive impact diseases</th>
+                <th style="min-width: 150px;">Contraindications</th>
+                <th style="min-width: 100px;">RCT Count</th>
             </tr>
         </thead>
         <tbody>
@@ -131,6 +132,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     
     {% if pagination and pagination.pages > 1 %}
     <div style="margin-top: 2rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
