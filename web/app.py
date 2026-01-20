@@ -23,12 +23,13 @@ from werkzeug.datastructures import FileStorage
 # Add parent directory to path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response, session as flask_session
+from sqlalchemy import text
 from sqlalchemy.orm import joinedload, selectinload
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
     RCT, RCTSymptom,
-    create_database, get_session, disease_contraindication_association,
+    create_database, get_engine, get_session, disease_contraindication_association,
     disease_practice_association, rct_disease_association
 )
 
@@ -62,8 +63,102 @@ os.makedirs(os.path.join(UPLOAD_FOLDER, 'videos'), exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def generate_practice_code(sanskrit_name, session=None, existing_codes=None):
+    """
+    Generate a practice code based on Sanskrit name.
+    
+    Methodology:
+    - Take first letter of each word in Sanskrit name (capitalized)
+    - If single word, take first 2-3 letters
+    - Add a 2-digit number suffix if needed for uniqueness
+    
+    Examples:
+    - Kapalabhati -> KAP01
+    - Shavasana -> SHA01
+    - Bhujangasana -> BHU01
+    - Padmasana -> PAD01
+    - Anulom Vilom -> AV01
+    
+    Args:
+        sanskrit_name: The Sanskrit name of the practice
+        session: Database session to check existing codes
+        existing_codes: Set of existing codes to avoid duplicates
+        
+    Returns:
+        A unique code string
+    """
+    import re
+    
+    if not sanskrit_name or not sanskrit_name.strip():
+        return None
+    
+    # Get existing codes from database if session provided
+    if session and existing_codes is None:
+        existing_codes = set()
+        all_practices = session.query(Practice).filter(Practice.code.isnot(None)).all()
+        existing_codes = {p.code for p in all_practices}
+    elif existing_codes is None:
+        existing_codes = set()
+    
+    # Clean the Sanskrit name
+    name = sanskrit_name.strip()
+    
+    # Split by spaces and get first letters
+    words = name.split()
+    
+    if len(words) == 1:
+        # Single word: take first 3 letters, capitalize
+        base_code = name[:3].upper()
+    else:
+        # Multiple words: take first letter of each word
+        base_code = ''.join([word[0].upper() for word in words if word])
+    
+    # Remove any non-alphabetic characters
+    base_code = re.sub(r'[^A-Z]', '', base_code)
+    
+    if not base_code:
+        # Fallback: use first 3 characters of name
+        base_code = name[:3].upper()
+        base_code = re.sub(r'[^A-Z]', '', base_code)
+        if not base_code:
+            base_code = 'PRC'  # Practice
+    
+    # Generate code with number suffix
+    code = base_code
+    counter = 1
+    
+    while code in existing_codes:
+        # Add 2-digit suffix
+        code = f"{base_code}{counter:02d}"
+        counter += 1
+        
+        # Prevent infinite loop
+        if counter > 99:
+            # Use hash as fallback
+            import hashlib
+            hash_suffix = hashlib.md5(name.encode()).hexdigest()[:2].upper()
+            code = f"{base_code}{hash_suffix}"
+            break
+    
+    return code
+
+def ensure_practice_code_column():
+    """Ensure practices.code column exists for older databases."""
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(practices)"))
+            columns = [row[1] for row in result]
+            if 'code' not in columns:
+                conn.execute(text("ALTER TABLE practices ADD COLUMN code VARCHAR(50)"))
+                conn.commit()
+    except Exception as exc:
+        # Avoid crashing startup for non-SQLite or locked DB; surface in logs.
+        print(f"Warning: failed to ensure practices.code column: {exc}")
+
 # Initialize database on startup
 create_database(DB_PATH)
+ensure_practice_code_column()
 
 
 def get_db_session():
@@ -375,32 +470,16 @@ def list_practices():
         
         practices = pagination.items
         
-        # Group practices by all fields except module_id
-        # Create a key based on all fields except module_id
+        # Group practices by CODE - practices with same code should be shown as one row
         grouped_practices = {}
         for practice in practices:
-            # Create a unique key based on all fields except module_id
-            key = (
-                practice.practice_sanskrit or '',
-                practice.practice_english,
-                practice.practice_segment,
-                practice.sub_category or '',
-                practice.kosha or '',
-                practice.rounds,
-                practice.time_minutes,
-                practice.strokes_per_min,
-                practice.strokes_per_cycle,
-                practice.rest_between_cycles_sec,
-                practice.variations or '',
-                practice.steps or '',
-                practice.description or '',
-                practice.how_to_do or '',
-                practice.photo_path or '',
-                practice.video_path or '',
-                practice.citation_id,
-                tuple(sorted([d.id for d in practice.diseases])),  # Sorted disease IDs
-                practice.rct_count or 0
-            )
+            # Use code as the grouping key - if no code, use Sanskrit name as fallback
+            if practice.code:
+                key = practice.code
+            elif practice.practice_sanskrit:
+                key = f"NO_CODE_{practice.practice_sanskrit}"
+            else:
+                key = f"NO_CODE_{practice.practice_english}"
             
             if key not in grouped_practices:
                 grouped_practices[key] = {
@@ -416,13 +495,14 @@ def list_practices():
                 if module_info not in grouped_practices[key]['modules']:
                     grouped_practices[key]['modules'].append(module_info)
 
-            # Prefer module disease names captured earlier
-            module_diseases = getattr(practice, '_module_disease_names', None)
-            if module_diseases:
-                grouped_practices[key]['diseases'].update(module_diseases)
-            elif practice.diseases:
+            # Collect all diseases from all practices with this code
+            if practice.diseases:
                 for disease in practice.diseases:
                     grouped_practices[key]['diseases'].add(disease.name)
+            
+            # Also get diseases from the module if practice is linked to a module
+            if practice.module and practice.module.disease:
+                grouped_practices[key]['diseases'].add(practice.module.disease.name)
             
             # Track all practice IDs in this group
             if practice.id not in grouped_practices[key]['practice_ids']:
@@ -454,9 +534,56 @@ def add_practice():
     session = get_db_session()
     
     if request.method == 'POST':
+        # Handle practice code
+        practice_sanskrit = request.form.get('practice_sanskrit', '').strip()
+        user_provided_code = request.form.get('code', '').strip()
+        
+        # DATA INTEGRITY RULE 1: Same Sanskrit name MUST have same code
+        # Check if a practice with the same Sanskrit name exists
+        existing_practice_with_sanskrit = None
+        if practice_sanskrit:
+            existing_practice_with_sanskrit = session.query(Practice).filter(
+                Practice.practice_sanskrit.ilike(practice_sanskrit)
+            ).first()
+        
+        # DATA INTEGRITY RULE 2: Same code MUST have same Sanskrit name
+        # Check if user-provided code already exists
+        existing_practice_with_code = None
+        if user_provided_code:
+            existing_practice_with_code = session.query(Practice).filter(
+                Practice.code == user_provided_code
+            ).first()
+        
+        # Determine the code to use (enforcing data integrity)
+        practice_code = None
+        
+        # PRIORITY 1: If Sanskrit name exists, MUST use its code (ignore user code if different)
+        if existing_practice_with_sanskrit and existing_practice_with_sanskrit.code:
+            practice_code = existing_practice_with_sanskrit.code
+            # If user provided a different code, warn but use the correct one
+            if user_provided_code and user_provided_code != practice_code:
+                flash(f'Warning: Practice with Sanskrit name "{practice_sanskrit}" already exists with code "{practice_code}". Using existing code for consistency.', 'warning')
+        # PRIORITY 2: If user provided a code that exists, MUST match Sanskrit name
+        elif user_provided_code and existing_practice_with_code:
+            existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+            if practice_sanskrit and practice_sanskrit.lower() != existing_sanskrit.lower():
+                flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
+                session.close()
+                return render_template('add_practice.html')
+            practice_code = user_provided_code
+        # PRIORITY 3: User provided a new code (doesn't exist yet)
+        elif user_provided_code:
+            practice_code = user_provided_code
+        # PRIORITY 4: Generate new code based on Sanskrit name
+        elif practice_sanskrit:
+            practice_code = generate_practice_code(practice_sanskrit, session)
+        # PRIORITY 5: Fallback to English name if no Sanskrit name
+        elif request.form['practice_english']:
+            practice_code = generate_practice_code(request.form['practice_english'], session)
+        
         # Create practice
         practice = Practice(
-            practice_sanskrit=request.form.get('practice_sanskrit', ''),
+            practice_sanskrit=practice_sanskrit,
             practice_english=request.form['practice_english'],
             practice_segment=request.form['practice_segment'],
             sub_category=request.form.get('sub_category', ''),
@@ -464,7 +591,8 @@ def add_practice():
             rounds=int(request.form['rounds']) if request.form.get('rounds') else None,
             time_minutes=float(request.form['time_minutes']) if request.form.get('time_minutes') else None,
             description=request.form.get('description', ''),
-            how_to_do=request.form.get('how_to_do', '')
+            how_to_do=request.form.get('how_to_do', ''),
+            code=practice_code
         )
         
         # Add optional fields
@@ -536,8 +664,12 @@ def edit_practice(practice_id):
             return redirect(url_for('list_practices'))
         
         if request.method == 'POST':
+            # Store old Sanskrit name for comparison
+            old_sanskrit = (practice.practice_sanskrit or '').strip()
+            new_sanskrit = request.form.get('practice_sanskrit', '').strip()
+            
             # Update practice fields
-            practice.practice_sanskrit = request.form.get('practice_sanskrit', '')
+            practice.practice_sanskrit = new_sanskrit
             practice.practice_english = request.form['practice_english']
             practice.practice_segment = request.form['practice_segment']
             practice.sub_category = request.form.get('sub_category', '')
@@ -546,6 +678,98 @@ def edit_practice(practice_id):
             practice.time_minutes = float(request.form['time_minutes']) if request.form.get('time_minutes') else None
             practice.how_to_do = request.form.get('how_to_do', '')
             practice.description = request.form.get('description', '')
+            
+            # Handle practice code - ENFORCE DATA INTEGRITY RULES
+            user_provided_code = request.form.get('code', '').strip()
+            
+            # RULE 1: If Sanskrit name changed to one that exists, MUST use that code
+            # RULE 2: If code changed to one that exists, Sanskrit name MUST match
+            new_code = None
+            
+            # Check if new Sanskrit name already exists (DATA INTEGRITY RULE 1)
+            existing_practice_with_new_sanskrit = None
+            if new_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                existing_practice_with_new_sanskrit = session.query(Practice).filter(
+                    Practice.practice_sanskrit.ilike(new_sanskrit),
+                    Practice.id != practice_id
+                ).first()
+            
+            # Check if user-provided code already exists (DATA INTEGRITY RULE 2)
+            existing_practice_with_code = None
+            if user_provided_code:
+                existing_practice_with_code = session.query(Practice).filter(
+                    Practice.code == user_provided_code,
+                    Practice.id != practice_id
+                ).first()
+            
+            # Determine new code based on data integrity rules
+            if existing_practice_with_new_sanskrit and existing_practice_with_new_sanskrit.code:
+                # PRIORITY 1: Sanskrit name exists → MUST use its code (ignore user code if different)
+                new_code = existing_practice_with_new_sanskrit.code
+                if user_provided_code and user_provided_code != new_code:
+                    flash(f'Warning: Practice with Sanskrit name "{new_sanskrit}" already exists with code "{new_code}". Using existing code for consistency.', 'warning')
+            elif user_provided_code and existing_practice_with_code:
+                # PRIORITY 2: User provided code that exists → Sanskrit name MUST match
+                existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+                if new_sanskrit and new_sanskrit.lower() != existing_sanskrit.lower():
+                    flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
+                    session.close()
+                    return render_template('edit_practice.html', practice=practice)
+                new_code = user_provided_code
+            elif user_provided_code:
+                # PRIORITY 3: User provided a new code (doesn't exist yet)
+                new_code = user_provided_code
+            elif new_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                # PRIORITY 4: Sanskrit name changed, generate new code
+                new_code = generate_practice_code(new_sanskrit, session)
+            
+            # Update code for all practices with the same Sanskrit name (RULE 1: Same name = Same code)
+            if new_code:
+                if old_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                    # Sanskrit name changed - update all practices with OLD Sanskrit name to new code
+                    practices_with_old_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(old_sanskrit)
+                    ).all()
+                    for p in practices_with_old_sanskrit:
+                        p.code = new_code
+                elif new_sanskrit:
+                    # Sanskrit name unchanged but code may have changed - update all practices with same Sanskrit name
+                    practices_with_same_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(new_sanskrit)
+                    ).all()
+                    for p in practices_with_same_sanskrit:
+                        p.code = new_code
+                
+                practice.code = new_code
+            elif not practice.code and new_sanskrit:
+                # No code yet and we have Sanskrit name - find or generate code
+                existing_practice_with_sanskrit = session.query(Practice).filter(
+                    Practice.practice_sanskrit.ilike(new_sanskrit),
+                    Practice.code.isnot(None),
+                    Practice.id != practice_id
+                ).first()
+                
+                if existing_practice_with_sanskrit and existing_practice_with_sanskrit.code:
+                    practice.code = existing_practice_with_sanskrit.code
+                    # Update all practices with same Sanskrit name
+                    practices_with_same_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(new_sanskrit)
+                    ).all()
+                    for p in practices_with_same_sanskrit:
+                        p.code = practice.code
+                else:
+                    practice.code = generate_practice_code(new_sanskrit, session)
+            elif not practice.code and new_sanskrit:
+                # No code set and we have a Sanskrit name - generate one
+                existing_practice_with_sanskrit = session.query(Practice).filter(
+                    Practice.practice_sanskrit.ilike(new_sanskrit),
+                    Practice.id != practice_id
+                ).first()
+                
+                if existing_practice_with_sanskrit and existing_practice_with_sanskrit.code:
+                    practice.code = existing_practice_with_sanskrit.code
+                else:
+                    practice.code = generate_practice_code(new_sanskrit, session)
             
             # Handle optional fields
             if request.form.get('strokes_per_min'):
@@ -600,60 +824,34 @@ def edit_practice(practice_id):
             old_category = practice.practice_segment
             old_disease_ids = set([d.id for d in practice.diseases])
             
-            # Get the practice key to find all related practices
-            practice_key = (
-                practice.practice_sanskrit or '',
-                practice.practice_english,
-                practice.practice_segment,
-                practice.sub_category or '',
-                practice.kosha or '',
-                practice.rounds,
-                practice.time_minutes,
-                practice.strokes_per_min,
-                practice.strokes_per_cycle,
-                practice.rest_between_cycles_sec,
-                practice.variations or '',
-                practice.steps or '',
-                practice.description or '',
-                practice.how_to_do or '',
-                practice.photo_path or '',
-                practice.video_path or '',
-                practice.citation_id,
-                tuple(sorted([d.id for d in practice.diseases])),
-                practice.cvr_score,
-                practice.rct_count or 0
-            )
+            # Find all practices with the SAME CODE - these should all be synced
+            # Get the code (either from current practice or from form)
+            current_code = practice.code or user_provided_code
+            if not current_code and new_sanskrit:
+                # If no code yet, check if other practices with same Sanskrit have a code
+                existing_with_code = session.query(Practice).filter(
+                    Practice.practice_sanskrit.ilike(new_sanskrit),
+                    Practice.code.isnot(None),
+                    Practice.id != practice_id
+                ).first()
+                if existing_with_code:
+                    current_code = existing_with_code.code
             
-            # Find all related practices (identical except for module)
-            all_practices = session.query(Practice).all()
+            # Find all practices with the same CODE (excluding CVR score which is module-specific)
             related_practices = []
-            for p in all_practices:
-                p_key = (
-                    p.practice_sanskrit or '',
-                    p.practice_english,
-                    p.practice_segment,
-                    p.sub_category or '',
-                    p.kosha or '',
-                    p.rounds,
-                    p.time_minutes,
-                    p.strokes_per_min,
-                    p.strokes_per_cycle,
-                    p.rest_between_cycles_sec,
-                    p.variations or '',
-                    p.steps or '',
-                    p.description or '',
-                    p.how_to_do or '',
-                    p.photo_path or '',
-                    p.video_path or '',
-                    p.citation_id,
-                    tuple(sorted([d.id for d in p.diseases])),
-                    p.cvr_score,
-                    p.rct_count or 0
-                )
-                if p_key == practice_key:
-                    related_practices.append(p)
+            if current_code:
+                related_practices = session.query(Practice).filter(
+                    Practice.code == current_code,
+                    Practice.id != practice_id
+                ).all()
             
-            # Update all related practices with new field values
+            # Also update the code for all related practices if it changed
+            if current_code and practice.code != current_code:
+                practice.code = current_code
+                for p in related_practices:
+                    p.code = current_code
+            
+            # Update all related practices with new field values (EXCEPT CVR score - it's module-specific)
             for p in related_practices:
                 p.practice_sanskrit = practice.practice_sanskrit
                 p.practice_english = practice.practice_english
@@ -673,117 +871,135 @@ def edit_practice(practice_id):
                 p.video_path = practice.video_path
                 p.citation_id = practice.citation_id
                 p.rct_count = practice.rct_count
-                p.cvr_score = practice.cvr_score
+                # DO NOT sync CVR score - it's module-specific and should remain different for each module
+                # p.cvr_score = practice.cvr_score
             
-            # Get disease associations and modules from form
+            # Check if this is a module-specific edit (has module_id in form) or a general edit from practices tab
+            # Only do module/disease management if form has disease/module data
             disease_ids = request.form.getlist('diseases')
             
-            # Collect all module IDs for each disease
-            modules_by_disease = {}
-            for disease_id in disease_ids:
-                disease_id_int = int(disease_id)
-                # Get all module IDs for this disease (format: module_id_diseaseId_index)
-                module_keys = [key for key in request.form.keys() 
-                              if key.startswith(f'module_id_{disease_id_int}_')]
-                modules_for_disease = []
-                for key in module_keys:
-                    module_id = request.form.get(key)
-                    if module_id:
-                        modules_for_disease.append(int(module_id))
-                modules_by_disease[disease_id_int] = modules_for_disease
-            
-            # Update disease associations for all related practices
-            for p in related_practices:
-                p.diseases = []
-            for disease_id in disease_ids:
-                disease = session.query(Disease).get(int(disease_id))
-                if disease:
-                        p.diseases.append(disease)
-            
-            # Create/update/delete practice entries based on modules
-            # First, delete practices that don't have a module in the new list
-            practices_to_delete = []
-            for p in related_practices:
-                if p.module:
-                    module_found = False
-                    for disease_id, module_ids in modules_by_disease.items():
-                        if p.module.id in module_ids and p.module.disease_id == disease_id:
-                            module_found = True
-                            break
-                    if not module_found:
-                        practices_to_delete.append(p)
-            
-            for p in practices_to_delete:
-                session.delete(p)
-                related_practices.remove(p)
-            
-            # Create new practice entries for modules that don't have a practice yet
-            for disease_id, module_ids in modules_by_disease.items():
-                disease = session.query(Disease).get(disease_id)
-                if not disease:
-                    continue
+            if disease_ids:
+                # This is a module-specific edit - handle module associations
+                # Collect all module IDs for each disease
+                modules_by_disease = {}
+                for disease_id in disease_ids:
+                    disease_id_int = int(disease_id)
+                    # Get all module IDs for this disease (format: module_id_diseaseId_index)
+                    module_keys = [key for key in request.form.keys() 
+                                  if key.startswith(f'module_id_{disease_id_int}_')]
+                    modules_for_disease = []
+                    for key in module_keys:
+                        module_id = request.form.get(key)
+                        if module_id:
+                            modules_for_disease.append(int(module_id))
+                    modules_by_disease[disease_id_int] = modules_for_disease
                 
-                for module_id in module_ids:
-                    module = session.query(Module).get(module_id)
-                    if not module or module.disease_id != disease_id:
+                # Update disease associations for all related practices
+                for p in related_practices:
+                    p.diseases = []
+                for disease_id in disease_ids:
+                    disease = session.query(Disease).get(int(disease_id))
+                    if disease:
+                        for p in related_practices:
+                            if disease not in p.diseases:
+                                p.diseases.append(disease)
+                
+                # Create/update/delete practice entries based on modules
+                # First, delete practices that don't have a module in the new list
+                practices_to_delete = []
+                for p in related_practices:
+                    if p.module:
+                        module_found = False
+                        for disease_id, module_ids in modules_by_disease.items():
+                            if p.module.id in module_ids and p.module.disease_id == disease_id:
+                                module_found = True
+                                break
+                        if not module_found:
+                            practices_to_delete.append(p)
+                
+                for p in practices_to_delete:
+                    session.delete(p)
+                    related_practices.remove(p)
+                
+                # Create new practice entries for modules that don't have a practice yet
+                for disease_id, module_ids in modules_by_disease.items():
+                    disease = session.query(Disease).get(disease_id)
+                    if not disease:
                         continue
                     
-                    # Check if a practice with this module already exists
-                    practice_exists = False
-                    for p in related_practices:
-                        if p.module and p.module.id == module_id:
-                            practice_exists = True
-                            break
-                    
-                    if not practice_exists:
-                        # Create new practice entry
-                        new_practice = Practice(
-                            practice_sanskrit=practice.practice_sanskrit,
-                            practice_english=practice.practice_english,
-                            practice_segment=practice.practice_segment,
-                            sub_category=practice.sub_category,
-                            kosha=practice.kosha,
-                            rounds=practice.rounds,
-                            time_minutes=practice.time_minutes,
-                            strokes_per_min=practice.strokes_per_min,
-                            strokes_per_cycle=practice.strokes_per_cycle,
-                            rest_between_cycles_sec=practice.rest_between_cycles_sec,
-                            variations=practice.variations,
-                            steps=practice.steps,
-                            description=practice.description,
-                            how_to_do=practice.how_to_do,
-                            photo_path=practice.photo_path,
-                            video_path=practice.video_path,
-                            citation_id=practice.citation_id,
-                            cvr_score=practice.cvr_score,
-                            module_id=module_id,
-                            rct_count=practice.rct_count
-                        )
-                        new_practice.diseases.append(disease)
-                        session.add(new_practice)
-            
-            # Update module_id for existing practices
-            for p in related_practices:
-                if p.module:
-                    # Find the module for this practice's disease
-                    for disease_id, module_ids in modules_by_disease.items():
-                        if p.module.disease_id == disease_id and p.module.id in module_ids:
-                            # Keep the same module
-                            break
-                    else:
-                        # Assign first module for first disease if no match
-                        if modules_by_disease:
-                            first_disease_id = list(modules_by_disease.keys())[0]
-                            first_module_id = modules_by_disease[first_disease_id][0] if modules_by_disease[first_disease_id] else None
-                            if first_module_id:
-                                p.module_id = first_module_id
-            
-            new_disease_ids = set([int(d) for d in disease_ids])
-            
-            # Recalculate RCT count if category or diseases changed
-            if old_category != practice.practice_segment or old_disease_ids != new_disease_ids:
+                    for module_id in module_ids:
+                        module = session.query(Module).get(module_id)
+                        if not module or module.disease_id != disease_id:
+                            continue
+                        
+                        # Check if a practice with this module already exists
+                        practice_exists = False
+                        for p in related_practices:
+                            if p.module and p.module.id == module_id:
+                                practice_exists = True
+                                break
+                        
+                        if not practice_exists:
+                            # Use the same code as the original practice, or generate one
+                            practice_code = practice.code
+                            if not practice_code and practice.practice_sanskrit:
+                                practice_code = generate_practice_code(practice.practice_sanskrit, session)
+                            elif not practice_code:
+                                practice_code = generate_practice_code(practice.practice_english, session)
+                            
+                            # Create new practice entry
+                            new_practice = Practice(
+                                practice_sanskrit=practice.practice_sanskrit,
+                                practice_english=practice.practice_english,
+                                practice_segment=practice.practice_segment,
+                                sub_category=practice.sub_category,
+                                kosha=practice.kosha,
+                                rounds=practice.rounds,
+                                time_minutes=practice.time_minutes,
+                                strokes_per_min=practice.strokes_per_min,
+                                strokes_per_cycle=practice.strokes_per_cycle,
+                                rest_between_cycles_sec=practice.rest_between_cycles_sec,
+                                variations=practice.variations,
+                                steps=practice.steps,
+                                description=practice.description,
+                                how_to_do=practice.how_to_do,
+                                photo_path=practice.photo_path,
+                                video_path=practice.video_path,
+                                citation_id=practice.citation_id,
+                                cvr_score=practice.cvr_score,
+                                code=practice_code,
+                                module_id=module_id,
+                                rct_count=practice.rct_count
+                            )
+                            new_practice.diseases.append(disease)
+                            session.add(new_practice)
+                
+                # Update module_id for existing practices
                 for p in related_practices:
-                    recalculate_practice_rct_count(session, p)
+                    if p.module:
+                        # Find the module for this practice's disease
+                        for disease_id, module_ids in modules_by_disease.items():
+                            if p.module.disease_id == disease_id and p.module.id in module_ids:
+                                # Keep the same module
+                                break
+                        else:
+                            # Assign first module for first disease if no match
+                            if modules_by_disease:
+                                first_disease_id = list(modules_by_disease.keys())[0]
+                                first_module_id = modules_by_disease[first_disease_id][0] if modules_by_disease[first_disease_id] else None
+                                if first_module_id:
+                                    p.module_id = first_module_id
+                
+                new_disease_ids = set([int(d) for d in disease_ids])
+                
+                # Recalculate RCT count if category or diseases changed
+                if old_category != practice.practice_segment or old_disease_ids != new_disease_ids:
+                    for p in related_practices:
+                        recalculate_practice_rct_count(session, p)
+            else:
+                # This is a general edit from practices tab - just sync fields, don't touch modules/diseases
+                # Keep all existing practices and their module associations intact
+                pass
             
             # Store the practice name before closing session
             practice_name = practice.practice_english
@@ -1434,9 +1650,63 @@ def add_practice_to_module(module_id):
                 cvr_score_value = request.form.get('cvr_score')
                 cvr_score = float(cvr_score_value) if cvr_score_value else None
 
+                # Handle practice code
+                practice_sanskrit = request.form.get('practice_sanskrit', '').strip()
+                user_provided_code = request.form.get('code', '').strip()
+                
+                # DATA INTEGRITY RULE 1: Same Sanskrit name MUST have same code
+                existing_practice_with_sanskrit = None
+                if practice_sanskrit:
+                    existing_practice_with_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(practice_sanskrit)
+                    ).first()
+                
+                # DATA INTEGRITY RULE 2: Same code MUST have same Sanskrit name
+                existing_practice_with_code = None
+                if user_provided_code:
+                    existing_practice_with_code = session.query(Practice).filter(
+                        Practice.code == user_provided_code
+                    ).first()
+                
+                # Determine the code to use (enforcing data integrity)
+                practice_code = None
+                
+                # PRIORITY 1: If Sanskrit name exists, MUST use its code (ignore user code if different)
+                if existing_practice_with_sanskrit and existing_practice_with_sanskrit.code:
+                    practice_code = existing_practice_with_sanskrit.code
+                    # If user provided a different code, warn but use the correct one
+                    if user_provided_code and user_provided_code != practice_code:
+                        flash(f'Warning: Practice with Sanskrit name "{practice_sanskrit}" already exists with code "{practice_code}". Using existing code for consistency.', 'warning')
+                # PRIORITY 2: If user provided a code that exists, MUST match Sanskrit name
+                elif user_provided_code and existing_practice_with_code:
+                    existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+                    if practice_sanskrit and practice_sanskrit.lower() != existing_sanskrit.lower():
+                        flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
+                        session.close()
+                        practice_segments = [
+                            'Preparatory Practice', 'Breathing Practice', 'Sequential Yogic Practice',
+                            'Yogasana', 'Pranayama', 'Meditation', 'Chanting', 'Additional Practices',
+                            'Kriya (Cleansing Techniques)', 'Yogic Counselling'
+                        ]
+                        existing_practices = get_existing_practices_list(module)
+                        return render_template('add_practice_to_module.html', 
+                                             module=module, 
+                                             practice_segments=practice_segments,
+                                             existing_practices=existing_practices)
+                    practice_code = user_provided_code
+                # PRIORITY 3: User provided a new code (doesn't exist yet)
+                elif user_provided_code:
+                    practice_code = user_provided_code
+                # PRIORITY 4: Generate new code based on Sanskrit name
+                elif practice_sanskrit:
+                    practice_code = generate_practice_code(practice_sanskrit, session)
+                # PRIORITY 5: Fallback to English name if no Sanskrit name
+                elif request.form['practice_english']:
+                    practice_code = generate_practice_code(request.form['practice_english'], session)
+                
                 # Create practice
                 practice = Practice(
-                    practice_sanskrit=request.form.get('practice_sanskrit', ''),
+                    practice_sanskrit=practice_sanskrit,
                     practice_english=request.form['practice_english'],
                     practice_segment=request.form['practice_segment'],
                     sub_category=request.form.get('sub_category', ''),
@@ -1445,6 +1715,7 @@ def add_practice_to_module(module_id):
                     time_minutes=float(request.form['time_minutes']) if request.form.get('time_minutes') else None,
                     strokes_per_min=int(request.form['strokes_per_min']) if request.form.get('strokes_per_min') else None,
                     cvr_score=cvr_score,
+                    code=practice_code,
                     module_id=module_id  # Associate with module
                 )
                 
@@ -1508,26 +1779,164 @@ def edit_practice_in_module(module_id, practice_id):
 
         if request.method == 'POST':
             try:
-                practice.practice_sanskrit = request.form.get('practice_sanskrit', '')
+                # Store old Sanskrit name for comparison
+                old_sanskrit = (practice.practice_sanskrit or '').strip()
+                new_sanskrit = request.form.get('practice_sanskrit', '').strip()
+                
+                practice.practice_sanskrit = new_sanskrit
                 practice.practice_english = request.form['practice_english']
                 practice.practice_segment = request.form['practice_segment']
                 practice.sub_category = request.form.get('sub_category', '')
                 practice.kosha = request.form.get('kosha', '')
-
+                
+                # Handle practice code - ENFORCE DATA INTEGRITY RULES
+                user_provided_code = request.form.get('code', '').strip()
+                
+                # RULE 1: If Sanskrit name changed to one that exists, MUST use its code
+                # RULE 2: If code changed to one that exists, Sanskrit name MUST match
+                new_code = None
+                
+                # Check if new Sanskrit name already exists (DATA INTEGRITY RULE 1)
+                existing_practice_with_new_sanskrit = None
+                if new_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                    existing_practice_with_new_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(new_sanskrit),
+                        Practice.id != practice_id
+                    ).first()
+                
+                # Check if user-provided code already exists (DATA INTEGRITY RULE 2)
+                existing_practice_with_code = None
+                if user_provided_code:
+                    existing_practice_with_code = session.query(Practice).filter(
+                        Practice.code == user_provided_code,
+                        Practice.id != practice_id
+                    ).first()
+                
+                # Determine new code based on data integrity rules
+                if existing_practice_with_new_sanskrit and existing_practice_with_new_sanskrit.code:
+                    # PRIORITY 1: Sanskrit name exists → MUST use its code (ignore user code if different)
+                    new_code = existing_practice_with_new_sanskrit.code
+                    if user_provided_code and user_provided_code != new_code:
+                        flash(f'Warning: Practice with Sanskrit name "{new_sanskrit}" already exists with code "{new_code}". Using existing code for consistency.', 'warning')
+                elif user_provided_code and existing_practice_with_code:
+                    # PRIORITY 2: User provided code that exists → Sanskrit name MUST match
+                    existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+                    if new_sanskrit and new_sanskrit.lower() != existing_sanskrit.lower():
+                        flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
+                        session.close()
+                        practice_segments = [
+                            'Preparatory Practice', 'Breathing Practice', 'Sequential Yogic Practice',
+                            'Yogasana', 'Pranayama', 'Meditation', 'Chanting', 'Additional Practices',
+                            'Kriya (Cleansing Techniques)', 'Yogic Counselling'
+                        ]
+                        return render_template(
+                            'edit_practice_in_module.html',
+                            module=module,
+                            practice=practice,
+                            practice_segments=practice_segments
+                        )
+                    new_code = user_provided_code
+                elif user_provided_code:
+                    # PRIORITY 3: User provided a new code (doesn't exist yet)
+                    new_code = user_provided_code
+                elif new_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                    # PRIORITY 4: Sanskrit name changed, generate new code
+                    new_code = generate_practice_code(new_sanskrit, session)
+                
+                # Find all practices with the SAME CODE - these should all be synced
+                related_practices = []
+                
+                # Update code for all practices with the same Sanskrit name (RULE 1: Same name = Same code)
+                if new_code:
+                    if old_sanskrit and old_sanskrit.lower() != new_sanskrit.lower():
+                        # Sanskrit name changed - update all practices with OLD Sanskrit name to new code
+                        practices_with_old_sanskrit = session.query(Practice).filter(
+                            Practice.practice_sanskrit.ilike(old_sanskrit)
+                        ).all()
+                        for p in practices_with_old_sanskrit:
+                            p.code = new_code
+                        # Update related practices list with new code
+                        related_practices = session.query(Practice).filter(
+                            Practice.code == new_code,
+                            Practice.id != practice_id
+                        ).all()
+                    elif new_sanskrit:
+                        # Sanskrit name unchanged but code may have changed - update all practices with same Sanskrit name
+                        practices_with_same_sanskrit = session.query(Practice).filter(
+                            Practice.practice_sanskrit.ilike(new_sanskrit)
+                        ).all()
+                        for p in practices_with_same_sanskrit:
+                            p.code = new_code
+                        related_practices = session.query(Practice).filter(
+                            Practice.code == new_code,
+                            Practice.id != practice_id
+                        ).all()
+                    
+                    practice.code = new_code
+                elif not practice.code and new_sanskrit:
+                    # No code yet and we have Sanskrit name - find or generate code
+                    existing_practice_with_sanskrit = session.query(Practice).filter(
+                        Practice.practice_sanskrit.ilike(new_sanskrit),
+                        Practice.code.isnot(None),
+                        Practice.id != practice_id
+                    ).first()
+                    
+                    if existing_practice_with_sanskrit and existing_practice_with_sanskrit.code:
+                        practice.code = existing_practice_with_sanskrit.code
+                        # Update all practices with same Sanskrit name
+                        practices_with_same_sanskrit = session.query(Practice).filter(
+                            Practice.practice_sanskrit.ilike(new_sanskrit)
+                        ).all()
+                        for p in practices_with_same_sanskrit:
+                            p.code = practice.code
+                        related_practices = session.query(Practice).filter(
+                            Practice.code == practice.code,
+                            Practice.id != practice_id
+                        ).all()
+                    else:
+                        practice.code = generate_practice_code(new_sanskrit, session)
+                elif practice.code:
+                    # Code unchanged - find related practices with same code
+                    related_practices = session.query(Practice).filter(
+                        Practice.code == practice.code,
+                        Practice.id != practice_id
+                    ).all()
+                
+                # Sync all field values to related practices with same code (EXCEPT CVR score)
+                for p in related_practices:
+                    p.practice_sanskrit = practice.practice_sanskrit
+                    p.practice_english = practice.practice_english
+                    p.practice_segment = practice.practice_segment
+                    p.sub_category = practice.sub_category
+                    p.kosha = practice.kosha
+                    # DO NOT sync CVR score - it's module-specific
+                    # DO NOT sync rounds, time_minutes, strokes_per_min - these might be module-specific too
+                    # Actually, let's sync these basic fields but not CVR
+                
                 rounds_val = request.form.get('rounds')
                 practice.rounds = int(rounds_val) if rounds_val else None
+                # Sync rounds to related practices
+                for p in related_practices:
+                    p.rounds = practice.rounds
 
                 duration_val = request.form.get('time_minutes')
                 practice.time_minutes = float(duration_val) if duration_val else None
+                # Sync time_minutes to related practices
+                for p in related_practices:
+                    p.time_minutes = practice.time_minutes
 
                 strokes_val = request.form.get('strokes_per_min')
                 practice.strokes_per_min = int(strokes_val) if strokes_val else None
+                # Sync strokes_per_min to related practices
+                for p in related_practices:
+                    p.strokes_per_min = practice.strokes_per_min
 
                 cvr_val = request.form.get('cvr_score')
                 try:
                     practice.cvr_score = float(cvr_val) if cvr_val else None
                 except (TypeError, ValueError):
                     practice.cvr_score = None
+                # DO NOT sync CVR score - it's module-specific
 
                 session.commit()
                 flash('Practice updated successfully!', 'success')
@@ -1644,12 +2053,13 @@ def api_search_diseases():
 @app.route('/api/practice/search', methods=['GET'])
 def api_search_practices():
     """
-    API endpoint for autocomplete - search practices by Sanskrit name
-    Query parameters: q (search query), disease (optional - filter by disease)
+    API endpoint for autocomplete - search practices by Sanskrit name or code
+    Query parameters: q (search query), disease (optional - filter by disease), search_by (optional - 'code' or 'sanskrit', default 'sanskrit')
     Returns list of matching practices with all details
     """
     query = request.args.get('q', '')
     disease_filter = request.args.get('disease', '').strip()
+    search_by = request.args.get('search_by', 'sanskrit').strip().lower()  # 'code' or 'sanskrit'
     
     if not query:
         return jsonify([])
@@ -1657,10 +2067,15 @@ def api_search_practices():
     session = get_db_session()
     
     try:
-        # Search for practices starting with the query (case insensitive)
-        practices_query = session.query(Practice).filter(
-            Practice.practice_sanskrit.ilike(f'{query}%')
-        )
+        # Search for practices by code or Sanskrit name (case insensitive)
+        if search_by == 'code':
+            practices_query = session.query(Practice).filter(
+                Practice.code.ilike(f'{query}%')
+            )
+        else:
+            practices_query = session.query(Practice).filter(
+                Practice.practice_sanskrit.ilike(f'{query}%')
+            )
         
         # If disease filter is provided, filter practices linked to that disease
         if disease_filter:
@@ -1680,6 +2095,7 @@ def api_search_practices():
                 'id': practice.id,
                 'practice_sanskrit': practice.practice_sanskrit or '',
                 'practice_english': practice.practice_english,
+                'code': practice.code or '',
                 'practice_segment': practice.practice_segment,
                 'kosha': practice.kosha or '',
                 'sub_category': practice.sub_category or '',
@@ -1696,6 +2112,112 @@ def api_search_practices():
             })
         
         return jsonify(results)
+    finally:
+        session.close()
+
+
+@app.route('/api/practice/validate-code-sanskrit', methods=['GET'])
+def api_validate_code_sanskrit():
+    """
+    API endpoint to validate code/Sanskrit name consistency
+    Query parameters: code (optional), sanskrit_name (optional)
+    Returns validation result with any conflicts
+    """
+    code = request.args.get('code', '').strip()
+    sanskrit_name = request.args.get('sanskrit_name', '').strip()
+    
+    if not code and not sanskrit_name:
+        return jsonify({'valid': True, 'message': ''})
+    
+    session = get_db_session()
+    
+    try:
+        # Check if code exists
+        existing_practice_with_code = None
+        if code:
+            existing_practice_with_code = session.query(Practice).filter(
+                Practice.code == code
+            ).first()
+        
+        # Check if Sanskrit name exists
+        existing_practice_with_sanskrit = None
+        if sanskrit_name:
+            existing_practice_with_sanskrit = session.query(Practice).filter(
+                Practice.practice_sanskrit.ilike(sanskrit_name)
+            ).first()
+        
+        # Validation logic
+        if code and sanskrit_name:
+            # Both provided - check for conflicts
+            if existing_practice_with_code and existing_practice_with_sanskrit:
+                # Both exist
+                if existing_practice_with_code.code == existing_practice_with_sanskrit.code:
+                    # Same code - names must match
+                    existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+                    if sanskrit_name.lower() != existing_sanskrit.lower():
+                        return jsonify({
+                            'valid': False,
+                            'message': f'Code "{code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.',
+                            'conflict_type': 'code_sanskrit_mismatch',
+                            'existing_sanskrit': existing_sanskrit
+                        })
+                    else:
+                        return jsonify({'valid': True, 'message': ''})
+                else:
+                    # Different codes for same Sanskrit name
+                    existing_code = existing_practice_with_sanskrit.code
+                    return jsonify({
+                        'valid': False,
+                        'message': f'Practice with Sanskrit name "{sanskrit_name}" already exists with code "{existing_code}". Using existing code for consistency.',
+                        'conflict_type': 'sanskrit_code_mismatch',
+                        'existing_code': existing_code
+                    })
+            elif existing_practice_with_code:
+                # Code exists, Sanskrit name doesn't match
+                existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+                if sanskrit_name.lower() != existing_sanskrit.lower():
+                    return jsonify({
+                        'valid': False,
+                        'message': f'Code "{code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.',
+                        'conflict_type': 'code_sanskrit_mismatch',
+                        'existing_sanskrit': existing_sanskrit
+                    })
+            elif existing_practice_with_sanskrit:
+                # Sanskrit name exists, code doesn't match
+                existing_code = existing_practice_with_sanskrit.code
+                if existing_code and code != existing_code:
+                    return jsonify({
+                        'valid': False,
+                        'message': f'Practice with Sanskrit name "{sanskrit_name}" already exists with code "{existing_code}". Using existing code for consistency.',
+                        'conflict_type': 'sanskrit_code_mismatch',
+                        'existing_code': existing_code
+                    })
+        
+        elif code and existing_practice_with_code:
+            # Only code provided - check if it exists
+            existing_sanskrit = (existing_practice_with_code.practice_sanskrit or '').strip()
+            if sanskrit_name:  # User is typing Sanskrit name
+                if sanskrit_name.lower() != existing_sanskrit.lower():
+                    return jsonify({
+                        'valid': False,
+                        'message': f'Code "{code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.',
+                        'conflict_type': 'code_sanskrit_mismatch',
+                        'existing_sanskrit': existing_sanskrit
+                    })
+        
+        elif sanskrit_name and existing_practice_with_sanskrit:
+            # Only Sanskrit name provided - check if it exists
+            existing_code = existing_practice_with_sanskrit.code
+            if code:  # User is typing code
+                if existing_code and code != existing_code:
+                    return jsonify({
+                        'valid': False,
+                        'message': f'Practice with Sanskrit name "{sanskrit_name}" already exists with code "{existing_code}". Using existing code for consistency.',
+                        'conflict_type': 'sanskrit_code_mismatch',
+                        'existing_code': existing_code
+                    })
+        
+        return jsonify({'valid': True, 'message': ''})
     finally:
         session.close()
 
@@ -2038,62 +2560,131 @@ def api_get_practice_counts():
 
 @app.route('/recommendations', methods=['GET', 'POST'])
 def recommendations():
-    """Generate practice recommendations based on selected modules"""
+    """Step 1: Select diseases and set weightages"""
     session = get_db_session()
     
     try:
         if request.method == 'POST':
+            # Validate and redirect to category selection
+            major_module_id = request.form.get('major_module_id')
+            weight_major = request.form.get('weight_major', '0')
+            
+            if not major_module_id:
+                flash('Please select a major disease module', 'error')
+                return redirect(url_for('recommendations'))
+            
             try:
-                # Get selected modules and parameters
-                major_module_id = request.form.get('major_module_id')
-                comorbid_module_ids = request.form.getlist('comorbid_module_ids')
-                num_practices = request.form.get('num_practices')
-                proportion_percentage = request.form.get('proportion_percentage', '50')
+                weight_major = int(weight_major)
+            except (ValueError, TypeError):
+                weight_major = 0
+            
+            # Validate weight total
+            comorbid_module_ids = request.form.getlist('comorbid_module_ids')
+            comorbid_ids_int = []
+            for module_id in comorbid_module_ids:
+                try:
+                    comorbid_ids_int.append(int(module_id))
+                except (ValueError, TypeError):
+                    continue
+            
+            comorbid_weights = {}
+            for mid in comorbid_ids_int:
+                weight_key = f'weight_module_{mid}'
+                w = request.form.get(weight_key, '0')
+                try:
+                    w = int(w)
+                    if w < 0:
+                        w = 0
+                    if w > 100:
+                        w = 100
+                    comorbid_weights[mid] = w
+                except (ValueError, TypeError):
+                    comorbid_weights[mid] = 0
+            
+            total_weight = weight_major + sum(comorbid_weights.get(mid, 0) for mid in comorbid_ids_int)
+            if total_weight != 100:
+                flash(f'Weights must total exactly 100 (currently {total_weight}).', 'error')
+                return redirect(url_for('recommendations'))
+            
+            # Store in session and redirect to category selection
+            flask_session['recommendation_major_module_id'] = int(major_module_id)
+            flask_session['recommendation_comorbid_module_ids'] = comorbid_ids_int
+            flask_session['recommendation_weight_major'] = weight_major
+            flask_session['recommendation_comorbid_weights'] = comorbid_weights
+            
+            return redirect(url_for('recommendations_categories'))
+        
+        # GET request - show form
+        return render_template('recommendations.html')
+    except Exception as e:
+        flash(f'Unexpected error: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
+        return render_template('recommendations.html')
+    finally:
+        session.close()
+
+
+@app.route('/recommendations/categories', methods=['GET', 'POST'])
+def recommendations_categories():
+    """Step 2: Select practices per category, then generate recommendations"""
+    session = get_db_session()
+    
+    try:
+        if request.method == 'POST':
+            # Generate recommendations based on category selections
+            try:
+                # Get data from session
+                major_module_id = flask_session.get('recommendation_major_module_id')
+                comorbid_module_ids = flask_session.get('recommendation_comorbid_module_ids', [])
+                weight_major = flask_session.get('recommendation_weight_major', 0)
+                comorbid_weights = flask_session.get('recommendation_comorbid_weights', {})
                 
                 if not major_module_id:
-                    flash('Please select a major disease module', 'error')
+                    flash('Session expired. Please start over.', 'error')
                     return redirect(url_for('recommendations'))
                 
-                if not num_practices:
-                    flash('Please enter the number of practices you want', 'error')
-                    return redirect(url_for('recommendations'))
+                # Get category selections from form
+                category_selections = {}  # category -> user_selected_count
+                for key in request.form:
+                    if key.startswith('category_'):
+                        category = key.replace('category_', '')
+                        try:
+                            count = int(request.form.get(key, '0'))
+                            if count > 0:
+                                category_selections[category] = count
+                        except (ValueError, TypeError):
+                            continue
                 
-                try:
-                    num_practices = int(num_practices)
-                    proportion_percentage = float(proportion_percentage)
-                except (ValueError, TypeError):
-                    flash('Invalid number of practices or proportion', 'error')
-                    return redirect(url_for('recommendations'))
+                if not category_selections:
+                    flash('Please select at least one practice from any category', 'error')
+                    return redirect(url_for('recommendations_categories'))
                 
-                # Fetch modules with eager loading of relationships
+                # Fetch modules
                 major_module = session.query(Module).options(
                     joinedload(Module.disease),
                     joinedload(Module.practices).joinedload(Practice.diseases)
-                ).filter(Module.id == int(major_module_id)).first()
+                ).filter(Module.id == major_module_id).first()
                 if not major_module:
                     flash('Major disease module not found', 'error')
                     return redirect(url_for('recommendations'))
                 
                 comorbid_modules = []
-                for module_id in comorbid_module_ids:
+                for mid in comorbid_module_ids:
                     module = session.query(Module).options(
                         joinedload(Module.disease),
                         joinedload(Module.practices).joinedload(Practice.diseases)
-                    ).filter(Module.id == int(module_id)).first()
+                    ).filter(Module.id == mid).first()
                     if module:
                         comorbid_modules.append(module)
                 
-                # Collect all modules
+                # Get all diseases and contraindications
                 all_modules = [major_module] + comorbid_modules
-                
-                # Get all diseases from selected modules
                 all_disease_ids = set()
                 for module in all_modules:
                     if module.disease_id:
                         all_disease_ids.add(module.disease_id)
                 
-                # NEW LOGIC: Separate practices by module and filter contraindications
-                # Get contraindications for all diseases
                 contraindications = []
                 for disease_id in all_disease_ids:
                     disease = session.query(Disease).get(disease_id)
@@ -2101,7 +2692,6 @@ def recommendations():
                         for contraindication in disease.contraindications:
                             contraindications.append(contraindication)
                 
-                # Remove duplicates from contraindications
                 seen_contraindications = set()
                 unique_contraindications = []
                 for contra in contraindications:
@@ -2110,7 +2700,6 @@ def recommendations():
                         seen_contraindications.add(key)
                         unique_contraindications.append(contra)
                 
-                # Create contraindicated keys set
                 contraindicated_keys = set()
                 for contra in unique_contraindications:
                     contraindicated_keys.add((
@@ -2118,106 +2707,103 @@ def recommendations():
                         contra.practice_segment
                     ))
                 
-                # Filter major module practices (exclude contraindications)
-                major_module_practices = []
-                for practice in major_module.practices:
-                    practice_key = (
-                        practice.practice_english.lower().strip() if practice.practice_english else '',
-                        practice.practice_segment
-                    )
-                    if practice_key not in contraindicated_keys:
-                        major_module_practices.append(practice)
+                def _practice_identifier(p: Practice):
+                    return p.code if getattr(p, 'code', None) else (p.practice_english or '')
                 
-                # Filter comorbid module practices (exclude contraindications)
-                comorbid_module_practices = []
-                for module in comorbid_modules:
-                    for practice in module.practices:
-                        practice_key = (
-                            practice.practice_english.lower().strip() if practice.practice_english else '',
-                            practice.practice_segment
+                def _filtered_sorted_practices_by_category(module: Module):
+                    """Return practices grouped by category, filtered and sorted"""
+                    by_category = {}
+                    for p in module.practices:
+                        pk = (
+                            (p.practice_english or '').lower().strip(),
+                            p.practice_segment
                         )
-                        if practice_key not in contraindicated_keys:
-                            comorbid_module_practices.append(practice)
+                        if pk not in contraindicated_keys:
+                            category = p.practice_segment or 'Unknown'
+                            if category not in by_category:
+                                by_category[category] = []
+                            by_category[category].append(p)
+                    
+                    # Sort each category by RCT count, CVR, then name
+                    for category in by_category:
+                        by_category[category].sort(
+                            key=lambda p: (
+                                -(p.rct_count if p.rct_count is not None else 0),               # primary: RCT count desc
+                                -(len(p.diseases) if getattr(p, 'diseases', None) else 0),      # tie: disease coverage desc
+                                -(p.cvr_score if p.cvr_score is not None else 0),               # tie: CVR score desc
+                                p.practice_english or ''                                        # tie: name asc
+                            )
+                        )
+                    return by_category
                 
-                # Validate we have enough practices
-                total_available = len(major_module_practices) + len(comorbid_module_practices)
-                if total_available == 0:
-                    flash('No practices available after filtering contraindications', 'error')
-                    return redirect(url_for('recommendations'))
+                # Get practices by category for each module
+                major_practices_by_cat = _filtered_sorted_practices_by_category(major_module)
+                comorbid_practices_by_cat = {}
+                for m in comorbid_modules:
+                    comorbid_practices_by_cat[m.id] = _filtered_sorted_practices_by_category(m)
                 
-                if num_practices <= 0:
-                    flash('Number of practices must be greater than 0', 'error')
-                    return redirect(url_for('recommendations'))
+                # For each category, apply weightages to user's selection
+                order_modules = [major_module] + comorbid_modules
+                weights_by_id = {major_module.id: weight_major}
+                for m in comorbid_modules:
+                    weights_by_id[m.id] = comorbid_weights.get(m.id, 0)
                 
-                if num_practices > total_available:
-                    flash(f'Cannot generate plan: Requested {num_practices} practices, but only {total_available} available (Major: {len(major_module_practices)}, Co-morbid: {len(comorbid_module_practices)})', 'error')
-                    return redirect(url_for('recommendations'))
+                selected_practices = []
+                seen = set()
                 
-                # Calculate split based on proportion percentage
-                major_practices_needed = round(num_practices * (proportion_percentage / 100))
-                comorbid_practices_needed = num_practices - major_practices_needed
+                def take_from_category_list(practice_list, want):
+                    picked = 0
+                    for p in practice_list:
+                        ident = _practice_identifier(p)
+                        if not ident or ident in seen:
+                            continue
+                        seen.add(ident)
+                        selected_practices.append(p)
+                        picked += 1
+                        if picked >= want:
+                            break
+                    return picked
                 
-                # Ensure we don't request negative practices
-                if major_practices_needed < 0:
-                    major_practices_needed = 0
-                if comorbid_practices_needed < 0:
-                    comorbid_practices_needed = 0
+                # Process each category
+                for category, user_selected_count in category_selections.items():
+                    # Calculate per-module targets for this category
+                    base_counts = {}
+                    for m in order_modules:
+                        raw = (weights_by_id.get(m.id, 0) / 100.0) * user_selected_count
+                        base_counts[m.id] = int(raw)  # floor
+                    
+                    remaining = user_selected_count - sum(base_counts.values())
+                    idx = 0
+                    while remaining > 0 and order_modules:
+                        mid = order_modules[idx % len(order_modules)].id
+                        base_counts[mid] += 1
+                        remaining -= 1
+                        idx += 1
+                    
+                    # Select practices from each module for this category
+                    # Major module
+                    major_cat_practices = major_practices_by_cat.get(category, [])
+                    take_from_category_list(major_cat_practices, base_counts.get(major_module.id, 0))
+                    
+                    # Comorbid modules
+                    for m in comorbid_modules:
+                        comorbid_cat_practices = comorbid_practices_by_cat.get(m.id, {}).get(category, [])
+                        take_from_category_list(comorbid_cat_practices, base_counts.get(m.id, 0))
                 
-                # Validate the split is achievable
-                if major_practices_needed > len(major_module_practices):
-                    flash(f'Cannot generate plan: Need {major_practices_needed} practices from major disease, but only {len(major_module_practices)} available', 'error')
-                    return redirect(url_for('recommendations'))
+                if len(selected_practices) == 0:
+                    flash('No practices selected after filtering contraindications/duplicates', 'error')
+                    return redirect(url_for('recommendations_categories'))
                 
-                if comorbid_practices_needed > len(comorbid_module_practices):
-                    flash(f'Cannot generate plan: Need {comorbid_practices_needed} practices from co-morbid diseases, but only {len(comorbid_module_practices)} available', 'error')
-                    return redirect(url_for('recommendations'))
+                filtered_practices = selected_practices
                 
-                # If no comorbid practices needed, that's fine (all from major disease)
-                # But if user wants comorbid practices but no comorbid modules selected, that's an issue
-                if comorbid_practices_needed > 0 and len(comorbid_modules) == 0:
-                    flash('Cannot generate plan: Need practices from co-morbid diseases but no co-morbid modules selected', 'error')
-                    return redirect(url_for('recommendations'))
-                
-                # If major practices needed is 0 but we're requesting practices, we need at least one
-                if major_practices_needed == 0 and num_practices > 0:
-                    # This means 100% should come from comorbid, but check if we have comorbid modules
-                    if len(comorbid_modules) == 0:
-                        flash('Cannot generate plan: No co-morbid modules selected, but proportion requires all practices from co-morbid diseases', 'error')
-                        return redirect(url_for('recommendations'))
-                    # Adjust: if user wants 100% from comorbid, that's valid
-                    # The validation above should have already checked if comorbid_practices_needed <= len(comorbid_module_practices)
-                
-                # Sort major module practices by RCT count (descending), then by CVR score, then alphabetically
-                major_module_practices.sort(key=lambda p: (
-                    -(p.rct_count if p.rct_count is not None else 0),
-                    -(p.cvr_score if p.cvr_score is not None else 0),
-                    p.practice_english or ''
-                ))
-                
-                # Sort comorbid module practices by RCT count (descending), then by CVR score, then alphabetically
-                comorbid_module_practices.sort(key=lambda p: (
-                    -(p.rct_count if p.rct_count is not None else 0),
-                    -(p.cvr_score if p.cvr_score is not None else 0),
-                    p.practice_english or ''
-                ))
-                
-                # Select top N practices from each
-                selected_major_practices = major_module_practices[:major_practices_needed]
-                selected_comorbid_practices = comorbid_module_practices[:comorbid_practices_needed]
-                
-                # Combine selected practices
-                filtered_practices = selected_major_practices + selected_comorbid_practices
-                
-                # Get RCTs for practices - optimized with database joins
-                # Collect all disease IDs from filtered practices
+                # Get RCTs for practices
                 all_practice_disease_ids = set()
-                practice_disease_map = {}  # practice_id -> list of disease_ids
+                practice_disease_map = {}
                 for practice in filtered_practices:
                     practice_disease_ids = [d.id for d in practice.diseases]
                     practice_disease_map[practice.id] = practice_disease_ids
                     all_practice_disease_ids.update(practice_disease_ids)
                 
-                # Query only RCTs that match our diseases (much more efficient)
                 matching_rcts = []
                 if all_practice_disease_ids:
                     matching_rcts = session.query(RCT).join(
@@ -2228,17 +2814,14 @@ def recommendations():
                         selectinload(RCT.diseases)
                     ).all()
                 
-                practice_rcts = {}  # practice_id -> list of RCT parenthetical citations
-                
+                practice_rcts = {}
                 for practice in filtered_practices:
                     practice_rcts[practice.id] = []
                     practice_disease_ids = practice_disease_map[practice.id]
                     
                     for rct in matching_rcts:
                         rct_disease_ids = [d.id for d in rct.diseases]
-                        # Check if RCT is for any of the practice's diseases
                         if any(did in practice_disease_ids for did in rct_disease_ids):
-                            # Check if RCT mentions this practice
                             if rct.intervention_practices:
                                 try:
                                     intervention_list = json.loads(rct.intervention_practices)
@@ -2246,7 +2829,6 @@ def recommendations():
                                         practice_name = intervention.get('name', '').strip()
                                         intervention_category = intervention.get('category', '').strip()
                                         
-                                        # Match by name or category
                                         if (practice_name and 
                                             ((practice.practice_sanskrit and practice.practice_sanskrit.lower() == practice_name.lower()) or
                                              (practice.practice_english and practice.practice_english.lower() == practice_name.lower()))):
@@ -2261,13 +2843,12 @@ def recommendations():
                                     pass
                 
                 # Organize practices by Kosha, then Category, then Subcategory
-                # Kosha order: Annamaya, Pranamaya, Manomaya, Vijnanamaya, Anandamaya
                 kosha_order = {
                     'Annamaya Kosha': 1,
                     'Pranamaya Kosha': 2,
                     'Manomaya Kosha': 3,
-                    'Vijnanamaya Kosha': 4,
-                    'Anandamaya Kosha': 5
+                    'Anandamaya Kosha': 4,
+                    'Vijnanamaya Kosha': 5
                 }
                 
                 organized_practices = {}
@@ -2288,54 +2869,162 @@ def recommendations():
                         'rcts': practice_rcts.get(practice.id, [])
                     })
                 
-                # Sort practices within each subcategory by RCT count (descending)
+                # Sort practices within each subcategory by RCT count
                 for kosha in organized_practices:
                     for category in organized_practices[kosha]:
                         for subcategory in organized_practices[kosha][category]:
                             organized_practices[kosha][category][subcategory].sort(
-                                key=lambda x: len(x['rcts']), 
-                                reverse=True
+                                key=lambda x: (
+                                    -(x['practice'].rct_count if x['practice'].rct_count is not None else 0),
+                                    -(len(x['practice'].diseases) if getattr(x['practice'], 'diseases', None) else 0),
+                                    -(x['practice'].cvr_score if x['practice'].cvr_score is not None else 0),
+                                    x['practice'].practice_english or ''
+                                )
                             )
                 
-                # Get disease names with full module citations (for display)
-                major_disease_name = f"{major_module.disease.name if major_module.disease else 'N/A'} ({major_module.developed_by or 'N/A'})"
+                major_disease_name = major_module.disease.name if major_module.disease else 'N/A'
+                major_module_name = major_module.developed_by or 'N/A'
+                
                 comorbid_disease_names = [
-                    f"{m.disease.name if m.disease else 'N/A'} ({m.developed_by or 'N/A'})" 
+                    m.disease.name if m.disease else 'N/A' 
+                    for m in comorbid_modules
+                ]
+                comorbid_module_names = [
+                    m.developed_by or 'N/A'
                     for m in comorbid_modules
                 ]
                 
-                # Sort koshas by order (descending: highest number first)
                 sorted_koshas = sorted(
                     organized_practices.keys(),
-                    key=lambda x: kosha_order.get(x, 0),
-                    reverse=True
+                    key=lambda x: kosha_order.get(x, 999)
                 )
+                
+                # Clear session data
+                flask_session.pop('recommendation_major_module_id', None)
+                flask_session.pop('recommendation_comorbid_module_ids', None)
+                flask_session.pop('recommendation_weight_major', None)
+                flask_session.pop('recommendation_comorbid_weights', None)
                 
                 return render_template('recommendations_result.html',
                                      major_disease_name=major_disease_name,
+                                     major_module_name=major_module_name,
                                      comorbid_disease_names=comorbid_disease_names,
+                                     comorbid_module_names=comorbid_module_names,
                                      organized_practices=organized_practices,
                                      contraindications=unique_contraindications,
                                      kosha_order=kosha_order,
                                      sorted_koshas=sorted_koshas)
-            except (ValueError, TypeError) as e:
-                flash(f'Invalid module ID format: {str(e)}', 'error')
-                import traceback
-                traceback.print_exc()
-                return redirect(url_for('recommendations'))
             except Exception as e:
                 flash(f'Error generating recommendations: {str(e)}', 'error')
                 import traceback
                 traceback.print_exc()
-                return redirect(url_for('recommendations'))
+                return redirect(url_for('recommendations_categories'))
         
-        # GET request - show form
-        return render_template('recommendations.html')
+        # GET request - show category selection form
+        # Get data from session
+        major_module_id = flask_session.get('recommendation_major_module_id')
+        comorbid_module_ids = flask_session.get('recommendation_comorbid_module_ids', [])
+        
+        if not major_module_id:
+            flash('Please start from the recommendations page', 'error')
+            return redirect(url_for('recommendations'))
+        
+        # Fetch modules
+        major_module = session.query(Module).options(
+            joinedload(Module.disease),
+            joinedload(Module.practices)
+        ).filter(Module.id == major_module_id).first()
+        if not major_module:
+            flash('Major disease module not found', 'error')
+            return redirect(url_for('recommendations'))
+        
+        comorbid_modules = []
+        for mid in comorbid_module_ids:
+            module = session.query(Module).options(
+                joinedload(Module.disease),
+                joinedload(Module.practices)
+            ).filter(Module.id == mid).first()
+            if module:
+                comorbid_modules.append(module)
+        
+        # Get all diseases and contraindications
+        all_modules = [major_module] + comorbid_modules
+        all_disease_ids = set()
+        for module in all_modules:
+            if module.disease_id:
+                all_disease_ids.add(module.disease_id)
+        
+        contraindications = []
+        for disease_id in all_disease_ids:
+            disease = session.query(Disease).get(disease_id)
+            if disease:
+                for contraindication in disease.contraindications:
+                    contraindications.append(contraindication)
+        
+        seen_contraindications = set()
+        unique_contraindications = []
+        for contra in contraindications:
+            key = (contra.practice_english, contra.practice_segment)
+            if key not in seen_contraindications:
+                seen_contraindications.add(key)
+                unique_contraindications.append(contra)
+        
+        contraindicated_keys = set()
+        for contra in unique_contraindications:
+            contraindicated_keys.add((
+                contra.practice_english.lower().strip(),
+                contra.practice_segment
+            ))
+        
+        # Count max practices per category across all modules
+        category_max_counts = {}  # category -> max_count
+        
+        # Process major module
+        for p in major_module.practices:
+            pk = (
+                (p.practice_english or '').lower().strip(),
+                p.practice_segment
+            )
+            if pk not in contraindicated_keys:
+                category = p.practice_segment or 'Unknown'
+                if category not in category_max_counts:
+                    category_max_counts[category] = 0
+                category_max_counts[category] += 1
+        
+        # Process comorbid modules (deduplicate by practice code/name)
+        for m in comorbid_modules:
+            seen_in_category = {}  # category -> set of practice identifiers
+            for p in m.practices:
+                pk = (
+                    (p.practice_english or '').lower().strip(),
+                    p.practice_segment
+                )
+                if pk not in contraindicated_keys:
+                    category = p.practice_segment or 'Unknown'
+                    if category not in seen_in_category:
+                        seen_in_category[category] = set()
+                    ident = p.code if getattr(p, 'code', None) else (p.practice_english or '')
+                    if ident and ident not in seen_in_category[category]:
+                        seen_in_category[category].add(ident)
+                        if category not in category_max_counts:
+                            category_max_counts[category] = 0
+                        category_max_counts[category] += 1
+        
+        # Sort categories alphabetically for display
+        sorted_categories = sorted(category_max_counts.items(), key=lambda x: x[0])
+        total_max = sum(category_max_counts.values())
+        
+        return render_template('recommendations_categories.html',
+                             major_module=major_module,
+                             comorbid_modules=comorbid_modules,
+                             category_max_counts=category_max_counts,
+                             sorted_categories=sorted_categories,
+                             total_max=total_max)
     except Exception as e:
         flash(f'Unexpected error: {str(e)}', 'error')
         import traceback
         traceback.print_exc()
-        return render_template('recommendations.html')
+        return redirect(url_for('recommendations'))
     finally:
         session.close()
 
@@ -2343,6 +3032,9 @@ def recommendations():
 # ============================================================================
 # RCT Database Routes
 # ============================================================================
+
+def calculate_age_range(mean, std_dev):
+    """Calculate age range from mean and standard deviation"""
 
 def calculate_age_range(mean, std_dev):
     """Calculate age range from mean and standard deviation"""
@@ -3560,6 +4252,21 @@ def generate_synthetic_data():
         ]
         
         for p_data in practices_data:
+            # Generate code for practice
+            practice_sanskrit = p_data.get('practice_sanskrit', '')
+            practice_code = None
+            if practice_sanskrit:
+                # Check if practice with same Sanskrit name exists
+                existing = session.query(Practice).filter(
+                    Practice.practice_sanskrit.ilike(practice_sanskrit)
+                ).first()
+                if existing and existing.code:
+                    practice_code = existing.code
+                else:
+                    practice_code = generate_practice_code(practice_sanskrit, session)
+            else:
+                practice_code = generate_practice_code(p_data['practice_english'], session)
+            
             # Always create new practice (same practice can have different CVR in different modules)
             practice = Practice(
                 practice_sanskrit=p_data.get('practice_sanskrit'),
@@ -3575,6 +4282,7 @@ def generate_synthetic_data():
                 description=p_data.get('description'),
                 how_to_do=p_data.get('how_to_do'),
                 cvr_score=p_data.get('cvr_score'),
+                code=practice_code,
                 citation_id=citations[p_data['citation']].id,
                 module_id=modules[p_data['module']].id,
                 rct_count=0

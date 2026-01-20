@@ -3,87 +3,104 @@
 {% block title %}Recommendation System{% endblock %}
 
 {% block content %}
-<h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Recommendation System</h2>
+<div style="max-width: 1200px; margin: 0 auto; padding: 0.75rem;">
+    <h2 style="font-size: 1.4rem; font-weight: 600; color: #333; margin-bottom: 0.75rem;">
+        Recommendation System
+    </h2>
 
-<form method="POST" id="recommendation-form" style="max-width: 1400px;">
-    <!-- Major Disease and Co-morbid Disease Side by Side -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+    <form method="POST" id="recommendation-form" action="{{ url_for('recommendations') }}">
         <!-- Major Disease -->
-        <div class="form-group">
-            <label for="major_module" style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
-                Major Disease *
+        <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <label for="major_module" style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                Major Disease <span style="color: #dc3545;">*</span>
             </label>
-            <div style="position: relative;">
-                <input type="text" id="major_module" name="major_module_display" 
-                       placeholder="Type disease name (e.g., Depression (Naveen et al., 2013))" 
-                       autocomplete="off" required
-                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem;">
-                <input type="hidden" id="major_module_id" name="major_module_id">
-                <div id="major-autocomplete-results" style="position: absolute; width: 100%; z-index: 1000;"></div>
+            
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: start;">
+                <div style="position: relative;">
+                    <input type="text" id="major_module" name="major_module_display" 
+                           placeholder="Type disease name (e.g., Depression (Naveen et al., 2013))" 
+                           autocomplete="off" required
+                           style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; transition: all 0.2s;">
+                    <input type="hidden" id="major_module_id" name="major_module_id">
+                    <div id="major-autocomplete-results" style="position: absolute; width: 100%; z-index: 1000; margin-top: 0.25rem;"></div>
+                </div>
+                <!-- Practice Count Display for Major Disease -->
+                <div id="major-practice-count-box" style="display: none; padding: 0.55rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; min-width: 140px; text-align: center;">
+                    <div style="font-size: 0.7rem; color: #6c757d; margin-bottom: 0.25rem;">Total Practices</div>
+                    <div id="major-practice-count" style="font-size: 1.25rem; font-weight: 600; color: #495057;">0</div>
+                </div>
             </div>
         </div>
         
         <!-- Co-morbid Diseases -->
-        <div class="form-group">
-            <label style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
-                Co-morbid Disease
+        <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                Co-morbid Diseases
             </label>
-            <!-- Tag container -->
-            <div id="comorbid-tags-container" 
-                 style="min-height: 38px; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; 
-                        background: #f8f9fa; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;">
-                <input type="text" id="comorbid_module" 
-                       placeholder="Type disease name (e.g., GAD (Naveen et al., 2017))" 
-                       autocomplete="off"
-                       style="border: none; outline: none; background: transparent; flex: 1; min-width: 150px; font-size: 0.85rem; padding: 0.2rem;">
-            </div>
-            <div id="comorbid-autocomplete-results" style="position: relative; z-index: 1000;"></div>
-        </div>
-    </div>
-    
-    <!-- Dynamic Practice Count Display -->
-    <div id="practice-counts-display" style="margin-top: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; display: none;">
-        <div id="practice-counts-content" style="color: #495057; font-size: 0.85rem;">
-            <!-- Content will be dynamically updated -->
-        </div>
-    </div>
-    
-    <!-- Number of Practices Input and Proportion Slider -->
-    <div id="practice-selection-panel" style="margin-top: 1rem; padding: 0.75rem; background: #fff; border-radius: 4px; border: 1px solid #dee2e6; display: none;">
-        <div style="display: grid; grid-template-columns: 200px 1fr; gap: 1rem; align-items: start;">
-            <div class="form-group">
-                <label for="num_practices" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
-                    Number of Practices *
-                </label>
-                <input type="number" id="num_practices" name="num_practices" min="1" 
-                       placeholder="e.g., 6"
-                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem;">
+            
+            <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.5rem; font-style: italic;">
+                    <strong>Note:</strong> User is guided to arrange comorbidities by intensity. More severe condition should come first.
+                </div>
+                <!-- Tag container -->
+                <div id="comorbid-tags-container" 
+                     style="min-height: 36px; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; 
+                            background: white; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;">
+                    <input type="text" id="comorbid_module" 
+                           placeholder="Type disease name to add (e.g., GAD (Naveen et al., 2017))" 
+                           autocomplete="off"
+                           style="border: none; outline: none; background: transparent; flex: 1; min-width: 150px; font-size: 0.85rem; padding: 0.2rem;">
+                </div>
+                <div id="comorbid-autocomplete-results" style="position: relative; z-index: 1000; margin-top: 0.3rem;"></div>
             </div>
             
-            <div class="form-group">
-                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; display: block;">
-                    Proportion Split
-                </label>
-                <div id="proportion-slider-container" style="margin-bottom: 0.4rem;">
-                    <!-- Slider will be dynamically generated -->
-                </div>
-                <div id="proportion-display" style="padding: 0.4rem; background: #e7f3ff; border-radius: 4px;">
-                    <span id="proportion-text" style="font-size: 0.8rem; color: #495057;"></span>
-                </div>
-                <input type="hidden" id="proportion_percentage" name="proportion_percentage" value="50">
+            <!-- Comorbid Diseases List with Practice Counts and Inputs -->
+            <div id="comorbid-diseases-list" style="display: none;">
+                <!-- Will be populated dynamically -->
             </div>
         </div>
-    </div>
-    
-    <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
-        <button type="submit" id="generate-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" disabled>
-            Generate Practice Plan
-        </button>
-        <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">
-            Clear
-        </button>
-    </div>
-</form>
+
+        <!-- Weightage (Sum = 100) -->
+        <div id="allocation-panel" style="display:none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start;">
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem;">
+                        Step 2: Give weightage (Total = 100)
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.75rem; font-style: italic;">
+                        Extra practices (from rounding) go to the <strong>major disease</strong>, then comorbidities in the order you added them.
+                    </div>
+                </div>
+                <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; min-width: 150px;">
+                    <div style="font-size: 0.7rem; color: #6c757d; margin-bottom: 0.25rem;">Weight total</div>
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem;">
+                        <div id="weight-total" style="font-size: 1.05rem; font-weight: 700; color: #495057;">0</div>
+                        <div style="font-size:0.75rem; color:#6c757d;">/ 100</div>
+                    </div>
+                    <div id="weight-total-status" style="font-size:0.75rem; color:#6c757d; margin-top:0.25rem;"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
+                <div id="partition-slider-wrap" style="display:none;">
+                    <div id="partition-slider" style="position: relative; height: 14px; border-radius: 8px; border: 1px solid #dee2e6; background: #f0f0f0; overflow: hidden;"></div>
+                    <div id="partition-handles" style="position: relative; height: 0;"></div>
+                </div>
+                <div id="weights-legend" style="margin-top: 0.75rem; display:flex; flex-direction:column; gap:0.35rem;"></div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
+            <button type="submit" id="continue-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" disabled>
+                Continue to Category Selection
+            </button>
+            <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">
+                Clear
+            </button>
+        </div>
+    </form>
+</div>
 
 <script>
 // Major Disease Autocomplete
@@ -94,19 +111,54 @@ const majorInput = document.getElementById('major_module');
 const majorIdInput = document.getElementById('major_module_id');
 const majorAutocompleteDiv = document.getElementById('major-autocomplete-results');
 
+// Co-morbid Diseases Autocomplete (Tag-based)
+let comorbidModules = []; // ordered by intensity (order added)
+let comorbidAutocompleteTimeout;
+let currentComorbidModules = [];
+let selectedComorbidIndex = -1;
+const comorbidInput = document.getElementById('comorbid_module');
+const comorbidAutocompleteDiv = document.getElementById('comorbid-autocomplete-results');
+const comorbidTagsContainer = document.getElementById('comorbid-tags-container');
+
+let practiceCountsData = null;
+let weightRows = []; // { key, module_id, label, weight }
+let partitionStops = []; // N-1 integers in [0..100], sorted; partitions define weights
+let countsLoading = false;
+
+function clampInt(v, min, max) {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return min;
+    return Math.max(min, Math.min(max, n));
+}
+
+// ---------------- Major autocomplete ----------------
+majorInput.addEventListener('focus', function() {
+    this.style.borderColor = '#667eea';
+    this.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.1)';
+});
+majorInput.addEventListener('blur', function() {
+    this.style.borderColor = '#ddd';
+    this.style.boxShadow = 'none';
+});
+
 majorInput.addEventListener('input', function() {
     clearTimeout(majorAutocompleteTimeout);
     const query = this.value.trim();
     selectedMajorIndex = -1;
-    
+
     if (query.length < 1) {
         majorAutocompleteDiv.innerHTML = '';
         currentMajorModules = [];
         majorIdInput.value = '';
-        updatePracticeCounts(); // Clear practice counts when major module is cleared
+        practiceCountsData = null;
+        document.getElementById('major-practice-count-box').style.display = 'none';
+        document.getElementById('allocation-panel').style.display = 'none';
+        document.getElementById('comorbid-diseases-list').style.display = 'none';
+        document.getElementById('comorbid-diseases-list').innerHTML = '';
+        updateGenerateButton();
         return;
     }
-    
+
     majorAutocompleteTimeout = setTimeout(() => {
         fetch(`/api/module/search/recommendation?q=${encodeURIComponent(query)}`)
             .then(response => response.json())
@@ -114,30 +166,28 @@ majorInput.addEventListener('input', function() {
                 currentMajorModules = data;
                 displayMajorAutocompleteResults(data);
             });
-    }, 300);
+    }, 250);
 });
 
 majorInput.addEventListener('keydown', function(e) {
     if (majorAutocompleteDiv.innerHTML === '') return;
-    
+
     const items = majorAutocompleteDiv.querySelectorAll('.autocomplete-item');
-    
     switch(e.key) {
         case 'ArrowDown':
             e.preventDefault();
             selectedMajorIndex = Math.min(selectedMajorIndex + 1, items.length - 1);
-            updateMajorSelection(items, selectedMajorIndex);
+            updateSelection(items, selectedMajorIndex);
             break;
         case 'ArrowUp':
             e.preventDefault();
             selectedMajorIndex = Math.max(selectedMajorIndex - 1, -1);
-            updateMajorSelection(items, selectedMajorIndex);
+            updateSelection(items, selectedMajorIndex);
             break;
         case 'Enter':
             e.preventDefault();
             if (selectedMajorIndex >= 0 && selectedMajorIndex < items.length) {
                 selectMajorModule(currentMajorModules[selectedMajorIndex]);
-                majorInput.focus();
             }
             break;
         case 'Escape':
@@ -149,25 +199,26 @@ majorInput.addEventListener('keydown', function(e) {
 });
 
 function displayMajorAutocompleteResults(modules) {
-    if (modules.length === 0) {
+    if (!modules.length) {
         majorAutocompleteDiv.innerHTML = '';
         return;
     }
-    
-    majorAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 0.85rem;">' +
+
+    majorAutocompleteDiv.innerHTML =
+        '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 0.85rem;">' +
         modules.map((m, index) => {
             const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
             return `
-            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;"
                  onclick="selectMajorModuleFromString('${escaped}')" data-index="${index}">
-                <strong>${m.display_name}</strong>
+                <strong style="color: #333;">${m.display_name}</strong>
             </div>
-        `;
+            `;
         }).join('') +
         '</div>';
 }
 
-function updateMajorSelection(items, index) {
+function updateSelection(items, index) {
     items.forEach((item, idx) => {
         if (idx === index) {
             item.style.backgroundColor = '#e3f2fd';
@@ -192,60 +243,53 @@ function selectMajorModuleFromString(moduleStr) {
     const module = JSON.parse(moduleStr.replace(/&quot;/g, '"'));
     selectMajorModule(module);
 }
+window.selectMajorModuleFromString = selectMajorModuleFromString;
 
-// Co-morbid Diseases Autocomplete (Tag-based)
-let comorbidModules = []; // Array of {module_id, display_name, disease_name, module_name}
-let comorbidAutocompleteTimeout;
-let currentComorbidModules = [];
-let selectedComorbidIndex = -1;
-const comorbidInput = document.getElementById('comorbid_module');
-const comorbidAutocompleteDiv = document.getElementById('comorbid-autocomplete-results');
-const comorbidTagsContainer = document.getElementById('comorbid-tags-container');
-
+// ---------------- Comorbid autocomplete ----------------
 comorbidInput.addEventListener('input', function() {
     clearTimeout(comorbidAutocompleteTimeout);
     const query = this.value.trim();
     selectedComorbidIndex = -1;
-    
+
     if (query.length < 1) {
         comorbidAutocompleteDiv.innerHTML = '';
         currentComorbidModules = [];
         return;
     }
-    
+
     comorbidAutocompleteTimeout = setTimeout(() => {
         fetch(`/api/module/search/recommendation?q=${encodeURIComponent(query)}`)
             .then(response => response.json())
             .then(data => {
-                // Filter out already selected modules
                 const selectedIds = new Set(comorbidModules.map(m => m.module_id));
-                currentComorbidModules = data.filter(m => !selectedIds.has(m.module_id));
+                const majorModuleId = majorIdInput.value;
+                currentComorbidModules = data.filter(m =>
+                    !selectedIds.has(m.module_id) && String(m.module_id) !== String(majorModuleId)
+                );
                 displayComorbidAutocompleteResults(currentComorbidModules);
             });
-    }, 300);
+    }, 250);
 });
 
 comorbidInput.addEventListener('keydown', function(e) {
     if (comorbidAutocompleteDiv.innerHTML === '') return;
-    
+
     const items = comorbidAutocompleteDiv.querySelectorAll('.autocomplete-item');
-    
     switch(e.key) {
         case 'ArrowDown':
             e.preventDefault();
             selectedComorbidIndex = Math.min(selectedComorbidIndex + 1, items.length - 1);
-            updateComorbidSelection(items, selectedComorbidIndex);
+            updateSelection(items, selectedComorbidIndex);
             break;
         case 'ArrowUp':
             e.preventDefault();
             selectedComorbidIndex = Math.max(selectedComorbidIndex - 1, -1);
-            updateComorbidSelection(items, selectedComorbidIndex);
+            updateSelection(items, selectedComorbidIndex);
             break;
         case 'Enter':
             e.preventDefault();
             if (selectedComorbidIndex >= 0 && selectedComorbidIndex < items.length) {
                 selectComorbidModule(currentComorbidModules[selectedComorbidIndex]);
-                comorbidInput.focus();
             }
             break;
         case 'Escape':
@@ -257,95 +301,66 @@ comorbidInput.addEventListener('keydown', function(e) {
 });
 
 function displayComorbidAutocompleteResults(modules) {
-    if (modules.length === 0) {
+    if (!modules.length) {
         comorbidAutocompleteDiv.innerHTML = '';
         return;
     }
-    
-    comorbidAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: absolute; width: 100%; margin-top: 0.3rem; font-size: 0.85rem;">' +
+    comorbidAutocompleteDiv.innerHTML =
+        '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: absolute; width: 100%; margin-top: 0.3rem; font-size: 0.85rem;">' +
         modules.map((m, index) => {
             const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
             return `
-            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;"
                  onclick="selectComorbidModuleFromString('${escaped}')" data-index="${index}">
-                <strong>${m.display_name}</strong>
+                <strong style="color: #333;">${m.display_name}</strong>
             </div>
-        `;
+            `;
         }).join('') +
         '</div>';
 }
 
-function updateComorbidSelection(items, index) {
-    items.forEach((item, idx) => {
-        if (idx === index) {
-            item.style.backgroundColor = '#e3f2fd';
-            item.style.borderLeft = '3px solid #2196f3';
-        } else {
-            item.style.backgroundColor = '';
-            item.style.borderLeft = '';
-        }
-    });
-}
-
 function selectComorbidModule(module) {
-    // Add to array
     comorbidModules.push(module);
-    
-    // Create tag
+
     const tag = document.createElement('div');
     tag.className = 'comorbid-tag';
     tag.dataset.moduleId = module.module_id;
     tag.style.cssText = 'display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.5rem; background: #667eea; color: white; border-radius: 12px; font-size: 0.75rem;';
     tag.innerHTML = `
         <span>${module.display_name}</span>
-        <button type="button" onclick="removeComorbidModule(${module.module_id})" 
+        <button type="button" onclick="removeComorbidModule(${module.module_id})"
                 style="background: rgba(255,255,255,0.3); border: none; color: white; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; font-size: 0.7rem; line-height: 1; padding: 0;">
             ×
         </button>
     `;
-    
-    // Insert before input
+
     comorbidTagsContainer.insertBefore(tag, comorbidInput);
-    
-    // Clear input
     comorbidInput.value = '';
     comorbidAutocompleteDiv.innerHTML = '';
     currentComorbidModules = [];
     selectedComorbidIndex = -1;
-    
-    // Update hidden inputs
     updateComorbidHiddenInputs();
-    
-    // Update practice counts
     updatePracticeCounts();
-    
-    // Refocus input
-    setTimeout(() => comorbidInput.focus(), 100);
+    setTimeout(() => comorbidInput.focus(), 50);
 }
 
 function selectComorbidModuleFromString(moduleStr) {
     const module = JSON.parse(moduleStr.replace(/&quot;/g, '"'));
     selectComorbidModule(module);
 }
+window.selectComorbidModuleFromString = selectComorbidModuleFromString;
 
 function removeComorbidModule(moduleId) {
     comorbidModules = comorbidModules.filter(m => m.module_id !== moduleId);
-    
-    // Remove tag by data attribute
     const tag = comorbidTagsContainer.querySelector(`.comorbid-tag[data-module-id="${moduleId}"]`);
-    if (tag) {
-        tag.remove();
-    }
-    
+    if (tag) tag.remove();
     updateComorbidHiddenInputs();
     updatePracticeCounts();
 }
+window.removeComorbidModule = removeComorbidModule;
 
 function updateComorbidHiddenInputs() {
-    // Remove existing hidden inputs
     document.querySelectorAll('input[name="comorbid_module_ids"]').forEach(input => input.remove());
-    
-    // Add new hidden inputs
     comorbidModules.forEach(module => {
         const input = document.createElement('input');
         input.type = 'hidden';
@@ -355,359 +370,353 @@ function updateComorbidHiddenInputs() {
     });
 }
 
-function clearForm() {
-    majorInput.value = '';
-    majorIdInput.value = '';
-    comorbidInput.value = '';
-    comorbidModules = [];
-    comorbidTagsContainer.querySelectorAll('.comorbid-tag').forEach(tag => tag.remove());
-    updateComorbidHiddenInputs();
-    majorAutocompleteDiv.innerHTML = '';
-    comorbidAutocompleteDiv.innerHTML = '';
-    document.getElementById('practice-counts-display').style.display = 'none';
-    document.getElementById('practice-selection-panel').style.display = 'none';
-    document.getElementById('generate-btn').disabled = true;
-    document.getElementById('num_practices').value = '';
+// ---------------- Weights UI ----------------
+function weightsFromStops(stops) {
+    if (weightRows.length === 0) return [];
+    if (weightRows.length === 1) return [100];
+    const s = [...stops].sort((a,b)=>a-b).map(x => clampInt(x, 0, 100));
+    const weights = [];
+    let prev = 0;
+    for (let i = 0; i < s.length; i++) {
+        weights.push(s[i] - prev);
+        prev = s[i];
+    }
+    weights.push(100 - prev);
+    return weights;
 }
 
-// Close autocomplete when clicking outside
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('#major_module') && !e.target.closest('#major-autocomplete-results')) {
-        majorAutocompleteDiv.innerHTML = '';
-        currentMajorModules = [];
-        selectedMajorIndex = -1;
+function stopsFromWeights(weights) {
+    if (weights.length <= 1) return [];
+    const stops = [];
+    let acc = 0;
+    for (let i = 0; i < weights.length - 1; i++) {
+        acc += weights[i];
+        stops.push(acc);
     }
-    
-    if (!e.target.closest('#comorbid_module') && !e.target.closest('#comorbid-autocomplete-results') && !e.target.closest('.comorbid-tag')) {
-        comorbidAutocompleteDiv.innerHTML = '';
-        currentComorbidModules = [];
-        selectedComorbidIndex = -1;
-    }
-});
+    return stops;
+}
 
-// Initialize: Check if modules are already selected on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if major module is already selected
-    if (majorIdInput.value) {
-        updatePracticeCounts();
+function setWeightsFromStops() {
+    const weights = weightsFromStops(partitionStops);
+    // Normalize to ensure they sum to exactly 100
+    const sum = weights.reduce((s, w) => s + (w || 0), 0);
+    if (sum > 0) {
+        // Round each weight and adjust the last one to ensure sum = 100
+        let normalized = weights.map(w => Math.round(w || 0));
+        const normalizedSum = normalized.reduce((s, w) => s + w, 0);
+        const diff = 100 - normalizedSum;
+        if (diff !== 0 && normalized.length > 0) {
+            // Adjust the largest weight to make sum exactly 100
+            const maxIdx = normalized.reduce((maxIdx, w, i) => w > normalized[maxIdx] ? i : maxIdx, 0);
+            normalized[maxIdx] += diff;
+        }
+        for (let i = 0; i < weightRows.length; i++) {
+            weightRows[i].weight = normalized[i] || 0;
+        }
+    } else {
+        for (let i = 0; i < weightRows.length; i++) {
+            weightRows[i].weight = weights[i] || 0;
+        }
     }
-});
+    // Update button after weights change
+    updateGenerateButton();
+}
 
-// Practice counts and proportion management
-let practiceCountsData = null;
+function renderPartitionSlider() {
+    const wrap = document.getElementById('partition-slider-wrap');
+    const bar = document.getElementById('partition-slider');
+    const handlesLayer = document.getElementById('partition-handles');
+    const legend = document.getElementById('weights-legend');
+    if (!wrap || !bar || !handlesLayer || !legend) return;
+
+    // Hide if only one disease
+    wrap.style.display = weightRows.length ? 'block' : 'none';
+    document.getElementById('partition-slider-wrap').style.display = weightRows.length ? 'block' : 'none';
+    bar.innerHTML = '';
+    handlesLayer.innerHTML = '';
+    legend.innerHTML = '';
+
+    if (weightRows.length === 0) return;
+    if (weightRows.length === 1) {
+        partitionStops = [];
+        weightRows[0].weight = 100;
+    }
+
+    setWeightsFromStops();
+
+    // remove old hidden weight inputs
+    document.querySelectorAll('input[data-weight-hidden="1"]').forEach(i => i.remove());
+
+    const colors = ['#667eea', '#9aa7ff', '#c2c9ff', '#e0e5ff', '#f0f2ff'];
+    const weights = weightRows.map(r => r.weight);
+
+    // segments
+    let left = 0;
+    for (let i = 0; i < weights.length; i++) {
+        const seg = document.createElement('div');
+        const w = Math.max(0, weights[i]);
+        seg.style.cssText = `position:absolute; top:0; bottom:0; left:${left}%; width:${w}%; background:${colors[i % colors.length]}; opacity:0.22;`;
+        bar.appendChild(seg);
+        left += w;
+    }
+
+    // handles
+    const createHandle = (idx) => {
+        const h = document.createElement('div');
+        h.className = 'partition-handle';
+        h.dataset.idx = String(idx);
+        h.style.cssText = `
+          position:absolute;
+          top: -9px;
+          left: calc(${partitionStops[idx]}% - 7px);
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #667eea;
+          border: 2px solid white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          cursor: ew-resize;
+        `;
+        handlesLayer.appendChild(h);
+    };
+    for (let i = 0; i < partitionStops.length; i++) createHandle(i);
+
+    // legend rows + hidden inputs
+    for (let i = 0; i < weightRows.length; i++) {
+        const row = weightRows[i];
+        const line = document.createElement('div');
+        line.style.cssText = 'display:flex; justify-content:space-between; gap:0.75rem; align-items:center;';
+        const name = document.createElement('div');
+        name.style.cssText = 'font-size:0.85rem; font-weight:600; color:#495057; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;';
+        name.title = row.label;
+        name.textContent = row.label;
+        const pct = document.createElement('div');
+        pct.style.cssText = `font-size:0.8rem; color:#495057; padding:0.15rem 0.4rem; border:1px solid #dee2e6; border-radius:999px; background:white;`;
+        pct.textContent = `${Math.round(row.weight || 0)}%`;
+        line.appendChild(name);
+        line.appendChild(pct);
+        legend.appendChild(line);
+
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.dataset.weightHidden = '1';
+        hidden.name = row.key === 'major' ? 'weight_major' : `weight_module_${row.module_id}`;
+        hidden.value = String(Math.round(row.weight || 0));
+        document.getElementById('recommendation-form').appendChild(hidden);
+    }
+
+    const total = weightRows.reduce((s, r) => s + Math.round(r.weight || 0), 0);
+    document.getElementById('weight-total').textContent = String(total);
+    document.getElementById('weight-total-status').textContent = total === 100 ? 'OK' : 'Must be 100';
+}
+
+let dragIdx = null;
+function bindPartitionDrag() {
+    const bar = document.getElementById('partition-slider');
+    const handlesLayer = document.getElementById('partition-handles');
+    if (!bar || !handlesLayer) return;
+
+    function onDown(e) {
+        const t = e.target;
+        if (!t || !t.classList || !t.classList.contains('partition-handle')) return;
+        dragIdx = parseInt(t.dataset.idx, 10);
+        e.preventDefault();
+    }
+    function onMove(e) {
+        if (dragIdx === null) return;
+        const rect = bar.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        let pct = Math.round(x * 100);
+        const minBound = dragIdx === 0 ? 0 : partitionStops[dragIdx - 1];
+        const maxBound = dragIdx === partitionStops.length - 1 ? 100 : partitionStops[dragIdx + 1];
+        // keep at least 1% gap so handles don't overlap visually
+        pct = clampInt(pct, minBound + 1, maxBound - 1);
+        partitionStops[dragIdx] = pct;
+        renderPartitionSlider();
+        updateGenerateButton();
+    }
+    function onUp() { dragIdx = null; }
+
+    handlesLayer.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+}
+
+function initOrUpdateWeights() {
+    if (!practiceCountsData) return;
+    const majorLabel = practiceCountsData.major_module?.display_name || 'Major';
+    const comorbids = practiceCountsData.comorbid_modules || [];
+
+    const next = [];
+    next.push({ key: 'major', module_id: practiceCountsData.major_module?.module_id, label: majorLabel, weight: 0 });
+    comorbids.forEach(m => next.push({ key: `m_${m.module_id}`, module_id: m.module_id, label: m.display_name, weight: 0 }));
+
+    // preserve old weights if possible
+    const prev = {};
+    weightRows.forEach(r => { prev[r.key] = r.weight; });
+    next.forEach(r => { r.weight = (typeof prev[r.key] === 'number') ? prev[r.key] : 0; });
+
+    const sum = next.reduce((s, r) => s + (r.weight || 0), 0);
+    if (sum === 0) {
+        if (next.length === 1) {
+            next[0].weight = 100;
+        } else {
+            // default: give major 60, spread rest equally
+            next[0].weight = 60;
+            const remaining = 40;
+            const each = Math.floor(remaining / (next.length - 1));
+            let rem = remaining - each * (next.length - 1);
+            for (let i = 1; i < next.length; i++) {
+                next[i].weight = each + (rem > 0 ? 1 : 0);
+                rem = Math.max(0, rem - 1);
+            }
+        }
+    }
+
+    weightRows = next;
+    partitionStops = stopsFromWeights(weightRows.map(r => r.weight));
+    renderPartitionSlider();
+    // Update button state after weights are initialized
+    updateGenerateButton();
+}
+
+// ---------------- Practice counts + panels ----------------
+function displayComorbidDiseasesList(comorbidModulesData) {
+    const container = document.getElementById('comorbid-diseases-list');
+    if (!comorbidModulesData || comorbidModulesData.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+    container.style.display = 'block';
+
+    const moduleMap = {};
+    comorbidModulesData.forEach(m => { moduleMap[m.module_id] = m; });
+
+    let html = '<div style="display:flex; flex-direction:column; gap:0.5rem;">';
+    comorbidModules.forEach(module => {
+        const d = moduleMap[module.module_id];
+        if (!d) return;
+        html += `
+          <div style="padding:0.6rem 0.75rem; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; display:flex; justify-content:space-between; gap:0.75rem; align-items:center;">
+            <div style="font-size:0.85rem; font-weight:600; color:#495057;">${module.display_name}</div>
+            <div style="padding:0.35rem 0.5rem; border:1px solid #dee2e6; border-radius:4px; background:white; min-width:120px; text-align:center;">
+              <div style="font-size:0.7rem; color:#6c757d;">Available</div>
+              <div style="font-size:1rem; font-weight:700; color:#495057;">${d.practice_count}</div>
+            </div>
+          </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
 
 function updatePracticeCounts() {
     const majorModuleId = majorIdInput.value;
     const comorbidModuleIds = comorbidModules.map(m => m.module_id);
-    
+
     if (!majorModuleId) {
-        document.getElementById('practice-counts-display').style.display = 'none';
-        document.getElementById('practice-selection-panel').style.display = 'none';
-        document.getElementById('generate-btn').disabled = true;
+        document.getElementById('major-practice-count-box').style.display = 'none';
+        document.getElementById('allocation-panel').style.display = 'none';
+        document.getElementById('continue-btn').disabled = true;
         return;
     }
-    
+
+    countsLoading = true;
+    // Disable the continue button while counts are loading to prevent premature submit
+    const continueBtn = document.getElementById('continue-btn');
+    if (continueBtn) {
+        continueBtn.disabled = true;
+    }
+
     fetch('/api/module/practice-counts', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            major_module_id: parseInt(majorModuleId),
-            comorbid_module_ids: comorbidModuleIds.map(id => parseInt(id))
+            major_module_id: parseInt(majorModuleId, 10),
+            comorbid_module_ids: comorbidModuleIds.map(id => parseInt(id, 10))
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
+    .then(r => r.json())
     .then(data => {
         if (data.error) {
             console.error('Error fetching practice counts:', data.error);
             alert('Error fetching practice counts: ' + data.error);
+            countsLoading = false;
             return;
         }
-        
+
         practiceCountsData = data;
-        displayPracticeCounts(data);
-        updateProportionSlider();
-        
-        // Enable/disable generate button based on available practices
-        if (data.total_practices > 0) {
-            document.getElementById('practice-selection-panel').style.display = 'block';
-        } else {
-            document.getElementById('practice-selection-panel').style.display = 'none';
-            document.getElementById('generate-btn').disabled = true;
-        }
+        countsLoading = false;
+
+        document.getElementById('major-practice-count').textContent = data.major_module.practice_count;
+        document.getElementById('major-practice-count-box').style.display = 'block';
+
+        // allocation panel setup
+        document.getElementById('allocation-panel').style.display = 'block';
+
+        displayComorbidDiseasesList(data.comorbid_modules || []);
+        initOrUpdateWeights();
+        bindPartitionDrag();
+        updateGenerateButton();
     })
-    .catch(error => {
-        console.error('Error fetching practice counts:', error);
+    .catch(err => {
+        console.error(err);
         alert('Error fetching practice counts. Please check console for details.');
+        countsLoading = false;
+        updateGenerateButton();
     });
 }
 
-function displayPracticeCounts(data) {
-    const displayDiv = document.getElementById('practice-counts-display');
-    const contentDiv = document.getElementById('practice-counts-content');
+function updateGenerateButton() {
+    const majorModuleId = majorIdInput.value;
+    const btn = document.getElementById('continue-btn');
     
-    const totalComorbid = data.comorbid_modules && data.comorbid_modules.length > 0 
-        ? data.comorbid_modules.reduce((sum, m) => sum + m.practice_count, 0) 
-        : 0;
-    
-    let html = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; align-items: start;">
-            <div>
-                <strong style="font-size: 0.85rem;">Total Practices:</strong>
-                <span style="font-size: 0.85rem; color: #667eea; margin-left: 0.3rem; font-weight: 600;">${data.total_practices}</span>
-            </div>
-            <div>
-                <strong style="font-size: 0.85rem;">Contraindications:</strong>
-                <span style="font-size: 0.85rem; color: #dc3545; margin-left: 0.3rem; font-weight: 600;">${data.total_contraindications}</span>
-            </div>
-            <div>
-                <strong style="font-size: 0.85rem;">Major:</strong>
-                <span style="font-size: 0.85rem; color: #495057; margin-left: 0.3rem;">${data.major_module.practice_count} practices</span>
-            </div>
-            ${totalComorbid > 0 ? `
-            <div>
-                <strong style="font-size: 0.85rem;">Co-morbid:</strong>
-                <span style="font-size: 0.85rem; color: #495057; margin-left: 0.3rem;">${totalComorbid} practices</span>
-            </div>
-            ` : ''}
-        </div>
-    `;
-    
-    contentDiv.innerHTML = html;
-    displayDiv.style.display = 'block';
-}
-
-let numPracticesInputListener = null;
-
-function updateProportionSlider() {
-    if (!practiceCountsData) {
-        const sliderContainer = document.getElementById('proportion-slider-container');
-        sliderContainer.innerHTML = '<div style="color: #666; padding: 0.3rem; font-size: 0.8rem;">Please select modules first</div>';
+    // If loading or no major module, disable
+    if (countsLoading || !majorModuleId || !practiceCountsData) {
+        btn.disabled = true;
+        if (btn.disabled) {
+            console.log('Button disabled: countsLoading=', countsLoading, 'majorModuleId=', majorModuleId, 'practiceCountsData=', !!practiceCountsData);
+        }
         return;
     }
-    
-    const numPracticesInput = document.getElementById('num_practices');
-    
-    // Remove old event listener if it exists
-    if (numPracticesInputListener) {
-        numPracticesInput.removeEventListener('input', numPracticesInputListener);
-    }
-    
-    // Add new event listener
-    numPracticesInputListener = function() {
-        generateProportionSlider();
-    };
-    numPracticesInput.addEventListener('input', numPracticesInputListener);
-    
-    // Only generate slider if a number is already entered
-    const currentValue = parseInt(numPracticesInput.value) || 0;
-    if (currentValue > 0) {
-        generateProportionSlider();
-    } else {
-        const sliderContainer = document.getElementById('proportion-slider-container');
-        sliderContainer.innerHTML = '<div style="color: #666; padding: 0.3rem; font-size: 0.8rem;">Enter number of practices above to see proportion options</div>';
-        document.getElementById('proportion-text').textContent = '';
-        document.getElementById('generate-btn').disabled = true;
-    }
-}
 
-function generateProportionSlider() {
-    if (!practiceCountsData) {
+    // If no weight rows initialized yet, wait a bit and try again
+    if (!weightRows || weightRows.length === 0) {
+        btn.disabled = true;
+        console.log('Button disabled: weightRows not initialized yet');
+        // Try to initialize weights if we have practice counts data
+        if (practiceCountsData) {
+            setTimeout(function() {
+                initOrUpdateWeights();
+                updateGenerateButton();
+            }, 100);
+        }
         return;
     }
-    
-    const numPractices = parseInt(document.getElementById('num_practices').value) || 0;
-    const majorCount = practiceCountsData.major_module.practice_count;
-    const comorbidCount = (practiceCountsData.comorbid_modules && practiceCountsData.comorbid_modules.length > 0) 
-        ? practiceCountsData.comorbid_modules.reduce((sum, m) => sum + m.practice_count, 0) 
-        : 0;
-    
-    const sliderContainer = document.getElementById('proportion-slider-container');
-    const proportionDisplay = document.getElementById('proportion-text');
-    const proportionInput = document.getElementById('proportion_percentage');
-    const generateBtn = document.getElementById('generate-btn');
-    
-    if (numPractices <= 0 || numPractices > practiceCountsData.total_practices) {
-        sliderContainer.innerHTML = '<div style="color: #dc3545; padding: 0.3rem; font-size: 0.8rem;">Please enter a valid number of practices (1-' + practiceCountsData.total_practices + ')</div>';
-        proportionDisplay.textContent = '';
-        generateBtn.disabled = true;
-        return;
+
+    const totalWeight = weightRows.reduce((s, r) => s + Math.round(r.weight || 0), 0);
+    if (document.getElementById('weight-total')) {
+        document.getElementById('weight-total').textContent = String(totalWeight);
     }
-    
-    // Calculate achievable percentages based on available practices
-    const achievablePercentages = [];
-    
-    // If no comorbid modules, only 100% from major is possible
-    if (comorbidCount === 0 || practiceCountsData.comorbid_modules.length === 0) {
-        if (numPractices <= majorCount) {
-            achievablePercentages.push({
-                percentage: 100,
-                major: numPractices,
-                comorbid: 0
-            });
-        }
-    } else {
-        // Normal case: both major and comorbid available
-        for (let majorPractices = 0; majorPractices <= numPractices; majorPractices++) {
-            const comorbidPractices = numPractices - majorPractices;
-            
-            // Check if this split is achievable
-            if (majorPractices <= majorCount && comorbidPractices <= comorbidCount) {
-                const percentage = Math.round((majorPractices / numPractices) * 100 * 100) / 100;
-                achievablePercentages.push({
-                    percentage: percentage,
-                    major: majorPractices,
-                    comorbid: comorbidPractices
-                });
-            }
-        }
+    if (document.getElementById('weight-total-status')) {
+        document.getElementById('weight-total-status').textContent = totalWeight === 100 ? 'OK' : 'Must be 100';
     }
+
+    // Enable button if weights total 100 (with small tolerance for floating point)
+    const shouldEnable = Math.abs(totalWeight - 100) <= 0.5;
+    btn.disabled = !shouldEnable;
     
-    if (achievablePercentages.length === 0) {
-        sliderContainer.innerHTML = '<div style="color: #dc3545; padding: 0.3rem; font-size: 0.8rem;">Cannot generate plan with ' + numPractices + ' practices. Available: Major=' + majorCount + ', Co-morbid=' + comorbidCount + '</div>';
-        proportionDisplay.textContent = '';
-        generateBtn.disabled = true;
-        return;
-    }
-    
-    // Create range input slider with step based on achievable percentages
-    // For simplicity, we'll use a continuous slider but validate on the backend
-    // Alternatively, we can create a custom slider with only valid points
-    const minPercentage = achievablePercentages[0].percentage;
-    const maxPercentage = achievablePercentages[achievablePercentages.length - 1].percentage;
-    
-    // Use a step that ensures we can hit each achievable percentage
-    // Calculate step size: find the smallest difference between consecutive percentages
-    let minStep = 100;
-    for (let i = 1; i < achievablePercentages.length; i++) {
-        const step = achievablePercentages[i].percentage - achievablePercentages[i - 1].percentage;
-        if (step > 0 && step < minStep) {
-            minStep = step;
-        }
-    }
-    
-    // If minStep is too small (like 0.01), use a larger step for usability
-    // If only one option, use that directly
-    let actualStep = 1;
-    let defaultValue = minPercentage;
-    
-    if (achievablePercentages.length === 1) {
-        defaultValue = achievablePercentages[0].percentage;
-    } else if (achievablePercentages.length > 1) {
-        actualStep = minStep < 1 ? Math.max(0.01, 100 / (achievablePercentages.length - 1)) : minStep;
-        defaultValue = Math.round((minPercentage + maxPercentage) / 2);
-        // Find closest achievable percentage to the calculated default
-        let closestToDefault = achievablePercentages[0];
-        let minDiffFromDefault = Math.abs(defaultValue - closestToDefault.percentage);
-        for (const ap of achievablePercentages) {
-            const diff = Math.abs(defaultValue - ap.percentage);
-            if (diff < minDiffFromDefault) {
-                minDiffFromDefault = diff;
-                closestToDefault = ap;
-            }
-        }
-        defaultValue = closestToDefault.percentage;
-    }
-    
-    const maxLabel = achievablePercentages.length > 0 ? achievablePercentages[achievablePercentages.length - 1] : achievablePercentages[0];
-    const minLabel = achievablePercentages[0];
-    
-    let sliderHtml = '';
-    if (achievablePercentages.length === 1) {
-        // Only one option, show as fixed value
-        sliderHtml = `
-            <div style="padding: 0.4rem; background: #e7f3ff; border-radius: 4px; text-align: center; font-size: 0.8rem;">
-                <strong>Fixed Split:</strong> ${minLabel.major} practices from Major Disease (100%) and 0 from Co-morbid Diseases
-            </div>
-        `;
-    } else {
-        sliderHtml = `
-            <input type="range" id="proportion-slider" min="${minPercentage}" max="${maxPercentage}" 
-                   step="${actualStep}" value="${defaultValue}" 
-                   style="width: 100%; height: 6px; border-radius: 3px; outline: none; background: #ddd;">
-            <div style="display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: 0.75rem; color: #666;">
-                <span>${minPercentage.toFixed(2)}% (${minLabel.major} major, ${minLabel.comorbid} co-morbid)</span>
-                <span>${maxPercentage.toFixed(2)}% (${maxLabel.major} major, ${maxLabel.comorbid} co-morbid)</span>
-            </div>
-        `;
-    }
-    
-    sliderContainer.innerHTML = sliderHtml;
-    
-    // Store achievable percentages for validation
-    window.achievablePercentages = achievablePercentages;
-    
-    const slider = document.getElementById('proportion-slider');
-    if (slider) {
-        // Remove old listeners if any
-        const newSlider = slider.cloneNode(true);
-        slider.parentNode.replaceChild(newSlider, slider);
-        
-        // Add event listener to new slider
-        document.getElementById('proportion-slider').addEventListener('input', function() {
-            updateProportionDisplay(this.value, achievablePercentages, numPractices, majorCount, comorbidCount);
-        });
-        
-        // Initialize display
-        updateProportionDisplay(defaultValue, achievablePercentages, numPractices, majorCount, comorbidCount);
-    } else {
-        // Single option case - set values directly
-        if (achievablePercentages.length === 1) {
-            const ap = achievablePercentages[0];
-            document.getElementById('proportion_percentage').value = ap.percentage;
-            document.getElementById('proportion-text').innerHTML = `
-                <strong>Split:</strong> ${ap.major} major (${ap.percentage.toFixed(2)}%) / ${ap.comorbid} co-morbid (${(100 - ap.percentage).toFixed(2)}%)
-            `;
-            generateBtn.disabled = false;
-        }
-    }
+    console.log('updateGenerateButton:', {
+        totalWeight: totalWeight,
+        shouldEnable: shouldEnable,
+        weightRows: weightRows,
+        buttonDisabled: btn.disabled
+    });
 }
 
-function updateProportionDisplay(sliderValue, achievablePercentages, numPractices, majorCount, comorbidCount) {
-    const proportionDisplay = document.getElementById('proportion-text');
-    const proportionInput = document.getElementById('proportion_percentage');
-    const generateBtn = document.getElementById('generate-btn');
-    
-    // Find the closest achievable percentage
-    const targetPercentage = parseFloat(sliderValue);
-    let closest = achievablePercentages[0];
-    let minDiff = Math.abs(targetPercentage - closest.percentage);
-    
-    for (const ap of achievablePercentages) {
-        const diff = Math.abs(targetPercentage - ap.percentage);
-        if (diff < minDiff) {
-            minDiff = diff;
-            closest = ap;
-        }
-    }
-    
-    // Validate the closest split
-    if (closest.major <= majorCount && closest.comorbid <= comorbidCount) {
-        proportionInput.value = closest.percentage;
-        proportionDisplay.innerHTML = `
-            <strong>Split:</strong> ${closest.major} major (${closest.percentage.toFixed(2)}%) / ${closest.comorbid} co-morbid (${(100 - closest.percentage).toFixed(2)}%)
-        `;
-        proportionDisplay.style.color = '#495057';
-        generateBtn.disabled = false;
-    } else {
-        proportionDisplay.innerHTML = `
-            <span style="color: #dc3545;">Cannot generate plan with this split. 
-            Available: Major=${majorCount}, Co-morbid=${comorbidCount}</span>
-        `;
-        generateBtn.disabled = true;
-    }
-}
-
-// Form submission validation
 document.getElementById('recommendation-form').addEventListener('submit', function(e) {
-    const numPractices = parseInt(document.getElementById('num_practices').value);
-    const majorModuleId = document.getElementById('major_module_id').value;
+    console.log('Form submit event triggered');
+    const majorModuleId = majorIdInput.value;
     
     if (!majorModuleId) {
         e.preventDefault();
@@ -715,36 +724,124 @@ document.getElementById('recommendation-form').addEventListener('submit', functi
         return false;
     }
     
-    if (!numPractices || numPractices <= 0) {
+    if (countsLoading) {
         e.preventDefault();
-        alert('Please enter a valid number of practices');
-        const numPracticesInput = document.getElementById('num_practices');
-        if (numPracticesInput) {
-            numPracticesInput.focus();
+        alert('Please wait for practice counts to finish loading.');
+        return false;
+    }
+    
+    if (!practiceCountsData) {
+        e.preventDefault();
+        alert('Please wait for practice counts to load.');
+        return false;
+    }
+
+    const totalWeight = weightRows.reduce((s, r) => s + Math.round(r.weight || 0), 0);
+    console.log('Total weight before normalization:', totalWeight);
+    
+    // Allow small tolerance for floating point precision (within 1%)
+    if (Math.abs(totalWeight - 100) > 1) {
+        e.preventDefault();
+        alert(`Weights total ${totalWeight}%, but must total 100%. Please adjust the sliders.`);
+        return false;
+    }
+    
+    // Normalize weights to exactly 100 before submission
+    if (Math.abs(totalWeight - 100) > 0.5) {
+        const diff = 100 - totalWeight;
+        if (weightRows.length > 0) {
+            // Adjust the first (major) weight to make sum exactly 100
+            weightRows[0].weight = Math.round((weightRows[0].weight || 0) + diff);
+            // Re-render to update hidden inputs
+            renderPartitionSlider();
         }
-        return false;
     }
     
-    const proportionPercentage = document.getElementById('proportion_percentage').value;
-    if (!proportionPercentage) {
-        e.preventDefault();
-        alert('Please select a proportion split by entering a number of practices first');
-        return false;
-    }
+    updateComorbidHiddenInputs();
+    // weight hidden inputs are created in renderPartitionSlider()
     
-    // Additional validation can be added here
+    console.log('Form submitting to:', this.action);
+    console.log('Form data:', {
+        major_module_id: majorModuleId,
+        comorbid_module_ids: comorbidModules.map(m => m.module_id),
+        weight_major: weightRows.find(r => r.key === 'major')?.weight || 0
+    });
+    
+    // Don't prevent default - let form submit
     return true;
+});
+
+function clearForm() {
+    majorInput.value = '';
+    majorIdInput.value = '';
+    comorbidInput.value = '';
+    comorbidModules = [];
+    practiceCountsData = null;
+    weightRows = [];
+    comorbidTagsContainer.querySelectorAll('.comorbid-tag').forEach(tag => tag.remove());
+    updateComorbidHiddenInputs();
+    document.querySelectorAll('input[data-weight-hidden=\"1\"]').forEach(i => i.remove());
+    majorAutocompleteDiv.innerHTML = '';
+    comorbidAutocompleteDiv.innerHTML = '';
+    document.getElementById('major-practice-count-box').style.display = 'none';
+    document.getElementById('comorbid-diseases-list').style.display = 'none';
+    document.getElementById('comorbid-diseases-list').innerHTML = '';
+    document.getElementById('allocation-panel').style.display = 'none';
+    document.getElementById('weights-legend').innerHTML = '';
+    document.getElementById('partition-slider').innerHTML = '';
+    document.getElementById('partition-handles').innerHTML = '';
+    document.getElementById('continue-btn').disabled = true;
+    majorInput.style.borderColor = '#ddd';
+    majorInput.style.boxShadow = 'none';
+}
+window.clearForm = clearForm;
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#major_module') && !e.target.closest('#major-autocomplete-results')) {
+        majorAutocompleteDiv.innerHTML = '';
+        currentMajorModules = [];
+        selectedMajorIndex = -1;
+    }
+    if (!e.target.closest('#comorbid_module') && !e.target.closest('#comorbid-autocomplete-results') && !e.target.closest('.comorbid-tag')) {
+        comorbidAutocompleteDiv.innerHTML = '';
+        currentComorbidModules = [];
+        selectedComorbidIndex = -1;
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (majorIdInput.value) {
+        updatePracticeCounts();
+    }
+    
+    // Debug: Log button state periodically
+    setInterval(function() {
+        const btn = document.getElementById('continue-btn');
+        const majorModuleId = majorIdInput.value;
+        const totalWeight = weightRows.reduce((s, r) => s + Math.round(r.weight || 0), 0);
+        console.log('Button state:', {
+            disabled: btn.disabled,
+            majorModuleId: majorModuleId,
+            practiceCountsData: !!practiceCountsData,
+            countsLoading: countsLoading,
+            totalWeight: totalWeight,
+            weightRows: weightRows
+        });
+    }, 2000);
 });
 </script>
 
 <style>
 .autocomplete-item:hover {
-    background: #f0f0f0;
+    background: #f0f0f0 !important;
 }
 
 .comorbid-tag button:hover {
     background: rgba(255,255,255,0.5) !important;
 }
+
+.partition-handle:active {
+    transform: scale(1.05);
+}
 </style>
 {% endblock %}
-

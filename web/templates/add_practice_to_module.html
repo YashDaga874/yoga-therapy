@@ -84,6 +84,19 @@
             <input type="text" id="practice_english" name="practice_english" required
                    placeholder="e.g., Corpse pose">
         </div>
+        
+        <div class="form-group">
+            <label for="code">Practice Code</label>
+            <div style="position: relative;">
+                <input type="text" id="code" name="code" 
+                       placeholder="e.g., SHA01 (auto-filled)" maxlength="50" autocomplete="off">
+                <div id="code-autocomplete-results" style="position: relative;"></div>
+            </div>
+            <div id="code-validation-message" style="margin-top: 0.3rem; font-size: 0.85rem;"></div>
+            <small style="color: #666; display: block; margin-top: 0.3rem; font-size: 0.85rem;">
+                Code for this practice. Same code is used for practices with the same Sanskrit name. Type a code to auto-fill all fields.
+            </small>
+        </div>
     </div>
     
     <div class="compact-grid three" style="margin-bottom: 1.25rem;">
@@ -277,6 +290,12 @@ function selectPractice(id) {
         document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
         document.getElementById('practice_english').value = practice.practice_english;
         
+        // Fill Code
+        const codeField = document.getElementById('code');
+        if (codeField && practice.code) {
+            codeField.value = practice.code;
+        }
+        
         // Fill Category (practice_segment)
         const practiceSegmentField = document.getElementById('practice_segment');
         if (practiceSegmentField && practice.practice_segment) {
@@ -311,7 +330,8 @@ function selectPractice(id) {
         document.getElementById('rounds').value = practice.rounds || '';
         document.getElementById('time_minutes').value = practice.time_minutes || '';
         document.getElementById('strokes_per_min').value = practice.strokes_per_min || '';
-        document.getElementById('cvr_score').value = practice.cvr_score || '';
+        // Don't autofill CVR score - it's module-specific, so it should be different for different modules
+        // document.getElementById('cvr_score').value = practice.cvr_score || '';
         document.getElementById('practice_english').focus();
     }
 }
@@ -322,7 +342,235 @@ document.addEventListener('click', function(e) {
         currentPractices = [];
         selectedIndex = -1;
     }
+    if (!e.target.closest('#code') && !e.target.closest('#code-autocomplete-results')) {
+        codeAutocompleteDiv.innerHTML = '';
+        codeCurrentPractices = [];
+        codeSelectedIndex = -1;
+    }
 });
+
+// Autocomplete functionality for Code field
+let codeAutocompleteTimeout;
+let codeCurrentPractices = [];
+let codeSelectedIndex = -1;
+const codeInput = document.getElementById('code');
+const codeAutocompleteDiv = document.getElementById('code-autocomplete-results');
+
+if (codeInput) {
+    codeInput.addEventListener('input', function() {
+        clearTimeout(codeAutocompleteTimeout);
+        const query = this.value.trim();
+        codeSelectedIndex = -1;
+        
+        if (query.length < 1) {
+            codeAutocompleteDiv.innerHTML = '';
+            codeCurrentPractices = [];
+            return;
+        }
+        
+        codeAutocompleteTimeout = setTimeout(() => {
+            fetch(`/api/practice/search?q=${encodeURIComponent(query)}&search_by=code`)
+                .then(response => response.json())
+                .then(data => {
+                    codeCurrentPractices = data;
+                    displayCodeAutocompleteResults(data);
+                });
+        }, 300);
+    });
+    
+    // Keyboard navigation for code autocomplete
+    codeInput.addEventListener('keydown', function(e) {
+        if (codeAutocompleteDiv.innerHTML === '') return;
+        
+        const items = codeAutocompleteDiv.querySelectorAll('.autocomplete-item');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                codeSelectedIndex = Math.min(codeSelectedIndex + 1, items.length - 1);
+                updateCodeSelection();
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                codeSelectedIndex = Math.max(codeSelectedIndex - 1, -1);
+                updateCodeSelection();
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (codeSelectedIndex >= 0 && codeSelectedIndex < items.length) {
+                    selectPracticeByCode(codeCurrentPractices[codeSelectedIndex].id);
+                    document.getElementById('practice_english').focus();
+                }
+                break;
+            case 'Escape':
+                codeAutocompleteDiv.innerHTML = '';
+                codeCurrentPractices = [];
+                codeSelectedIndex = -1;
+                break;
+        }
+    });
+}
+
+function updateCodeSelection() {
+    const items = codeAutocompleteDiv.querySelectorAll('.autocomplete-item');
+    items.forEach((item, index) => {
+        if (index === codeSelectedIndex) {
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.borderLeft = '3px solid #2196f3';
+        } else {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        }
+    });
+}
+
+function displayCodeAutocompleteResults(practices) {
+    if (practices.length === 0) {
+        codeAutocompleteDiv.innerHTML = '';
+        return;
+    }
+    
+    codeAutocompleteDiv.innerHTML = '<div style="background: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: absolute; width: 100%; z-index: 1000;">' +
+        practices.map((p, index) => `
+            <div class="autocomplete-item" style="padding: 0.7rem; cursor: pointer; border-bottom: 1px solid #eee;" 
+                 onclick="selectPracticeByCode(${p.id})" data-index="${index}">
+                <strong>${p.code || 'No code'}</strong> - ${p.practice_sanskrit || 'No Sanskrit name'}<br>
+                <small>${p.practice_english}</small>
+            </div>
+        `).join('') +
+        '</div>';
+    updateCodeSelection();
+}
+
+function selectPracticeByCode(id) {
+    const practice = codeCurrentPractices.find(p => p.id === id);
+    if (practice) {
+        // Close autocomplete immediately
+        codeAutocompleteDiv.innerHTML = '';
+        codeCurrentPractices = [];
+        codeSelectedIndex = -1;
+        
+        // Fill all fields using the existing selectPractice function logic
+        document.getElementById('code').value = practice.code || '';
+        document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
+        document.getElementById('practice_english').value = practice.practice_english;
+        
+        // Clear validation message after autofill
+        if (validationMessageDivForValidation) {
+            validationMessageDivForValidation.innerHTML = '';
+            validationMessageDivForValidation.style.display = 'none';
+        }
+        
+        // Fill Category (practice_segment)
+        const practiceSegmentField = document.getElementById('practice_segment');
+        if (practiceSegmentField && practice.practice_segment) {
+            practiceSegmentField.value = practice.practice_segment;
+        }
+        
+        // Fill Kosha
+        const koshaField = document.getElementById('kosha');
+        if (koshaField && practice.kosha) {
+            koshaField.value = practice.kosha;
+        } else if (koshaField && practiceSegmentField && practice.practice_segment) {
+            // Auto-fill kosha based on category if not provided
+            const categoryToKosha = {
+                'Preparatory Practice': 'Annamaya Kosha',
+                'Yogasana': 'Annamaya Kosha',
+                'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+                'Sequential Yogic Practice': 'Annamaya Kosha',
+                'Breathing Practice': 'Pranamaya Kosha',
+                'Pranayama': 'Pranamaya Kosha',
+                'Meditation': 'Manomaya Kosha',
+                'Chanting': 'Manomaya Kosha',
+                'Yogic Counselling': 'Vijnanamaya Kosha',
+                'Additional Practices': ''
+            };
+            const mappedKosha = categoryToKosha[practice.practice_segment];
+            if (mappedKosha) {
+                koshaField.value = mappedKosha;
+            }
+        }
+        
+        document.getElementById('sub_category').value = practice.sub_category || '';
+        document.getElementById('rounds').value = practice.rounds || '';
+        document.getElementById('time_minutes').value = practice.time_minutes || '';
+        document.getElementById('strokes_per_min').value = practice.strokes_per_min || '';
+        // Don't autofill CVR score - it's module-specific, so it should be different for different modules
+        // document.getElementById('cvr_score').value = practice.cvr_score || '';
+        document.getElementById('practice_english').focus();
+        
+        // Clear validation message after autofill
+        if (validationMessageDivForValidation) {
+            validationMessageDivForValidation.innerHTML = '';
+            validationMessageDivForValidation.style.display = 'none';
+        }
+    }
+}
+
+// Real-time validation for code/Sanskrit name consistency
+let validationTimeout;
+const codeInputForValidation = document.getElementById('code');
+const sanskritNameInputForValidation = document.getElementById('practice_sanskrit');
+const validationMessageDivForValidation = document.getElementById('code-validation-message');
+
+function validateCodeSanskrit() {
+    clearTimeout(validationTimeout);
+    const code = (codeInputForValidation ? codeInputForValidation.value : '').trim();
+    const sanskrit = (sanskritNameInputForValidation ? sanskritNameInputForValidation.value : '').trim();
+    
+    // Clear previous validation message
+    if (validationMessageDivForValidation) {
+        validationMessageDivForValidation.innerHTML = '';
+        validationMessageDivForValidation.style.display = 'none';
+    }
+    
+    // Only validate if at least one field has content
+    if (!code && !sanskrit) {
+        return;
+    }
+    
+    // Debounce validation
+    validationTimeout = setTimeout(() => {
+        fetch(`/api/practice/validate-code-sanskrit?code=${encodeURIComponent(code)}&sanskrit_name=${encodeURIComponent(sanskrit)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid && data.message && validationMessageDivForValidation) {
+                    // Show validation error
+                    validationMessageDivForValidation.innerHTML = `<span style="color: #dc3545;">⚠️ ${data.message}</span>`;
+                    validationMessageDivForValidation.style.display = 'block';
+                    
+                    // If there's a suggested code, auto-fill it (for sanskrit_code_mismatch)
+                    if (data.conflict_type === 'sanskrit_code_mismatch' && data.existing_code && codeInputForValidation && codeInputForValidation.value !== data.existing_code) {
+                        // Don't auto-fill if user is actively typing code
+                        // Only auto-fill if code field is empty or was auto-filled
+                        if (!codeInputForValidation.value || codeInputForValidation.value === code) {
+                            codeInputForValidation.value = data.existing_code;
+                            // Re-validate with new code
+                            setTimeout(() => validateCodeSanskrit(), 100);
+                        }
+                    }
+                } else if (validationMessageDivForValidation) {
+                    // Clear validation message
+                    validationMessageDivForValidation.innerHTML = '';
+                    validationMessageDivForValidation.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Validation error:', error);
+            });
+    }, 500); // Wait 500ms after user stops typing
+}
+
+// Add event listeners for real-time validation
+if (codeInputForValidation) {
+    codeInputForValidation.addEventListener('input', validateCodeSanskrit);
+    codeInputForValidation.addEventListener('blur', validateCodeSanskrit);
+}
+
+if (sanskritNameInputForValidation) {
+    sanskritNameInputForValidation.addEventListener('input', validateCodeSanskrit);
+    sanskritNameInputForValidation.addEventListener('blur', validateCodeSanskrit);
+}
 </script>
 
 <style>

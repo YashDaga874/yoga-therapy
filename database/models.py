@@ -73,6 +73,7 @@ class Practice(Base):
     # Practice identification
     practice_sanskrit = Column(String(200))
     practice_english = Column(String(200), nullable=False)
+    code = Column(String(50))  # Practice code (e.g., K01 for Kapalabhati) - same code for practices with same Sanskrit name
     
     # Practice Category classification (formerly practice_segment)
     practice_segment = Column(String(50), nullable=False)  # Preparatory Practice, Breathing Practice, etc. (now called "Category")
@@ -120,6 +121,7 @@ class Practice(Base):
 # Indexes for Practice table - critical for performance
 Index('idx_practice_english', Practice.practice_english)
 Index('idx_practice_sanskrit', Practice.practice_sanskrit)
+Index('idx_practice_code', Practice.code)
 Index('idx_practice_segment', Practice.practice_segment)
 Index('idx_practice_module_id', Practice.module_id)
 Index('idx_practice_citation_id', Practice.citation_id)

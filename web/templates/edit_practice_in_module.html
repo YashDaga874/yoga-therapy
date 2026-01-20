@@ -52,6 +52,15 @@
             <input type="text" id="practice_english" name="practice_english" required
                    value="{{ practice.practice_english }}" placeholder="e.g., Corpse pose">
         </div>
+        
+        <div class="form-group">
+            <label for="code">Practice Code</label>
+            <input type="text" id="code" name="code" 
+                   value="{{ practice.code or '' }}" placeholder="e.g., SHA01" maxlength="50">
+            <small style="color: #666; display: block; margin-top: 0.3rem; font-size: 0.85rem;">
+                Code for this practice. Changing Sanskrit name will update the code for all practices with the same Sanskrit name.
+            </small>
+        </div>
     </div>
 
     <div class="compact-grid three" style="margin-bottom: 1.25rem;">

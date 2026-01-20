@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Select Practices by Category{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; padding: 0.75rem;">
+    <h2 style="font-size: 1.4rem; font-weight: 600; color: #333; margin-bottom: 0.75rem;">
+        Step 3: Select Practices by Category
+    </h2>
+
+    <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+        <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem;">
+            <strong>Major Disease:</strong> {{ major_module.disease.name if major_module.disease else 'N/A' }} ({{ major_module.developed_by or 'N/A' }})
+        </div>
+        {% if comorbid_modules %}
+        <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem;">
+            <strong>Co-morbid Diseases:</strong> 
+            {% for m in comorbid_modules %}
+                {{ m.disease.name if m.disease else 'N/A' }} ({{ m.developed_by or 'N/A' }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="POST" id="category-form">
+        <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <div style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.75rem;">
+                Select number of practices from each category (≤ Maximum)
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 0.6rem; text-align: left; font-weight: 600; color: #495057;">Category</th>
+                        <th style="padding: 0.6rem; text-align: center; font-weight: 600; color: #495057;">Maximum practices</th>
+                        <th style="padding: 0.6rem; text-align: center; font-weight: 600; color: #495057;">User selects</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category, max_count in sorted_categories %}
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 0.6rem; font-weight: 500; color: #333;">{{ category }}</td>
+                        <td style="padding: 0.6rem; text-align: center; color: #495057;">{{ max_count }}</td>
+                        <td style="padding: 0.6rem; text-align: center;">
+                            <input type="number" 
+                                   name="category_{{ category }}" 
+                                   id="category_{{ category }}"
+                                   min="0" 
+                                   max="{{ max_count }}" 
+                                   value="0"
+                                   style="width: 80px; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem;"
+                                   oninput="updateTotal()">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; border-top: 2px solid #dee2e6; font-weight: 600;">
+                        <td style="padding: 0.6rem; color: #495057;">Total maximum</td>
+                        <td style="padding: 0.6rem; text-align: center; color: #495057;">{{ total_max }}</td>
+                        <td style="padding: 0.6rem; text-align: center;">
+                            <div id="selected-total" style="color: #667eea; font-size: 1rem;">0</div>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div style="margin-top: 0.75rem; padding: 0.6rem; background: #e3f2fd; border-radius: 4px; border: 1px solid #90caf9;">
+                <div style="font-size: 0.85rem; color: #1976d2; font-weight: 600;">
+                    Your selected total: <span id="live-total" style="font-size: 1.1rem;">0</span> practices
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
+            <button type="submit" id="generate-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" disabled>
+                Generate Practice Plan
+            </button>
+            <a href="{{ url_for('recommendations') }}" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem; text-decoration: none; display: inline-block;">
+                Back
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function updateTotal() {
+    let total = 0;
+    {% for category, max_count in sorted_categories %}
+    const val{{ loop.index0 }} = parseInt(document.getElementById('category_{{ category }}').value || '0', 10);
+    total += isNaN(val{{ loop.index0 }}) ? 0 : val{{ loop.index0 }};
+    {% endfor %}
+    
+    document.getElementById('selected-total').textContent = total;
+    document.getElementById('live-total').textContent = total;
+    
+    const generateBtn = document.getElementById('generate-btn');
+    generateBtn.disabled = total <= 0;
+}
+
+document.getElementById('category-form').addEventListener('submit', function(e) {
+    const total = parseInt(document.getElementById('live-total').textContent, 10);
+    if (total <= 0) {
+        e.preventDefault();
+        alert('Please select at least one practice from any category.');
+        return false;
+    }
+    return true;
+});
+
+// Initialize on page load
+updateTotal();
+</script>
+{% endblock %}

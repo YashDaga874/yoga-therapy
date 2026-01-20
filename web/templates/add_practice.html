@@ -73,6 +73,16 @@
             <input type="text" id="practice_english" name="practice_english" required
                    placeholder="e.g., Corpse pose">
         </div>
+        
+        <div class="form-group">
+            <label for="code">Practice Code</label>
+            <input type="text" id="code" name="code" 
+                   placeholder="e.g., SHA01 (auto-filled)" maxlength="50" autocomplete="off">
+            <div id="code-validation-message" style="margin-top: 0.3rem; font-size: 0.85rem;"></div>
+            <small style="color: #666; display: block; margin-top: 0.3rem; font-size: 0.85rem;">
+                Code for this practice. Same code is used for practices with the same Sanskrit name.
+            </small>
+        </div>
     </div>
     
     <div class="compact-grid three" style="margin-bottom: 1.25rem;">
@@ -161,7 +171,7 @@
     
     <div style="display: flex; gap: 1rem;">
         <button type="submit" class="btn">Add Practice</button>
-        <a href="/" class="btn btn-secondary">Cancel</a>
+        <a href="/practices" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
 
@@ -434,6 +444,19 @@ function selectPractice(id) {
         document.getElementById('practice_sanskrit').value = practice.practice_sanskrit || '';
         document.getElementById('practice_english').value = practice.practice_english;
         
+        // Fill Code
+        const codeField = document.getElementById('code');
+        if (codeField && practice.code) {
+            codeField.value = practice.code;
+        }
+        
+        // Clear validation message after autofill
+        const validationMessageDiv = document.getElementById('code-validation-message');
+        if (validationMessageDiv) {
+            validationMessageDiv.innerHTML = '';
+            validationMessageDiv.style.display = 'none';
+        }
+        
         // Fill Category (practice_segment)
         const practiceSegmentField = document.getElementById('practice_segment');
         if (practiceSegmentField && practice.practice_segment) {
@@ -524,6 +547,70 @@ document.addEventListener('click', function(e) {
         selectedIndex = -1;
     }
 });
+
+// Real-time validation for code/Sanskrit name consistency
+let validationTimeout;
+const codeInput = document.getElementById('code');
+const sanskritNameInput = document.getElementById('practice_sanskrit');
+const validationMessageDiv = document.getElementById('code-validation-message');
+
+function validateCodeSanskrit() {
+    clearTimeout(validationTimeout);
+    const code = (codeInput.value || '').trim();
+    const sanskrit = (sanskritNameInput.value || '').trim();
+    
+    // Clear previous validation message
+    validationMessageDiv.innerHTML = '';
+    validationMessageDiv.style.display = 'none';
+    
+    // Only validate if at least one field has content
+    if (!code && !sanskrit) {
+        return;
+    }
+    
+    // Debounce validation
+    validationTimeout = setTimeout(() => {
+        fetch(`/api/practice/validate-code-sanskrit?code=${encodeURIComponent(code)}&sanskrit_name=${encodeURIComponent(sanskrit)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid && data.message) {
+                    // Show validation error
+                    validationMessageDiv.innerHTML = `<span style="color: #dc3545;">⚠️ ${data.message}</span>`;
+                    validationMessageDiv.style.display = 'block';
+                    
+                    // If there's a suggested code, auto-fill it (for sanskrit_code_mismatch)
+                    if (data.conflict_type === 'sanskrit_code_mismatch' && data.existing_code && codeInput.value !== data.existing_code) {
+                        // Don't auto-fill if user is actively typing code
+                        // Only auto-fill if code field is empty or was auto-filled
+                        if (!codeInput.value || codeInput.value === code) {
+                            codeInput.value = data.existing_code;
+                            // Re-validate with new code
+                            setTimeout(() => validateCodeSanskrit(), 100);
+                        }
+                    }
+                } else {
+                    // Clear validation message
+                    validationMessageDiv.innerHTML = '';
+                    validationMessageDiv.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Validation error:', error);
+            });
+    }, 500); // Wait 500ms after user stops typing
+}
+
+// Add event listeners for real-time validation
+if (codeInput) {
+    codeInput.addEventListener('input', validateCodeSanskrit);
+    codeInput.addEventListener('blur', validateCodeSanskrit);
+}
+
+if (sanskritNameInput) {
+    sanskritNameInput.addEventListener('input', validateCodeSanskrit);
+    sanskritNameInput.addEventListener('blur', validateCodeSanskrit);
+}
+
 </script>
 
 <style>

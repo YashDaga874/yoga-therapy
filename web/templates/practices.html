@@ -75,6 +75,7 @@
         <thead>
             <tr>
                 <th style="min-width: 180px;">Practice Name</th>
+                <th style="min-width: 100px;">Code</th>
                 <th style="min-width: 120px;">Category</th>
                 <th style="min-width: 120px;">Kosha</th>
                 <th style="min-width: 120px;">Sub-Category</th>
@@ -94,6 +95,11 @@
                     {% else %}
                         <strong>{{ practice.practice_english }}</strong>
                     {% endif %}
+                </td>
+                <td>
+                    <span style="font-weight: bold; color: #667eea; font-family: monospace;">
+                        {{ practice.code or '-' }}
+                    </span>
                 </td>
                 <td>{{ practice.practice_segment }}</td>
                 <td>{{ practice.kosha or '-' }}</td>
