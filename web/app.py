@@ -47,12 +47,71 @@ def from_json_filter(value):
     except (json.JSONDecodeError, TypeError):
         return []
 
+# Enumerations enforced across the app
+ALLOWED_CATEGORIES = [
+    # Canonical names
+    'Preparatory practices',
+    'Breathing practices',
+    'Sequential yogic practices',
+    'Yogasana',
+    'Pranayama',
+    'Meditation',
+    'Chanting',
+    'Additional practices',
+    'Kriya (cleansing)',
+    'Yogic counselling',
+    'Lifestyle modifications (Anna)',
+    'Yogic diet (Anna)',
+    'Chair Yoga (Anna)',
+    # Backward-compatible legacy spellings
+    'Preparatory Practice',
+    'Breathing Practice',
+    'Sequential Yogic Practice',
+    'Additional Practices',
+    'Kriya (Cleansing Techniques)',
+    'Yogic Counselling',
+    'Suryanamaskara',
+]
+
+ALLOWED_KOSHAS = [
+    'Annamaya',
+    'Pranamaya',
+    'Manomaya',
+    'Vijnanamaya',
+    'Anandamaya',
+]
+
 # Database path
 DB_PATH = 'sqlite:///yoga_therapy.db'
+
+
+def _is_valid_category(category: str) -> bool:
+    return category in ALLOWED_CATEGORIES
+
+
+def _is_valid_kosha(kosha: str) -> bool:
+    return kosha in ALLOWED_KOSHAS
+
+
+def _ensure_category_and_kosha(practice_segment: str, kosha: str):
+    """Validate enums early and raise ValueError if invalid."""
+    if not _is_valid_category(practice_segment):
+        raise ValueError(f'Invalid category "{practice_segment}". Must be one of: {", ".join(ALLOWED_CATEGORIES)}')
+    if kosha and not _is_valid_kosha(kosha):
+        raise ValueError(f'Invalid kosha "{kosha}". Must be one of: {", ".join(ALLOWED_KOSHAS)}')
 
 # Configuration for file uploads
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi', 'mov', 'wmv'}
+ALLOWED_MIME_TYPES = {
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'video/mp4',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-ms-wmv'
+}
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
 
 # Create upload directories if they don't exist
@@ -62,6 +121,15 @@ os.makedirs(os.path.join(UPLOAD_FOLDER, 'videos'), exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_mimetype(file: FileStorage):
+    """Strict MIME validation to avoid unexpected uploads."""
+    mimetype = getattr(file, 'mimetype', '') or ''
+    mimetype = mimetype.lower()
+    return mimetype in ALLOWED_MIME_TYPES or mimetype.startswith('image/') or mimetype.startswith('video/')
+
+# Enforce request body size limit for uploads (must be after MAX_FILE_SIZE is defined)
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 def generate_practice_code(sanskrit_name, session=None, existing_codes=None):
     """
@@ -581,7 +649,25 @@ def add_practice():
         elif request.form['practice_english']:
             practice_code = generate_practice_code(request.form['practice_english'], session)
         
+        # Require a unique, non-empty code
+        if not practice_code:
+            flash('Error: A unique practice code is required for every practice.', 'error')
+            session.close()
+            return render_template('add_practice.html')
+        existing_code_conflict = session.query(Practice).filter(Practice.code == practice_code).first()
+        if existing_code_conflict:
+            flash(f'Error: Practice code "{practice_code}" already exists. Please reuse or choose another code.', 'error')
+            session.close()
+            return render_template('add_practice.html')
+        
         # Create practice
+        try:
+            _ensure_category_and_kosha(request.form['practice_segment'], request.form.get('kosha', ''))
+        except ValueError as ve:
+            flash(str(ve), 'error')
+            session.close()
+            return render_template('add_practice.html')
+        
         practice = Practice(
             practice_sanskrit=practice_sanskrit,
             practice_english=request.form['practice_english'],
@@ -626,7 +712,17 @@ def add_practice():
         # Handle file uploads after we have the ID
         if 'photo' in request.files:
             photo = request.files['photo']
-            if photo and photo.filename and allowed_file(photo.filename):
+            if photo and photo.filename:
+                if not allowed_file(photo.filename):
+                    session.rollback()
+                    flash('Unsupported photo file type. Allowed: png, jpg, jpeg, gif.', 'error')
+                    session.close()
+                    return render_template('add_practice.html')
+                if not allowed_mimetype(photo):
+                    session.rollback()
+                    flash('Invalid photo MIME type.', 'error')
+                    session.close()
+                    return render_template('add_practice.html')
                 filename = secure_filename(photo.filename)
                 photo_path = os.path.join(UPLOAD_FOLDER, 'photos', f'{practice.id}_{filename}')
                 photo.save(photo_path)
@@ -634,7 +730,17 @@ def add_practice():
         
         if 'video' in request.files:
             video = request.files['video']
-            if video and video.filename and allowed_file(video.filename):
+            if video and video.filename:
+                if not allowed_file(video.filename):
+                    session.rollback()
+                    flash('Unsupported video file type. Allowed: mp4, avi, mov, wmv.', 'error')
+                    session.close()
+                    return render_template('add_practice.html')
+                if not allowed_mimetype(video):
+                    session.rollback()
+                    flash('Invalid video MIME type.', 'error')
+                    session.close()
+                    return render_template('add_practice.html')
                 filename = secure_filename(video.filename)
                 video_path = os.path.join(UPLOAD_FOLDER, 'videos', f'{practice.id}_{filename}')
                 video.save(video_path)
@@ -667,6 +773,14 @@ def edit_practice(practice_id):
             # Store old Sanskrit name for comparison
             old_sanskrit = (practice.practice_sanskrit or '').strip()
             new_sanskrit = request.form.get('practice_sanskrit', '').strip()
+            
+            # Validate enums
+            try:
+                _ensure_category_and_kosha(request.form['practice_segment'], request.form.get('kosha', ''))
+            except ValueError as ve:
+                flash(str(ve), 'error')
+                session.close()
+                return render_template('edit_practice.html', practice=practice)
             
             # Update practice fields
             practice.practice_sanskrit = new_sanskrit
@@ -771,6 +885,21 @@ def edit_practice(practice_id):
                 else:
                     practice.code = generate_practice_code(new_sanskrit, session)
             
+            # Final code validation
+            final_code = practice.code
+            if not final_code:
+                flash('Error: A unique practice code is required for every practice.', 'error')
+                session.close()
+                return render_template('edit_practice.html', practice=practice)
+            conflict = session.query(Practice).filter(
+                Practice.code == final_code,
+                Practice.id != practice_id
+            ).first()
+            if conflict:
+                flash(f'Error: Practice code "{final_code}" already exists. Please choose another code.', 'error')
+                session.close()
+                return render_template('edit_practice.html', practice=practice)
+            
             # Handle optional fields
             if request.form.get('strokes_per_min'):
                 practice.strokes_per_min = int(request.form['strokes_per_min'])
@@ -806,7 +935,17 @@ def edit_practice(practice_id):
             # Handle file uploads
             if 'photo' in request.files:
                 photo = request.files['photo']
-                if photo and photo.filename and allowed_file(photo.filename):
+                if photo and photo.filename:
+                    if not allowed_file(photo.filename):
+                        session.rollback()
+                        flash('Unsupported photo file type. Allowed: png, jpg, jpeg, gif.', 'error')
+                        session.close()
+                        return render_template('edit_practice.html', practice=practice)
+                    if not allowed_mimetype(photo):
+                        session.rollback()
+                        flash('Invalid photo MIME type.', 'error')
+                        session.close()
+                        return render_template('edit_practice.html', practice=practice)
                     filename = secure_filename(photo.filename)
                     photo_path = os.path.join(UPLOAD_FOLDER, 'photos', f'{practice.id}_{filename}')
                     photo.save(photo_path)
@@ -814,7 +953,17 @@ def edit_practice(practice_id):
             
             if 'video' in request.files:
                 video = request.files['video']
-                if video and video.filename and allowed_file(video.filename):
+                if video and video.filename:
+                    if not allowed_file(video.filename):
+                        session.rollback()
+                        flash('Unsupported video file type. Allowed: mp4, avi, mov, wmv.', 'error')
+                        session.close()
+                        return render_template('edit_practice.html', practice=practice)
+                    if not allowed_mimetype(video):
+                        session.rollback()
+                        flash('Invalid video MIME type.', 'error')
+                        session.close()
+                        return render_template('edit_practice.html', practice=practice)
                     filename = secure_filename(video.filename)
                     video_path = os.path.join(UPLOAD_FOLDER, 'videos', f'{practice.id}_{filename}')
                     video.save(video_path)
@@ -1240,18 +1389,7 @@ def add_contraindication():
         selected_disease = None
         existing_contras = []
 
-        practice_segments = [
-            'Preparatory Practice',
-            'Breathing Practice',
-            'Sequential Yogic Practice',
-            'Yogasana',
-            'Pranayama',
-            'Meditation',
-            'Chanting',
-            'Additional Practices',
-            'Kriya (Cleansing Techniques)',
-            'Yogic Counselling'
-        ]
+        practice_segments = ALLOWED_CATEGORIES
 
         if disease_id:
             selected_disease = session.query(Disease).get(disease_id)
@@ -1514,16 +1652,27 @@ def view_module(module_id):
             'Anandamaya Kosha'
         ]
         category_order = [
-            'Preparatory Practice',
-            'Breathing Practice',
-            'Sequential Yogic Practice',
+            'Preparatory practices',
+            'Breathing practices',
+            'Sequential yogic practices',
             'Yogasana',
             'Pranayama',
             'Meditation',
             'Chanting',
+            'Additional practices',
+            'Kriya (cleansing)',
+            'Yogic counselling',
+            'Lifestyle modifications (Anna)',
+            'Yogic diet (Anna)',
+            'Chair Yoga (Anna)',
+            # legacy spellings
+            'Preparatory Practice',
+            'Breathing Practice',
+            'Sequential Yogic Practice',
             'Additional Practices',
             'Kriya (Cleansing Techniques)',
-            'Yogic Counselling'
+            'Yogic Counselling',
+            'Suryanamaskara',
         ]
 
         if module.practices:
@@ -1683,11 +1832,7 @@ def add_practice_to_module(module_id):
                     if practice_sanskrit and practice_sanskrit.lower() != existing_sanskrit.lower():
                         flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
                         session.close()
-                        practice_segments = [
-                            'Preparatory Practice', 'Breathing Practice', 'Sequential Yogic Practice',
-                            'Yogasana', 'Pranayama', 'Meditation', 'Chanting', 'Additional Practices',
-                            'Kriya (Cleansing Techniques)', 'Yogic Counselling'
-                        ]
+                        practice_segments = ALLOWED_CATEGORIES
                         existing_practices = get_existing_practices_list(module)
                         return render_template('add_practice_to_module.html', 
                                              module=module, 
@@ -1738,18 +1883,7 @@ def add_practice_to_module(module_id):
                 flash(f'Error adding practice: {str(e)}', 'error')
         
         # Get practice segments for dropdown (now called "Category")
-        practice_segments = [
-            'Preparatory Practice',
-            'Breathing Practice',
-            'Sequential Yogic Practice',
-            'Yogasana',
-            'Pranayama',
-            'Meditation',
-            'Chanting',
-            'Additional Practices',
-            'Kriya (Cleansing Techniques)',
-            'Yogic Counselling'
-        ]
+        practice_segments = ALLOWED_CATEGORIES
         
         existing_practices = get_existing_practices_list(module)
         return render_template('add_practice_to_module.html', 
@@ -1824,11 +1958,7 @@ def edit_practice_in_module(module_id, practice_id):
                     if new_sanskrit and new_sanskrit.lower() != existing_sanskrit.lower():
                         flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
                         session.close()
-                        practice_segments = [
-                            'Preparatory Practice', 'Breathing Practice', 'Sequential Yogic Practice',
-                            'Yogasana', 'Pranayama', 'Meditation', 'Chanting', 'Additional Practices',
-                            'Kriya (Cleansing Techniques)', 'Yogic Counselling'
-                        ]
+                        practice_segments = ALLOWED_CATEGORIES
                         return render_template(
                             'edit_practice_in_module.html',
                             module=module,
@@ -1945,18 +2075,7 @@ def edit_practice_in_module(module_id, practice_id):
                 session.rollback()
                 flash(f'Error updating practice: {str(e)}', 'error')
 
-        practice_segments = [
-            'Preparatory Practice',
-            'Breathing Practice',
-            'Sequential Yogic Practice',
-            'Yogasana',
-            'Pranayama',
-            'Meditation',
-            'Chanting',
-            'Additional Practices',
-            'Kriya (Cleansing Techniques)',
-            'Yogic Counselling'
-        ]
+        practice_segments = ALLOWED_CATEGORIES
 
         return render_template(
             'edit_practice_in_module.html',
@@ -1981,14 +2100,22 @@ def api_get_recommendations():
     """
     from core.recommendation_engine import YogaTherapyRecommendationEngine
     
-    data = request.get_json()
+    data = request.get_json(silent=True)
     
-    if not data or 'diseases' not in data:
+    if not isinstance(data, dict) or 'diseases' not in data:
         return jsonify({'error': 'Please provide a list of diseases'}), 400
+    
+    diseases = data.get('diseases')
+    if not isinstance(diseases, list):
+        return jsonify({'error': '"diseases" must be a list of disease names'}), 400
+    
+    diseases_clean = [str(d).strip() for d in diseases if str(d).strip()]
+    if not diseases_clean:
+        return jsonify({'error': '"diseases" must contain at least one name'}), 400
     
     engine = YogaTherapyRecommendationEngine(DB_PATH)
     try:
-        recommendations = engine.get_recommendations(data['diseases'])
+        recommendations = engine.get_recommendations(diseases_clean)
         return jsonify(recommendations)
     finally:
         engine.close()
@@ -2006,14 +2133,22 @@ def api_get_summary():
     """
     from core.recommendation_engine import YogaTherapyRecommendationEngine
     
-    data = request.get_json()
+    data = request.get_json(silent=True)
     
-    if not data or 'diseases' not in data:
+    if not isinstance(data, dict) or 'diseases' not in data:
         return jsonify({'error': 'Please provide a list of diseases'}), 400
+    
+    diseases = data.get('diseases')
+    if not isinstance(diseases, list):
+        return jsonify({'error': '"diseases" must be a list of disease names'}), 400
+    
+    diseases_clean = [str(d).strip() for d in diseases if str(d).strip()]
+    if not diseases_clean:
+        return jsonify({'error': '"diseases" must contain at least one name'}), 400
     
     engine = YogaTherapyRecommendationEngine(DB_PATH)
     try:
-        summary = engine.get_summary(data['diseases'])
+        summary = engine.get_summary(diseases_clean)
         return jsonify({'summary': summary})
     finally:
         engine.close()
@@ -2630,6 +2765,69 @@ def recommendations_categories():
     """Step 2: Select practices per category, then generate recommendations"""
     session = get_db_session()
     
+    def _practice_identifier(p: Practice):
+        return (p.code or '').strip().lower() or (p.practice_english or '').strip().lower()
+
+    def _rank_key(p: Practice, selected_disease_ids: set):
+        rct_val = p.rct_count if p.rct_count is not None else 0
+        repeat = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
+        cvr_val = p.cvr_score if p.cvr_score is not None else 0
+        name_val = p.practice_english or ''
+        return (-rct_val, -repeat, -cvr_val, name_val)
+
+    def _group_practices_by_category(module: Module, contraindicated_keys: set, selected_disease_ids: set):
+        by_category = {}
+        for p in module.practices:
+            category = p.practice_segment or 'Unknown'
+            if not _is_valid_category(category):
+                continue
+            pk = (
+                (p.practice_english or '').lower().strip(),
+                p.practice_segment
+            )
+            if pk in contraindicated_keys:
+                continue
+            if category not in by_category:
+                by_category[category] = []
+            by_category[category].append(p)
+        for category in by_category:
+            by_category[category].sort(key=lambda pr: _rank_key(pr, selected_disease_ids))
+        return by_category
+
+    def _compute_category_max_counts(major_module: Module, comorbid_modules: list, contraindicated_keys: set, selected_disease_ids: set):
+        category_max_counts = {}
+        seen_by_category = {}
+        
+        def _add_practice(practice):
+            category = practice.practice_segment or 'Unknown'
+            if not _is_valid_category(category):
+                return
+            pk = (
+                (practice.practice_english or '').lower().strip(),
+                practice.practice_segment
+            )
+            if pk in contraindicated_keys:
+                return
+            ident = _practice_identifier(practice)
+            if not ident:
+                return
+            if category not in seen_by_category:
+                seen_by_category[category] = set()
+            if ident in seen_by_category[category]:
+                return
+            seen_by_category[category].add(ident)
+            category_max_counts[category] = category_max_counts.get(category, 0) + 1
+        
+        for p in major_module.practices:
+            _add_practice(p)
+        for m in comorbid_modules:
+            for p in m.practices:
+                _add_practice(p)
+        
+        sorted_categories = sorted(category_max_counts.items(), key=lambda x: x[0])
+        total_max = sum(category_max_counts.values())
+        return category_max_counts, sorted_categories, total_max
+    
     try:
         if request.method == 'POST':
             # Generate recommendations based on category selections
@@ -2680,13 +2878,13 @@ def recommendations_categories():
                 
                 # Get all diseases and contraindications
                 all_modules = [major_module] + comorbid_modules
-                all_disease_ids = set()
+                selected_disease_ids = set()
                 for module in all_modules:
                     if module.disease_id:
-                        all_disease_ids.add(module.disease_id)
+                        selected_disease_ids.add(module.disease_id)
                 
                 contraindications = []
-                for disease_id in all_disease_ids:
+                for disease_id in selected_disease_ids:
                     disease = session.query(Disease).get(disease_id)
                     if disease:
                         for contraindication in disease.contraindications:
@@ -2707,43 +2905,28 @@ def recommendations_categories():
                         contra.practice_segment
                     ))
                 
-                def _practice_identifier(p: Practice):
-                    return p.code if getattr(p, 'code', None) else (p.practice_english or '')
+                # Validate category selections against maxima
+                category_max_counts, _, _ = _compute_category_max_counts(major_module, comorbid_modules, contraindicated_keys, selected_disease_ids)
+                validated_category_selections = {}
+                for category, count in category_selections.items():
+                    if category not in category_max_counts:
+                        flash(f'Invalid category selection "{category}".', 'error')
+                        return redirect(url_for('recommendations_categories'))
+                    if count > category_max_counts[category]:
+                        flash(f'Selection for "{category}" exceeds available maximum ({count} > {category_max_counts[category]}).', 'error')
+                        return redirect(url_for('recommendations_categories'))
+                    validated_category_selections[category] = count
+                category_selections = validated_category_selections
+                total_requested = sum(category_selections.values())
                 
-                def _filtered_sorted_practices_by_category(module: Module):
-                    """Return practices grouped by category, filtered and sorted"""
-                    by_category = {}
-                    for p in module.practices:
-                        pk = (
-                            (p.practice_english or '').lower().strip(),
-                            p.practice_segment
-                        )
-                        if pk not in contraindicated_keys:
-                            category = p.practice_segment or 'Unknown'
-                            if category not in by_category:
-                                by_category[category] = []
-                            by_category[category].append(p)
-                    
-                    # Sort each category by RCT count, CVR, then name
-                    for category in by_category:
-                        by_category[category].sort(
-                            key=lambda p: (
-                                -(p.rct_count if p.rct_count is not None else 0),               # primary: RCT count desc
-                                -(len(p.diseases) if getattr(p, 'diseases', None) else 0),      # tie: disease coverage desc
-                                -(p.cvr_score if p.cvr_score is not None else 0),               # tie: CVR score desc
-                                p.practice_english or ''                                        # tie: name asc
-                            )
-                        )
-                    return by_category
-                
-                # Get practices by category for each module
-                major_practices_by_cat = _filtered_sorted_practices_by_category(major_module)
+                # Get practices by category for each module with ranking
+                major_practices_by_cat = _group_practices_by_category(major_module, contraindicated_keys, selected_disease_ids)
                 comorbid_practices_by_cat = {}
                 for m in comorbid_modules:
-                    comorbid_practices_by_cat[m.id] = _filtered_sorted_practices_by_category(m)
+                    comorbid_practices_by_cat[m.id] = _group_practices_by_category(m, contraindicated_keys, selected_disease_ids)
                 
                 # For each category, apply weightages to user's selection
-                order_modules = [major_module] + comorbid_modules
+                order_modules = [major_module] + comorbid_modules  # order reflects severity (major first, then user order)
                 weights_by_id = {major_module.id: weight_major}
                 for m in comorbid_modules:
                     weights_by_id[m.id] = comorbid_weights.get(m.id, 0)
@@ -2757,6 +2940,8 @@ def recommendations_categories():
                         ident = _practice_identifier(p)
                         if not ident or ident in seen:
                             continue
+                        # attach selected disease repetition for downstream display
+                        p.selected_disease_count = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
                         seen.add(ident)
                         selected_practices.append(p)
                         picked += 1
@@ -2781,20 +2966,44 @@ def recommendations_categories():
                         idx += 1
                     
                     # Select practices from each module for this category
+                    picked_total = 0
                     # Major module
                     major_cat_practices = major_practices_by_cat.get(category, [])
-                    take_from_category_list(major_cat_practices, base_counts.get(major_module.id, 0))
+                    picked_total += take_from_category_list(major_cat_practices, base_counts.get(major_module.id, 0))
                     
                     # Comorbid modules
                     for m in comorbid_modules:
                         comorbid_cat_practices = comorbid_practices_by_cat.get(m.id, {}).get(category, [])
-                        take_from_category_list(comorbid_cat_practices, base_counts.get(m.id, 0))
+                        picked_total += take_from_category_list(comorbid_cat_practices, base_counts.get(m.id, 0))
+                    
+                    # Fallback allocation if deficit remains: pull remaining ranked items in severity order
+                    deficit = user_selected_count - picked_total
+                    if deficit > 0:
+                        fallback_candidates = []
+                        for m in order_modules:
+                            cat_list = major_cat_practices if m.id == major_module.id else comorbid_practices_by_cat.get(m.id, {}).get(category, [])
+                            for p in cat_list:
+                                ident = _practice_identifier(p)
+                                if ident and ident not in seen:
+                                    fallback_candidates.append((m.id, p))
+                        for _, p in fallback_candidates:
+                            if deficit <= 0:
+                                break
+                            ident = _practice_identifier(p)
+                            if not ident or ident in seen:
+                                continue
+                            p.selected_disease_count = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
+                            seen.add(ident)
+                            selected_practices.append(p)
+                            deficit -= 1
                 
                 if len(selected_practices) == 0:
                     flash('No practices selected after filtering contraindications/duplicates', 'error')
                     return redirect(url_for('recommendations_categories'))
                 
                 filtered_practices = selected_practices
+                if len(filtered_practices) < total_requested:
+                    flash(f'Only {len(filtered_practices)} of {total_requested} practices available after applying weights, deduplication, and contraindications.', 'warning')
                 
                 # Get RCTs for practices
                 all_practice_disease_ids = set()
@@ -2853,6 +3062,8 @@ def recommendations_categories():
                 
                 organized_practices = {}
                 for practice in filtered_practices:
+                    if not hasattr(practice, 'selected_disease_count'):
+                        practice.selected_disease_count = len([d for d in practice.diseases if d.id in selected_disease_ids]) if getattr(practice, 'diseases', None) else 0
                     kosha = practice.kosha or 'Unknown'
                     category = practice.practice_segment or 'Unknown'
                     subcategory = practice.sub_category or 'None'
@@ -2876,7 +3087,7 @@ def recommendations_categories():
                             organized_practices[kosha][category][subcategory].sort(
                                 key=lambda x: (
                                     -(x['practice'].rct_count if x['practice'].rct_count is not None else 0),
-                                    -(len(x['practice'].diseases) if getattr(x['practice'], 'diseases', None) else 0),
+                                    -(getattr(x['practice'], 'selected_disease_count', 0)),
                                     -(x['practice'].cvr_score if x['practice'].cvr_score is not None else 0),
                                     x['practice'].practice_english or ''
                                 )
@@ -2949,13 +3160,10 @@ def recommendations_categories():
         
         # Get all diseases and contraindications
         all_modules = [major_module] + comorbid_modules
-        all_disease_ids = set()
-        for module in all_modules:
-            if module.disease_id:
-                all_disease_ids.add(module.disease_id)
+        selected_disease_ids = {m.disease_id for m in all_modules if m.disease_id}
         
         contraindications = []
-        for disease_id in all_disease_ids:
+        for disease_id in selected_disease_ids:
             disease = session.query(Disease).get(disease_id)
             if disease:
                 for contraindication in disease.contraindications:
@@ -2976,43 +3184,10 @@ def recommendations_categories():
                 contra.practice_segment
             ))
         
-        # Count max practices per category across all modules
-        category_max_counts = {}  # category -> max_count
-        
-        # Process major module
-        for p in major_module.practices:
-            pk = (
-                (p.practice_english or '').lower().strip(),
-                p.practice_segment
-            )
-            if pk not in contraindicated_keys:
-                category = p.practice_segment or 'Unknown'
-                if category not in category_max_counts:
-                    category_max_counts[category] = 0
-                category_max_counts[category] += 1
-        
-        # Process comorbid modules (deduplicate by practice code/name)
-        for m in comorbid_modules:
-            seen_in_category = {}  # category -> set of practice identifiers
-            for p in m.practices:
-                pk = (
-                    (p.practice_english or '').lower().strip(),
-                    p.practice_segment
-                )
-                if pk not in contraindicated_keys:
-                    category = p.practice_segment or 'Unknown'
-                    if category not in seen_in_category:
-                        seen_in_category[category] = set()
-                    ident = p.code if getattr(p, 'code', None) else (p.practice_english or '')
-                    if ident and ident not in seen_in_category[category]:
-                        seen_in_category[category].add(ident)
-                        if category not in category_max_counts:
-                            category_max_counts[category] = 0
-                        category_max_counts[category] += 1
-        
-        # Sort categories alphabetically for display
-        sorted_categories = sorted(category_max_counts.items(), key=lambda x: x[0])
-        total_max = sum(category_max_counts.values())
+        # Count max practices per category across all modules using shared helper
+        category_max_counts, sorted_categories, total_max = _compute_category_max_counts(
+            major_module, comorbid_modules, contraindicated_keys, selected_disease_ids
+        )
         
         return render_template('recommendations_categories.html',
                              major_module=major_module,
@@ -3213,7 +3388,8 @@ def api_practices():
                 'practice_sanskrit': practice.practice_sanskrit or '',
                 'practice_segment': practice.practice_segment,
                 'sub_category': practice.sub_category or '',
-                'kosha': practice.kosha or ''
+                'kosha': practice.kosha or '',
+                'code': practice.code or ''
             })
         return jsonify(results)
     finally:
@@ -4629,4 +4805,7 @@ def generate_synthetic_data():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug_mode = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+    host = os.getenv('FLASK_HOST', '127.0.0.1')
+    port = int(os.getenv('FLASK_PORT', '5000'))
+    app.run(debug=debug_mode, host=host, port=port)

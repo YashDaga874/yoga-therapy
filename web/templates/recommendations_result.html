@@ -66,8 +66,9 @@
                         <thead>
                             <tr style="background: #667eea; color: white;">
                                 <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
+                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 90px;">Code</th>
                                 <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">RCT</th>
-                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 90px;">Diseases</th>
+                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 110px;">Selected diseases</th>
                                 <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">CVR</th>
                                 <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">RCT Citations</th>
                             </tr>
@@ -84,10 +85,13 @@
                                     {% endif %}
                                 </td>
                                 <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
+                                    <span style="font-weight: 600; color: #495057; font-size: 0.9rem;">{{ practice.code or 'N/A' }}</span>
+                                </td>
+                                <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
                                     <span style="font-weight: 600; color: #667eea; font-size: 0.9rem;">{{ practice.rct_count if practice.rct_count is not none else 0 }}</span>
                                 </td>
                                 <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
-                                    <span style="font-weight: 600; color: #495057; font-size: 0.9rem;">{{ practice.diseases|length if practice.diseases else 0 }}</span>
+                                    <span style="font-weight: 600; color: #495057; font-size: 0.9rem;">{{ practice.selected_disease_count if practice.selected_disease_count is defined else (practice.diseases|length if practice.diseases else 0) }}</span>
                                 </td>
                                 <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
                                     {% if practice.cvr_score is not none %}
@@ -135,6 +139,8 @@
                 <tr style="background: #ffc107; color: #856404;">
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Category</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Diseases</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Safety notes</th>
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Citation</th>
                 </tr>
             </thead>
@@ -148,6 +154,22 @@
                         {% endif %}
                     </td>
                     <td style="padding: 0.5rem; border: 1px solid #ddd;">{{ contra.practice_segment }}</td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        {% if contra.diseases %}
+                            {% for d in contra.diseases %}
+                                {{ d.name }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        {% if contra.reason %}
+                            <span style="font-size: 0.8rem;">{{ contra.reason }}</span>
+                        {% else %}
+                            <span style="color: #999; font-size: 0.8rem;">N/A</span>
+                        {% endif %}
+                    </td>
                     <td style="padding: 0.5rem; border: 1px solid #ddd;">
                         {% if contra.apa_citation %}
                             <span style="font-size: 0.8rem;">{{ contra.apa_citation|safe }}</span>

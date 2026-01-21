@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from collections import defaultdict
 from database.models import Disease, Practice, Contraindication, DiseaseCombination, Module, get_session
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import func
 import json
 
 
@@ -32,16 +33,39 @@ class YogaTherapyRecommendationEngine:
     def __init__(self, db_path='sqlite:///yoga_therapy.db'):
         self.session = get_session(db_path)
         self.practice_segment_order = [
-            'Preparatory Practice',
-            'Breathing Practice',
-            'Suryanamaskara',
+            # Canonical categories (match web UI)
+            'Preparatory practices',
+            'Breathing practices',
+            'Sequential yogic practices',
+            'Suryanamaskara',  # keep legacy explicit slot if stored that way
             'Yogasana',
             'Pranayama',
             'Meditation',
+            'Chanting',
+            'Additional practices',
+            'Kriya (cleansing)',
+            'Yogic counselling',
+            'Lifestyle modifications (Anna)',
+            'Yogic diet (Anna)',
+            'Chair Yoga (Anna)',
+            # Legacy fallbacks (will be normalized, but kept for safety)
+            'Preparatory Practice',
+            'Breathing Practice',
+            'Sequential Yogic Practice',
             'Additional Practices',
             'Kriya (Cleansing Techniques)',
             'Yogic Counselling'
         ]
+        # Map legacy/variant labels to canonical labels so the engine matches the UI
+        self.segment_aliases = {
+            'Preparatory Practice': 'Preparatory practices',
+            'Breathing Practice': 'Breathing practices',
+            'Sequential Yogic Practice': 'Sequential yogic practices',
+            'Suryanamaskara': 'Sequential yogic practices',
+            'Additional Practices': 'Additional practices',
+            'Kriya (Cleansing Techniques)': 'Kriya (cleansing)',
+            'Yogic Counselling': 'Yogic counselling'
+        }
     
     def get_recommendations(self, disease_names):
         """
@@ -85,12 +109,18 @@ class YogaTherapyRecommendationEngine:
         # Use eager loading to prevent N+1 queries
         diseases = []
         for name in disease_names:
-            disease = self.session.query(Disease).options(
+            search_name = (name or '').strip()
+            if not search_name:
+                continue
+            base_query = self.session.query(Disease).options(
                 selectinload(Disease.practices),
                 selectinload(Disease.contraindications)
-            ).filter(
-                Disease.name.ilike(f'%{name}%')
-            ).first()
+            )
+            # Prefer exact (case-insensitive) match to avoid ambiguous partials
+            disease = base_query.filter(func.lower(Disease.name) == search_name.lower()).first()
+            # Fallback to partial match for backward compatibility
+            if not disease:
+                disease = base_query.filter(Disease.name.ilike(f'%{search_name}%')).first()
             
             if disease:
                 diseases.append(disease)
@@ -127,15 +157,16 @@ class YogaTherapyRecommendationEngine:
         for practice in practices:
             # Create a unique identifier for this practice
             # We use practice_english (lowercased) + practice_segment + sub_category as the key
+            normalized_segment = self._normalize_segment(practice.practice_segment)
             practice_key = (
                 practice.practice_english.lower().strip(),
-                practice.practice_segment,
+                normalized_segment,
                 practice.sub_category or ''
             )
             
             # Only add if we haven't seen this exact practice before
             if practice_key not in seen_practices:
-                organized[practice.practice_segment][practice.sub_category or 'general'].append(practice)
+                organized[normalized_segment][practice.sub_category or 'general'].append(practice)
                 seen_practices.add(practice_key)
         
         return organized
@@ -175,48 +206,27 @@ class YogaTherapyRecommendationEngine:
         This now works with disease COMBINATIONS rather than individual diseases.
         A practice is removed if it's contraindicated for any subset of the user's diseases.
         """
-        # Get user's disease names
-        user_disease_names = {d.name for d in diseases}
-        
-        # Find all disease combinations that are subsets of user's diseases
-        applicable_combinations = self._find_applicable_combinations(user_disease_names)
-        
-        # Collect all contraindications for these combinations
-        all_contraindications = []
-        contraindication_sources = []  # Track which combinations caused each contraindication
-        
-        for combo in applicable_combinations:
-            for contraindication in combo.contraindications:
-                all_contraindications.append(contraindication)
-                contraindication_sources.append({
-                    'contraindication': contraindication,
-                    'combination': combo.combination_name
-                })
-        
-        # Create a set of contraindicated practices for quick lookup
+        # Collect contraindications directly from diseases (authoritative source)
         contraindicated = set()
-        contraindication_details = {}  # Store details about why each practice is contraindicated
-        
-        for source in contraindication_sources:
-            contra = source['contraindication']
-            combo_name = source['combination']
-            
-            contra_key = (
-                contra.practice_english.lower().strip(),
-                contra.practice_segment,
-                contra.sub_category or ''
-            )
-            contraindicated.add(contra_key)
-            
-            # Store details for reporting
-            if contra_key not in contraindication_details:
-                contraindication_details[contra_key] = []
-            contraindication_details[contra_key].append({
-                'practice': contra.practice_english,
-                'practice_segment': contra.practice_segment,
-                'combination': combo_name,
-                'reason': contra.reason
-            })
+        contraindication_details = {}
+
+        for disease in diseases:
+            for contra in disease.contraindications:
+                contra_key = (
+                    contra.practice_english.lower().strip(),
+                    self._normalize_segment(contra.practice_segment),
+                    contra.sub_category or ''
+                )
+                contraindicated.add(contra_key)
+
+                if contra_key not in contraindication_details:
+                    contraindication_details[contra_key] = []
+                contraindication_details[contra_key].append({
+                    'practice': contra.practice_english,
+                    'practice_segment': self._normalize_segment(contra.practice_segment),
+                    'disease': disease.name,
+                    'reason': contra.reason
+                })
         
         # Filter out contraindicated practices
         filtered_practices = defaultdict(lambda: defaultdict(list))
@@ -227,7 +237,7 @@ class YogaTherapyRecommendationEngine:
                 for practice in practices:
                     practice_key = (
                         practice.practice_english.lower().strip(),
-                        practice.practice_segment,
+                        segment,
                         practice.sub_category or ''
                     )
                     
@@ -247,7 +257,7 @@ class YogaTherapyRecommendationEngine:
         self._contraindication_report = {
             'removed_practices': removed_practices,
             'total_contraindications': len(contraindicated),
-            'applicable_combinations': [combo.combination_name for combo in applicable_combinations]
+            'diseases_checked': [d.name for d in diseases]
         }
         
         return filtered_practices
@@ -272,14 +282,26 @@ class YogaTherapyRecommendationEngine:
                     'description': module.module_description
                 })
         
-        # Organize practices by segment in the defined order
+        # Determine which segments we have (keep any unexpected categories too)
+        segments_present = set(practices_by_segment.keys())
+        ordered_segments = []
         for segment in self.practice_segment_order:
+            normalized = self._normalize_segment(segment)
+            if normalized in segments_present and normalized not in ordered_segments:
+                ordered_segments.append(normalized)
+        # Append any extra segments not covered above (sorted for stability)
+        for segment in sorted(segments_present):
+            if segment not in ordered_segments:
+                ordered_segments.append(segment)
+
+        # Organize practices by segment in the defined order
+        for segment in ordered_segments:
             if segment in practices_by_segment:
                 output['practices_by_segment'][segment] = {}
-                
+
                 for sub_cat, practices in practices_by_segment[segment].items():
                     formatted_practices = []
-                    
+
                     for practice in practices:
                         practice_dict = {
                             'practice_sanskrit': practice.practice_sanskrit,
@@ -287,32 +309,32 @@ class YogaTherapyRecommendationEngine:
                             'rounds': practice.rounds,
                             'time_minutes': practice.time_minutes
                         }
-                        
+
                         # Add optional fields if they exist
                         if practice.strokes_per_min:
                             practice_dict['strokes_per_min'] = practice.strokes_per_min
-                        
+
                         if practice.strokes_per_cycle:
                             practice_dict['strokes_per_cycle'] = practice.strokes_per_cycle
-                        
+
                         if practice.rest_between_cycles_sec:
                             practice_dict['rest_between_cycles_sec'] = practice.rest_between_cycles_sec
-                        
+
                         if practice.variations:
                             try:
                                 practice_dict['variations'] = json.loads(practice.variations)
                             except:
                                 practice_dict['variations'] = practice.variations
-                        
+
                         if practice.steps:
                             try:
                                 practice_dict['steps'] = json.loads(practice.steps)
                             except:
                                 practice_dict['steps'] = practice.steps
-                        
+
                         if practice.description:
                             practice_dict['description'] = practice.description
-                        
+
                         # Add citation if available
                         if practice.citation:
                             practice_dict['citation'] = {
@@ -320,9 +342,9 @@ class YogaTherapyRecommendationEngine:
                                 'type': practice.citation.citation_type,
                                 'reference': practice.citation.full_reference
                             }
-                        
+
                         formatted_practices.append(practice_dict)
-                    
+
                     output['practices_by_segment'][segment][sub_cat] = formatted_practices
         
         return output
@@ -385,6 +407,13 @@ class YogaTherapyRecommendationEngine:
     def close(self):
         """Close database session"""
         self.session.close()
+
+    def _normalize_segment(self, segment):
+        """Normalize practice segment labels to canonical names."""
+        if not segment:
+            return segment
+        segment = segment.strip()
+        return self.segment_aliases.get(segment, segment)
 
 
 # Convenience function for quick usage

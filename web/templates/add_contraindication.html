@@ -137,6 +137,12 @@
         <small style="color: #666; display: block; margin-top: 0.4rem;">Suggestions come from your practices library. You can adjust the fields after selecting.</small>
     </div>
 
+    <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="practice_code">Practice Code</label>
+        <input type="text" id="practice_code" name="practice_code" placeholder="Type or auto-filled when a practice is selected">
+        <small style="color: #666; display: block; margin-top: 0.25rem;">Type a code to auto-fill the practice, or select a practice to auto-fill the code.</small>
+    </div>
+
     <div class="compact-grid" style="margin-bottom: 1rem;">
         <div class="form-group">
             <label for="practice_english">Practice Name (English)</label>
@@ -230,6 +236,7 @@ const practiceInput = document.getElementById('practice_sanskrit');
 const practiceAutocomplete = document.getElementById('practice-autocomplete');
 const practiceIdInput = document.getElementById('practice_id');
 const practiceEnglishInput = document.getElementById('practice_english');
+const practiceCodeInput = document.getElementById('practice_code');
 const practiceSegmentInput = document.getElementById('practice_segment');
 const subCategoryInput = document.getElementById('sub_category');
 const koshaInput = document.getElementById('kosha');
@@ -241,6 +248,9 @@ const categoryToKosha = {
     'Yogasana': 'Annamaya Kosha',
     'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
     'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+    'Yogic diet (Anna)': 'Annamaya Kosha',
+    'Chair Yoga (Anna)': 'Annamaya Kosha',
     'Breathing Practice': 'Pranamaya Kosha',
     'Pranayama': 'Pranamaya Kosha',
     'Meditation': 'Manomaya Kosha',
@@ -334,6 +344,9 @@ function resetPracticeFields() {
     practiceIdInput.value = '';
     practiceInput.value = '';
     practiceEnglishInput.value = '';
+    if (practiceCodeInput) {
+        practiceCodeInput.value = '';
+    }
     if (practiceSegmentInput) {
         Array.from(practiceSegmentInput.querySelectorAll('option[data-generated="true"]')).forEach(opt => opt.remove());
         practiceSegmentInput.value = '';
@@ -492,10 +505,10 @@ function displayPracticeResults(results) {
     practiceSelectedIndex = -1;
     practiceAutocomplete.innerHTML = results.map((practice, index) => {
         const displayLabel = practice.practice_sanskrit || practice.practice_english;
-        const labelJson = JSON.stringify(displayLabel);
-        return `<div class="autocomplete-item" onclick="selectPracticeOption(${practice.id}, ${labelJson})">
+        const codeLabel = practice.code ? ` • Code: ${practice.code}` : '';
+        return `<div class="autocomplete-item" data-id="${practice.id}">
             <strong>${displayLabel}</strong><br>
-            <small>${practice.practice_english || ''}</small>
+            <small>${practice.practice_english || ''}${codeLabel}</small>
         </div>`;
     }).join('');
 
@@ -509,12 +522,25 @@ function displayPracticeResults(results) {
     updatePracticeSelection();
 }
 
-function selectPracticeOption(practiceId, label) {
+// Delegate clicks to ensure selection always works
+practiceAutocomplete.addEventListener('click', (event) => {
+    const item = event.target.closest('.autocomplete-item');
+    if (!item) return;
+    const practiceId = parseInt(item.dataset.id, 10);
+    if (!Number.isNaN(practiceId)) {
+        selectPracticeOption(practiceId);
+    }
+});
+
+function selectPracticeOption(practiceId) {
     const practice = availablePractices.find(p => p.id === practiceId);
     if (!practice) return;
     practiceIdInput.value = practice.id;
-    practiceInput.value = label || practice.practice_sanskrit || practice.practice_english;
+    practiceInput.value = practice.practice_sanskrit || practice.practice_english;
     practiceEnglishInput.value = practice.practice_english || '';
+    if (practiceCodeInput) {
+        practiceCodeInput.value = practice.code || '';
+    }
     setSelectValue(practiceSegmentInput, practice.practice_segment || '');
     subCategoryInput.value = practice.sub_category || '';
     if (practice.kosha) {
@@ -598,6 +624,24 @@ practiceInput.addEventListener('input', () => {
         displayPracticeResults(practiceResults);
     }, 200);
 });
+
+// Search by practice code
+if (practiceCodeInput) {
+    let codeDebounce;
+    practiceCodeInput.addEventListener('input', () => {
+        clearTimeout(codeDebounce);
+        const codeQuery = (practiceCodeInput.value || '').trim().toLowerCase();
+        if (!codeQuery) {
+            return;
+        }
+        codeDebounce = setTimeout(() => {
+            const match = availablePractices.find(p => (p.code || '').toLowerCase() === codeQuery);
+            if (match) {
+                selectPracticeOption(match.id);
+            }
+        }, 150);
+    });
+}
 
 function updatePracticeSelection() {
     const items = practiceAutocomplete.querySelectorAll('.autocomplete-item');
