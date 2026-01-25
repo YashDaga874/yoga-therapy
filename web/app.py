@@ -24,7 +24,7 @@ from werkzeug.datastructures import FileStorage
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response, session as flask_session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.orm import joinedload, selectinload
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
@@ -127,6 +127,69 @@ def allowed_mimetype(file: FileStorage):
     mimetype = getattr(file, 'mimetype', '') or ''
     mimetype = mimetype.lower()
     return mimetype in ALLOWED_MIME_TYPES or mimetype.startswith('image/') or mimetype.startswith('video/')
+
+
+def _normalize_str(value: str) -> str:
+    """Trim whitespace and coerce None to empty string."""
+    return (value or '').strip()
+
+
+def _match_allowed_category(category: str) -> str:
+    """
+    Best-effort match to an allowed category (case-insensitive).
+    Falls back to the provided string if no match is found.
+    """
+    cleaned = _normalize_str(category)
+    if not cleaned:
+        return ''
+    for allowed in ALLOWED_CATEGORIES:
+        if cleaned.lower() == allowed.lower():
+            return allowed
+    return cleaned
+
+
+def _load_tabular_rows(file_storage: FileStorage):
+    """
+    Load rows from a CSV or XLSX file into a list of dicts with string values.
+    Supports UTF-8 CSV and Excel (xlsx/xlsm).
+    """
+    filename = secure_filename(file_storage.filename or '')
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext == '.csv':
+        content = file_storage.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        if not reader.fieldnames:
+            raise ValueError('CSV file is missing header row.')
+        rows = []
+        for row in reader:
+            rows.append({(key or '').strip(): _normalize_str(value) for key, value in row.items()})
+        return rows
+
+    if ext in ('.xlsx', '.xlsm'):
+        try:
+            from openpyxl import load_workbook
+        except ImportError as exc:
+            raise ValueError('Excel uploads require openpyxl; please install it.') from exc
+
+        file_storage.seek(0)
+        wb = load_workbook(file_storage, read_only=True, data_only=True)
+        ws = wb.active
+
+        header_row = next(ws.iter_rows(min_row=1, max_row=1), None)
+        headers = [(str(cell.value).strip() if cell.value is not None else '') for cell in header_row] if header_row else []
+        if not headers or all(not h for h in headers):
+            raise ValueError('Excel file is missing header row.')
+
+        rows = []
+        for row in ws.iter_rows(min_row=2):
+            entry = {}
+            for header, cell in zip(headers, row):
+                entry[header] = _normalize_str(str(cell.value) if cell.value is not None else '')
+            rows.append(entry)
+        return rows
+
+    raise ValueError('Unsupported file type. Please upload CSV or XLSX.')
 
 # Enforce request body size limit for uploads (must be after MAX_FILE_SIZE is defined)
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
@@ -266,6 +329,381 @@ def paginate_query(query, page, per_page, error_out=False):
     items = query.offset(offset).limit(per_page).all()
     
     return Pagination(query, page, per_page, total, items)
+
+
+def _get_or_create_disease_by_name(session, disease_name: str):
+    """Fetch a disease by name (case-insensitive) or create it."""
+    normalized = _normalize_str(disease_name)
+    if not normalized:
+        return None
+    disease = session.query(Disease).filter(func.lower(Disease.name) == normalized.lower()).first()
+    if not disease:
+        disease = Disease(name=normalized)
+        session.add(disease)
+        session.flush()
+    return disease
+
+
+def _parse_name_list(raw_value: str):
+    """Split comma/pipe separated strings into a clean list."""
+    if not raw_value:
+        return []
+    parts = []
+    for chunk in raw_value.replace('|', ',').split(','):
+        cleaned = _normalize_str(chunk)
+        if cleaned:
+            parts.append(cleaned)
+    return parts
+
+
+def _import_modules_rows(session, rows):
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+    for idx, row in enumerate(rows, start=2):
+        disease_name = _normalize_str(row.get('disease') or row.get('disease_name'))
+        developed_by = _normalize_str(row.get('developed_by') or row.get('module_developed_by'))
+        paper_link = _normalize_str(row.get('paper_link'))
+
+        if not disease_name:
+            stats['errors'].append(f'Row {idx}: disease_name is required for modules import.')
+            continue
+
+        disease = _get_or_create_disease_by_name(session, disease_name)
+        if not disease:
+            stats['errors'].append(f'Row {idx}: could not create disease "{disease_name}".')
+            continue
+
+        module = session.query(Module).filter(Module.disease_id == disease.id).first()
+        if not module:
+            module = Module(disease_id=disease.id, developed_by=developed_by, paper_link=paper_link)
+            session.add(module)
+            stats['created'] += 1
+            continue
+
+        changes = 0
+        if developed_by and module.developed_by != developed_by:
+            module.developed_by = developed_by
+            changes += 1
+        if paper_link and module.paper_link != paper_link:
+            module.paper_link = paper_link
+            changes += 1
+
+        if changes:
+            stats['updated'] += 1
+        else:
+            stats['skipped'] += 1
+
+    return stats
+
+
+def _find_existing_practice(session, practice_code, practice_sanskrit, practice_english, practice_segment):
+    """Find an existing practice using code, Sanskrit, or English+segment."""
+    if practice_code:
+        found = session.query(Practice).filter(func.lower(Practice.code) == practice_code.lower()).first()
+        if found:
+            return found
+    if practice_sanskrit:
+        found = session.query(Practice).filter(func.lower(Practice.practice_sanskrit) == practice_sanskrit.lower()).first()
+        if found:
+            return found
+    if practice_english and practice_segment:
+        found = session.query(Practice).filter(
+            func.lower(Practice.practice_english) == practice_english.lower(),
+            func.lower(Practice.practice_segment) == practice_segment.lower()
+        ).first()
+        if found:
+            return found
+    return None
+
+
+def _import_practices_rows(session, rows):
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+    for idx, row in enumerate(rows, start=2):
+        practice_english = _normalize_str(row.get('practice_english'))
+        practice_sanskrit = _normalize_str(row.get('practice_sanskrit'))
+        practice_segment = _match_allowed_category(
+            row.get('practice_segment') or row.get('category') or row.get('segment')
+        )
+        sub_category = _normalize_str(row.get('sub_category'))
+        kosha = _normalize_str(row.get('kosha'))
+        code = _normalize_str(row.get('code'))
+        module_developed_by = _normalize_str(row.get('module_developed_by'))
+        disease_names = _parse_name_list(row.get('diseases') or row.get('disease_names') or row.get('disease'))
+
+        if not practice_english and not practice_sanskrit:
+            stats['errors'].append(f'Row {idx}: practice_english or practice_sanskrit is required.')
+            continue
+        if not practice_segment:
+            stats['errors'].append(f'Row {idx}: practice_segment/category is required.')
+            continue
+
+        existing = _find_existing_practice(session, code, practice_sanskrit, practice_english, practice_segment)
+
+        if existing:
+            changes = 0
+            if practice_sanskrit and not existing.practice_sanskrit:
+                existing.practice_sanskrit = practice_sanskrit
+                changes += 1
+            if practice_english and existing.practice_english != practice_english:
+                existing.practice_english = practice_english
+                changes += 1
+            if sub_category and existing.sub_category != sub_category:
+                existing.sub_category = sub_category
+                changes += 1
+            if kosha and existing.kosha != kosha:
+                existing.kosha = kosha
+                changes += 1
+            if practice_segment and existing.practice_segment != practice_segment:
+                existing.practice_segment = practice_segment
+                changes += 1
+            if code and not existing.code:
+                existing.code = code
+                changes += 1
+
+            # Link diseases
+            for disease_name in disease_names:
+                disease = _get_or_create_disease_by_name(session, disease_name)
+                if disease and disease not in existing.diseases:
+                    existing.diseases.append(disease)
+                    changes += 1
+
+            # Attach to module if provided and disease exists
+            if module_developed_by and disease_names:
+                disease = _get_or_create_disease_by_name(session, disease_names[0])
+                if disease:
+                    module = session.query(Module).filter(Module.disease_id == disease.id).first()
+                    if not module:
+                        module = Module(disease_id=disease.id, developed_by=module_developed_by)
+                        session.add(module)
+                    if not existing.module_id:
+                        existing.module_id = module.id
+                        changes += 1
+
+            if changes:
+                stats['updated'] += 1
+            else:
+                stats['skipped'] += 1
+            continue
+
+        # New practice
+        practice_code = code or generate_practice_code(practice_sanskrit or practice_english, session)
+        practice = Practice(
+            practice_sanskrit=practice_sanskrit,
+            practice_english=practice_english or practice_sanskrit,
+            practice_segment=practice_segment,
+            sub_category=sub_category,
+            kosha=kosha or None,
+            code=practice_code,
+            description=_normalize_str(row.get('description')),
+            how_to_do=_normalize_str(row.get('how_to_do')),
+        )
+
+        # Attach module if provided
+        if module_developed_by and disease_names:
+            disease = _get_or_create_disease_by_name(session, disease_names[0])
+            if disease:
+                module = session.query(Module).filter(Module.disease_id == disease.id).first()
+                if not module:
+                    module = Module(disease_id=disease.id, developed_by=module_developed_by)
+                    session.add(module)
+                    session.flush()
+                practice.module_id = module.id
+
+        for disease_name in disease_names:
+            disease = _get_or_create_disease_by_name(session, disease_name)
+            if disease:
+                practice.diseases.append(disease)
+
+        session.add(practice)
+        stats['created'] += 1
+
+    return stats
+
+
+def _import_contraindications_rows(session, rows):
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+    for idx, row in enumerate(rows, start=2):
+        disease_name = _normalize_str(row.get('disease') or row.get('disease_name'))
+        practice_english = _normalize_str(row.get('practice_english') or row.get('practice'))
+        practice_sanskrit = _normalize_str(row.get('practice_sanskrit'))
+        practice_segment = _match_allowed_category(
+            row.get('practice_segment') or row.get('category') or row.get('segment')
+        )
+        sub_category = _normalize_str(row.get('sub_category'))
+        reason = _normalize_str(row.get('reason'))
+        source_type = _normalize_str(row.get('source_type'))
+        source_name = _normalize_str(row.get('source_name'))
+        apa_citation = _normalize_str(row.get('apa_citation'))
+
+        if not disease_name:
+            stats['errors'].append(f'Row {idx}: disease_name is required for contraindications import.')
+            continue
+        if not practice_english and not practice_sanskrit:
+            stats['errors'].append(f'Row {idx}: practice name is required for contraindications import.')
+            continue
+        if not practice_segment:
+            stats['errors'].append(f'Row {idx}: practice_segment/category is required for contraindications import.')
+            continue
+
+        disease = _get_or_create_disease_by_name(session, disease_name)
+        if not disease:
+            stats['errors'].append(f'Row {idx}: could not create disease "{disease_name}".')
+            continue
+
+        existing = None
+        for contra in disease.contraindications:
+            if (contra.practice_english.lower() == practice_english.lower() and
+                contra.practice_segment.lower() == practice_segment.lower()):
+                existing = contra
+                break
+
+        if existing:
+            changes = 0
+            if practice_sanskrit and not existing.practice_sanskrit:
+                existing.practice_sanskrit = practice_sanskrit
+                changes += 1
+            if sub_category and existing.sub_category != sub_category:
+                existing.sub_category = sub_category
+                changes += 1
+            if reason and existing.reason != reason:
+                existing.reason = reason
+                changes += 1
+            if source_type and existing.source_type != source_type:
+                existing.source_type = source_type
+                changes += 1
+            if source_name and existing.source_name != source_name:
+                existing.source_name = source_name
+                changes += 1
+            if apa_citation and existing.apa_citation != apa_citation:
+                existing.apa_citation = apa_citation
+                changes += 1
+
+            if changes:
+                stats['updated'] += 1
+            else:
+                stats['skipped'] += 1
+            continue
+
+        contra = Contraindication(
+            practice_sanskrit=practice_sanskrit,
+            practice_english=practice_english or practice_sanskrit,
+            practice_segment=practice_segment,
+            sub_category=sub_category,
+            reason=reason,
+            source_type=source_type,
+            source_name=source_name,
+            apa_citation=apa_citation
+        )
+        contra.diseases.append(disease)
+        session.add(contra)
+        stats['created'] += 1
+
+    return stats
+
+
+def _import_rcts_rows(session, rows):
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+    for idx, row in enumerate(rows, start=2):
+        title = _normalize_str(row.get('title'))
+        doi = _normalize_str(row.get('doi'))
+        citation_full = _normalize_str(row.get('citation_full') or row.get('full_reference'))
+        parenthetical_citation = _normalize_str(row.get('parenthetical_citation') or row.get('citation_text'))
+        database_journal = _normalize_str(row.get('database_journal'))
+        study_type = _normalize_str(row.get('study_type'))
+        participant_type = _normalize_str(row.get('participant_type'))
+        duration_type = _normalize_str(row.get('duration_type'))
+        duration_value = _normalize_str(row.get('duration_value'))
+        frequency_per_duration = _normalize_str(row.get('frequency_per_duration'))
+        results_text = _normalize_str(row.get('results'))
+        conclusion = _normalize_str(row.get('conclusion'))
+        remarks = _normalize_str(row.get('remarks'))
+        disease_names = _parse_name_list(row.get('diseases') or row.get('disease_names') or row.get('disease'))
+
+        if not title:
+            stats['errors'].append(f'Row {idx}: title is required for RCT import.')
+            continue
+
+        existing = None
+        if doi:
+            existing = session.query(RCT).filter(func.lower(RCT.doi) == doi.lower()).first()
+        if not existing:
+            existing = session.query(RCT).filter(func.lower(RCT.title) == title.lower()).first()
+
+        if existing:
+            changes = 0
+            if citation_full and existing.citation_full != citation_full:
+                existing.citation_full = citation_full
+                changes += 1
+            if parenthetical_citation and existing.parenthetical_citation != parenthetical_citation:
+                existing.parenthetical_citation = parenthetical_citation
+                changes += 1
+            if database_journal and existing.database_journal != database_journal:
+                existing.database_journal = database_journal
+                changes += 1
+            if study_type and existing.study_type != study_type:
+                existing.study_type = study_type
+                changes += 1
+            if participant_type and existing.participant_type != participant_type:
+                existing.participant_type = participant_type
+                changes += 1
+            if duration_type and existing.duration_type != duration_type:
+                existing.duration_type = duration_type
+                changes += 1
+            if duration_value:
+                try:
+                    value_int = int(float(duration_value))
+                    if existing.duration_value != value_int:
+                        existing.duration_value = value_int
+                        changes += 1
+                except ValueError:
+                    stats['errors'].append(f'Row {idx}: invalid duration_value "{duration_value}".')
+            if frequency_per_duration and existing.frequency_per_duration != frequency_per_duration:
+                existing.frequency_per_duration = frequency_per_duration
+                changes += 1
+            if results_text and existing.results != results_text:
+                existing.results = results_text
+                changes += 1
+            if conclusion and existing.conclusion != conclusion:
+                existing.conclusion = conclusion
+                changes += 1
+            if remarks and existing.remarks != remarks:
+                existing.remarks = remarks
+                changes += 1
+
+            for disease_name in disease_names:
+                disease = _get_or_create_disease_by_name(session, disease_name)
+                if disease and disease not in existing.diseases:
+                    existing.diseases.append(disease)
+                    changes += 1
+
+            if changes:
+                stats['updated'] += 1
+            else:
+                stats['skipped'] += 1
+            continue
+
+        rct = RCT(
+            title=title,
+            doi=doi or None,
+            citation_full=citation_full,
+            parenthetical_citation=parenthetical_citation,
+            database_journal=database_journal,
+            study_type=study_type,
+            participant_type=participant_type,
+            duration_type=duration_type,
+            duration_value=int(float(duration_value)) if duration_value else None,
+            frequency_per_duration=frequency_per_duration,
+            results=results_text,
+            conclusion=conclusion,
+            remarks=remarks
+        )
+        for disease_name in disease_names:
+            disease = _get_or_create_disease_by_name(session, disease_name)
+            if disease:
+                rct.diseases.append(disease)
+        session.add(rct)
+        stats['created'] += 1
+
+    return stats
 
 
 @app.route('/')
@@ -1281,6 +1719,68 @@ def view_practice(practice_id):
         _ = practice.citation
         
         return render_template('view_practice.html', practice=practice)
+    finally:
+        session.close()
+
+
+@app.route('/import-data', methods=['GET', 'POST'])
+def import_data():
+    """Import modules, practices, contraindications, or RCTs from CSV/XLSX."""
+    session = get_db_session()
+    try:
+        if request.method == 'POST':
+            import_type = request.form.get('import_type')
+            upload = request.files.get('data_file')
+
+            if not import_type:
+                flash('Select what you want to import (modules/practices/contraindications/RCTs).', 'error')
+                return redirect(url_for('import_data'))
+
+            if not upload or not upload.filename:
+                flash('Please choose a CSV or XLSX file to upload.', 'error')
+                return redirect(url_for('import_data'))
+
+            try:
+                rows = _load_tabular_rows(upload)
+            except ValueError as exc:
+                flash(str(exc), 'error')
+                return redirect(url_for('import_data'))
+
+            if not rows:
+                flash('No rows found in the uploaded file.', 'error')
+                return redirect(url_for('import_data'))
+
+            try:
+                if import_type == 'modules':
+                    stats = _import_modules_rows(session, rows)
+                elif import_type == 'practices':
+                    stats = _import_practices_rows(session, rows)
+                elif import_type == 'contraindications':
+                    stats = _import_contraindications_rows(session, rows)
+                elif import_type == 'rcts':
+                    stats = _import_rcts_rows(session, rows)
+                else:
+                    flash('Unknown import type.', 'error')
+                    return redirect(url_for('import_data'))
+                session.commit()
+            except Exception as exc:
+                session.rollback()
+                flash(f'Error importing data: {exc}', 'error')
+                return redirect(url_for('import_data'))
+
+            created = stats.get('created', 0)
+            updated = stats.get('updated', 0)
+            skipped = stats.get('skipped', 0)
+            errors = stats.get('errors', [])
+
+            flash(f'Import complete: {created} created, {updated} updated, {skipped} skipped.', 'success')
+            if errors:
+                first_error = errors[0]
+                flash(f'{len(errors)} row(s) had issues. First: {first_error}', 'warning')
+            return redirect(url_for('import_data'))
+
+        # GET
+        return render_template('import_data.html')
     finally:
         session.close()
 
@@ -3796,6 +4296,34 @@ def export_diseases_csv():
         response = make_response(output.getvalue())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
         response.headers['Content-Disposition'] = 'attachment; filename=diseases.csv'
+        return response
+    finally:
+        session.close()
+
+
+@app.route('/export/modules/csv')
+def export_modules_csv():
+    """Export modules to CSV"""
+    session = get_db_session()
+    try:
+        modules = session.query(Module).order_by(Module.id).all()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['disease_name', 'developed_by', 'paper_link', 'module_description'])
+
+        for module in modules:
+            writer.writerow([
+                module.disease.name if module.disease else '',
+                module.developed_by or '',
+                module.paper_link or '',
+                module.module_description or ''
+            ])
+
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=modules.csv'
         return response
     finally:
         session.close()

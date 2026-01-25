@@ -5,8 +5,9 @@
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>RCT Database</h2>
-    <div style="display: flex; gap: 1rem;">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <a href="/export/rcts/csv" class="btn" style="background: #28a745;">Download CSV</a>
+        <a href="/import-data" class="btn btn-secondary">Import CSV/XLSX</a>
         <a href="/rct/add" class="btn">Add New RCT Entry</a>
     </div>
 </div>

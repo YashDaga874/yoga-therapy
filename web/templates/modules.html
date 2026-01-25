@@ -24,9 +24,13 @@
 }
 </style>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
     <h2>Modules</h2>
-    <a href="/module/add" class="btn">Add New Module</a>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="/export/modules/csv" class="btn" style="background: #28a745;">Download CSV</a>
+        <a href="/import-data" class="btn btn-secondary">Import CSV/XLSX</a>
+        <a href="/module/add" class="btn">Add New Module</a>
+    </div>
 </div>
 
 <div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
