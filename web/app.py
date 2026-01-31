@@ -24,12 +24,12 @@ from werkzeug.datastructures import FileStorage
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response, session as flask_session
-from sqlalchemy import text, func
+from sqlalchemy import text, func, inspect
 from sqlalchemy.orm import joinedload, selectinload
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
     RCT, RCTSymptom,
-    create_database, get_engine, get_session, disease_contraindication_association,
+    create_database, get_engine, get_session, get_database_url, disease_contraindication_association,
     disease_practice_association, rct_disease_association
 )
 
@@ -81,8 +81,8 @@ ALLOWED_KOSHAS = [
     'Anandamaya',
 ]
 
-# Database path
-DB_PATH = 'sqlite:///yoga_therapy.db'
+# Database path (respects DATABASE_URL / DB_* env vars; defaults to SQLite)
+DB_PATH = get_database_url()
 
 
 def _is_valid_category(category: str) -> bool:
@@ -277,12 +277,19 @@ def ensure_practice_code_column():
     """Ensure practices.code column exists for older databases."""
     try:
         engine = get_engine()
-        with engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(practices)"))
-            columns = [row[1] for row in result]
-            if 'code' not in columns:
-                conn.execute(text("ALTER TABLE practices ADD COLUMN code VARCHAR(50)"))
-                conn.commit()
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('practices')]
+        if 'code' in columns:
+            return
+
+        dialect = engine.dialect.name
+        alter_sql = "ALTER TABLE practices ADD COLUMN code VARCHAR(50)"
+        # Postgres supports IF NOT EXISTS; SQLite does not on older versions
+        if dialect.startswith('postgres'):
+            alter_sql = "ALTER TABLE IF NOT EXISTS practices ADD COLUMN code VARCHAR(50)"
+
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
     except Exception as exc:
         # Avoid crashing startup for non-SQLite or locked DB; surface in logs.
         print(f"Warning: failed to ensure practices.code column: {exc}")
@@ -357,11 +364,60 @@ def _parse_name_list(raw_value: str):
 
 
 def _import_modules_rows(session, rows):
-    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+    stats = {
+        'modules_created': 0,
+        'modules_updated': 0,
+        'modules_skipped': 0,
+        'practices_created': 0,
+        'practices_updated': 0,
+        'practices_skipped': 0,
+        'errors': []
+    }
+    module_cache = {}
+    module_status = {}  # module_id -> created/updated/unchanged
+    practice_status = {'created': set(), 'updated': set(), 'skipped': set()}
+
+    def _record_module_status(module_obj, status):
+        """Track module status without double counting."""
+        if not module_obj:
+            return
+        priority = {'created': 3, 'updated': 2, 'unchanged': 1}
+        current = module_status.get(module_obj.id)
+        if not current or priority[status] > priority[current]:
+            module_status[module_obj.id] = status
+
+    def _parse_int_field(raw_value, field_name, idx):
+        normalized = _normalize_str(raw_value)
+        if not normalized:
+            return None
+        try:
+            return int(float(normalized))
+        except ValueError:
+            stats['errors'].append(f'Row {idx}: {field_name} must be a number (got "{raw_value}").')
+            return None
+
+    def _parse_float_field(raw_value, field_name, idx):
+        normalized = _normalize_str(raw_value)
+        if not normalized:
+            return None
+        try:
+            return float(normalized)
+        except ValueError:
+            stats['errors'].append(f'Row {idx}: {field_name} must be a number (got "{raw_value}").')
+            return None
+
+    def _parse_list_field(raw_value):
+        normalized = _normalize_str(raw_value)
+        if not normalized:
+            return None
+        parts = [part.strip() for part in normalized.replace('|', ',').split(',') if part.strip()]
+        return json.dumps(parts) if parts else None
+
     for idx, row in enumerate(rows, start=2):
         disease_name = _normalize_str(row.get('disease') or row.get('disease_name'))
         developed_by = _normalize_str(row.get('developed_by') or row.get('module_developed_by'))
         paper_link = _normalize_str(row.get('paper_link'))
+        module_description = _normalize_str(row.get('module_description'))
 
         if not disease_name:
             stats['errors'].append(f'Row {idx}: disease_name is required for modules import.')
@@ -372,25 +428,200 @@ def _import_modules_rows(session, rows):
             stats['errors'].append(f'Row {idx}: could not create disease "{disease_name}".')
             continue
 
-        module = session.query(Module).filter(Module.disease_id == disease.id).first()
+        # Use cache to minimize duplicate lookups per disease
+        module = module_cache.get(disease.id)
         if not module:
-            module = Module(disease_id=disease.id, developed_by=developed_by, paper_link=paper_link)
+            module = session.query(Module).filter(Module.disease_id == disease.id).first()
+            module_cache[disease.id] = module
+
+        if not module:
+            module = Module(
+                disease_id=disease.id,
+                developed_by=developed_by,
+                paper_link=paper_link,
+                module_description=module_description
+            )
             session.add(module)
-            stats['created'] += 1
+            session.flush()  # ensure module.id is available for practice associations
+            module_cache[disease.id] = module
+            _record_module_status(module, 'created')
+        else:
+            changes = 0
+            if developed_by and module.developed_by != developed_by:
+                module.developed_by = developed_by
+                changes += 1
+            if paper_link and module.paper_link != paper_link:
+                module.paper_link = paper_link
+                changes += 1
+            if module_description and module.module_description != module_description:
+                module.module_description = module_description
+                changes += 1
+
+            if changes:
+                _record_module_status(module, 'updated')
+            else:
+                _record_module_status(module, 'unchanged')
+
+        # Detect practice data on this row (row represents a practice inside the module)
+        practice_fields = [
+            row.get('practice_english'), row.get('practice_sanskrit'),
+            row.get('practice_segment'), row.get('category'),
+            row.get('sub_category'), row.get('kosha'),
+            row.get('code'), row.get('practice_code'),
+            row.get('rounds'), row.get('time_minutes'),
+            row.get('strokes_per_min'), row.get('strokes_per_cycle'),
+            row.get('rest_between_cycles_sec'), row.get('cvr_score'),
+            row.get('practice_description'), row.get('how_to_do'),
+            row.get('variations'), row.get('steps')
+        ]
+        if not any(_normalize_str(field) for field in practice_fields):
+            # Metadata-only row
             continue
 
-        changes = 0
-        if developed_by and module.developed_by != developed_by:
-            module.developed_by = developed_by
-            changes += 1
-        if paper_link and module.paper_link != paper_link:
-            module.paper_link = paper_link
-            changes += 1
+        # Parse practice fields
+        practice_english = _normalize_str(row.get('practice_english') or row.get('practice_name'))
+        practice_sanskrit = _normalize_str(row.get('practice_sanskrit'))
+        practice_segment = _match_allowed_category(
+            row.get('practice_segment') or row.get('category') or row.get('practice_category')
+        )
+        sub_category = _normalize_str(row.get('sub_category') or row.get('practice_sub_category'))
+        kosha = _normalize_str(row.get('kosha') or row.get('practice_kosha'))
+        code = _normalize_str(row.get('code') or row.get('practice_code'))
+        rounds = _parse_int_field(row.get('rounds') or row.get('practice_rounds'), 'rounds', idx)
+        time_minutes = _parse_float_field(row.get('time_minutes') or row.get('duration_minutes'), 'time_minutes', idx)
+        strokes_per_min = _parse_int_field(row.get('strokes_per_min'), 'strokes_per_min', idx)
+        strokes_per_cycle = _parse_int_field(row.get('strokes_per_cycle'), 'strokes_per_cycle', idx)
+        rest_between_cycles_sec = _parse_int_field(
+            row.get('rest_between_cycles_sec') or row.get('rest_secs'),
+            'rest_between_cycles_sec',
+            idx
+        )
+        cvr_score = _parse_float_field(row.get('cvr_score') or row.get('cvr'), 'cvr_score', idx)
+        practice_description = _normalize_str(row.get('practice_description') or row.get('description'))
+        how_to_do = _normalize_str(row.get('how_to_do') or row.get('instructions'))
+        variations_json = _parse_list_field(row.get('variations') or row.get('practice_variations'))
+        steps_json = _parse_list_field(row.get('steps') or row.get('practice_steps'))
 
-        if changes:
-            stats['updated'] += 1
-        else:
-            stats['skipped'] += 1
+        if not practice_english and not practice_sanskrit:
+            stats['errors'].append(
+                f'Row {idx}: practice_english or practice_sanskrit is required when providing practice details.'
+            )
+            continue
+        if not practice_segment:
+            stats['errors'].append(
+                f'Row {idx}: practice_segment/category is required when providing practice details.'
+            )
+            continue
+
+        # Find an existing practice scoped to this module to avoid hijacking other modules' practices
+        existing = None
+        if code:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.code) == code.lower()
+            ).first()
+        if not existing and practice_sanskrit:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.practice_sanskrit) == practice_sanskrit.lower()
+            ).first()
+        if not existing and practice_english:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.practice_english) == practice_english.lower(),
+                func.lower(Practice.practice_segment) == practice_segment.lower()
+            ).first()
+
+        if existing:
+            changes = 0
+
+            update_fields = [
+                ('practice_sanskrit', practice_sanskrit),
+                ('practice_english', practice_english or practice_sanskrit),
+                ('practice_segment', practice_segment),
+                ('sub_category', sub_category),
+                ('kosha', kosha),
+                ('rounds', rounds),
+                ('time_minutes', time_minutes),
+                ('strokes_per_min', strokes_per_min),
+                ('strokes_per_cycle', strokes_per_cycle),
+                ('rest_between_cycles_sec', rest_between_cycles_sec),
+                ('cvr_score', cvr_score),
+                ('code', code),
+                ('description', practice_description),
+                ('how_to_do', how_to_do),
+            ]
+
+            for field_name, value in update_fields:
+                if value not in (None, '') and getattr(existing, field_name) != value:
+                    setattr(existing, field_name, value)
+                    changes += 1
+
+            if variations_json is not None and existing.variations != variations_json:
+                existing.variations = variations_json
+                changes += 1
+            if steps_json is not None and existing.steps != steps_json:
+                existing.steps = steps_json
+                changes += 1
+
+            if existing.module_id != module.id:
+                existing.module_id = module.id
+                changes += 1
+
+            if disease not in existing.diseases:
+                existing.diseases.append(disease)
+                changes += 1
+
+            if changes:
+                practice_status['updated'].add(existing.id)
+            else:
+                practice_status['skipped'].add(existing.id)
+            continue
+
+        # Create a new practice scoped to this module
+        practice_code = code or generate_practice_code(practice_sanskrit or practice_english, session)
+        practice = Practice(
+            practice_sanskrit=practice_sanskrit or None,
+            practice_english=practice_english or practice_sanskrit,
+            practice_segment=practice_segment,
+            sub_category=sub_category or None,
+            kosha=kosha or None,
+            rounds=rounds,
+            time_minutes=time_minutes,
+            strokes_per_min=strokes_per_min,
+            strokes_per_cycle=strokes_per_cycle,
+            rest_between_cycles_sec=rest_between_cycles_sec,
+            cvr_score=cvr_score,
+            code=practice_code,
+            description=practice_description or None,
+            how_to_do=how_to_do or None,
+            module_id=module.id
+        )
+
+        if variations_json:
+            practice.variations = variations_json
+        if steps_json:
+            practice.steps = steps_json
+
+        practice.diseases.append(disease)
+        session.add(practice)
+        session.flush()
+        practice_status['created'].add(practice.id)
+
+    # Summarize module stats
+    stats['modules_created'] = len([m for m in module_status.values() if m == 'created'])
+    stats['modules_updated'] = len([m for m in module_status.values() if m == 'updated'])
+    stats['modules_skipped'] = len([m for m in module_status.values() if m == 'unchanged'])
+
+    # Summarize practice stats
+    stats['practices_created'] = len(practice_status['created'])
+    stats['practices_updated'] = len(practice_status['updated'])
+    stats['practices_skipped'] = len(practice_status['skipped'])
+
+    # Backward-compatible keys for existing flash message logic
+    stats['created'] = stats['modules_created']
+    stats['updated'] = stats['modules_updated']
+    stats['skipped'] = stats['modules_skipped']
 
     return stats
 
@@ -1768,12 +1999,29 @@ def import_data():
                 flash(f'Error importing data: {exc}', 'error')
                 return redirect(url_for('import_data'))
 
-            created = stats.get('created', 0)
-            updated = stats.get('updated', 0)
-            skipped = stats.get('skipped', 0)
             errors = stats.get('errors', [])
 
-            flash(f'Import complete: {created} created, {updated} updated, {skipped} skipped.', 'success')
+            if import_type == 'modules':
+                modules_created = stats.get('modules_created', stats.get('created', 0))
+                modules_updated = stats.get('modules_updated', stats.get('updated', 0))
+                modules_skipped = stats.get('modules_skipped', stats.get('skipped', 0))
+                practices_created = stats.get('practices_created', 0)
+                practices_updated = stats.get('practices_updated', 0)
+                practices_skipped = stats.get('practices_skipped', 0)
+
+                flash(
+                    f'Import complete: {modules_created} module(s) created, '
+                    f'{modules_updated} updated, {modules_skipped} unchanged. '
+                    f'Practices: {practices_created} created, '
+                    f'{practices_updated} updated, {practices_skipped} unchanged.',
+                    'success'
+                )
+            else:
+                created = stats.get('created', 0)
+                updated = stats.get('updated', 0)
+                skipped = stats.get('skipped', 0)
+                flash(f'Import complete: {created} created, {updated} updated, {skipped} skipped.', 'success')
+
             if errors:
                 first_error = errors[0]
                 flash(f'{len(errors)} row(s) had issues. First: {first_error}', 'warning')

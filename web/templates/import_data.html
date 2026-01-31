@@ -35,8 +35,9 @@
     <div style="padding: 1rem; border: 1px solid #e9ecef; border-radius: 8px; background: #fff;">
         <h4 style="margin-bottom: 0.5rem;">Modules</h4>
         <ul style="margin-left: 1rem; color: #555; line-height: 1.5;">
-            <li>Headers: <code>disease_name</code>, <code>developed_by</code>, <code>paper_link</code> (optional)</li>
-            <li>Matches existing module by disease; updates fields, otherwise creates.</li>
+            <li>Required module columns: <code>disease_name</code>, <code>developed_by</code>; optional: <code>paper_link</code>, <code>module_description</code>.</li>
+            <li>Add practice columns on the same row to import the full module: <code>practice_english</code> (or <code>practice_sanskrit</code>), <code>practice_segment</code>/<code>category</code>, <code>kosha</code>, <code>sub_category</code>, <code>code</code>, <code>rounds</code>, <code>time_minutes</code>, <code>strokes_per_min</code>, <code>strokes_per_cycle</code>, <code>rest_between_cycles_sec</code>, <code>cvr_score</code>, <code>practice_description</code>, <code>how_to_do</code>, <code>variations</code>, <code>steps</code> (variations/steps accept comma/pipe lists).</li>
+            <li>Use one row per practice; repeat module columns for that module. Leaving practice columns empty imports/updates only the module metadata.</li>
         </ul>
     </div>
 
