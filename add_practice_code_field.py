@@ -12,7 +12,7 @@ Run this script once to migrate your database.
 import sys
 import os
 import re
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -102,17 +102,19 @@ def migrate_practice_codes():
         print("Starting practice code migration...")
         
         # Check if code column already exists
-        with engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(practices)"))
-            columns = [row[1] for row in result]
-            
-            if 'code' not in columns:
-                print("Adding 'code' column to practices table...")
-                conn.execute(text("ALTER TABLE practices ADD COLUMN code VARCHAR(50)"))
-                conn.commit()
-                print("Code column added successfully.")
-            else:
-                print("Code column already exists.")
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('practices')]
+        
+        if 'code' not in columns:
+            print("Adding 'code' column to practices table...")
+            alter_sql = "ALTER TABLE practices ADD COLUMN code VARCHAR(50)"
+            if engine.dialect.name.startswith('postgres'):
+                alter_sql = "ALTER TABLE IF NOT EXISTS practices ADD COLUMN code VARCHAR(50)"
+            with engine.begin() as conn:
+                conn.execute(text(alter_sql))
+            print("Code column added successfully.")
+        else:
+            print("Code column already exists.")
         
         # Get all practices grouped by Sanskrit name
         print("Generating codes for practices...")

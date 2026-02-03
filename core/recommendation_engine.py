@@ -19,7 +19,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from collections import defaultdict
-from database.models import Disease, Practice, Contraindication, DiseaseCombination, Module, get_session
+from database.models import Disease, Practice, Contraindication, DiseaseCombination, Module, get_session, get_database_url
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import func
 import json
@@ -30,8 +30,9 @@ class YogaTherapyRecommendationEngine:
     The main engine that generates practice recommendations for multiple diseases
     """
     
-    def __init__(self, db_path='sqlite:///yoga_therapy.db'):
-        self.session = get_session(db_path)
+    def __init__(self, db_path=None):
+        self.db_path = db_path or get_database_url()
+        self.session = get_session(self.db_path)
         self.practice_segment_order = [
             # Canonical categories (match web UI)
             'Preparatory practices',
@@ -417,7 +418,7 @@ class YogaTherapyRecommendationEngine:
 
 
 # Convenience function for quick usage
-def get_recommendations_for_diseases(disease_names, db_path='sqlite:///yoga_therapy.db'):
+def get_recommendations_for_diseases(disease_names, db_path=None):
     """
     Quick function to get recommendations
     
@@ -431,7 +432,7 @@ def get_recommendations_for_diseases(disease_names, db_path='sqlite:///yoga_ther
         engine.close()
 
 
-def get_summary_for_diseases(disease_names, db_path='sqlite:///yoga_therapy.db'):
+def get_summary_for_diseases(disease_names, db_path=None):
     """
     Quick function to get text summary
     

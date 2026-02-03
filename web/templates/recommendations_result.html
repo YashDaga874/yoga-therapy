@@ -6,12 +6,12 @@
 <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Practice Recommendations</h2>
 
 <div style="margin-bottom: 1.5rem;">
-    <!-- Disease Names and Modules -->
+    <!-- Condition Names and Modules -->
     <div style="margin-bottom: 1rem; padding: 0.75rem; background: #e7f3ff; border-radius: 4px; border-left: 3px solid #2196F3;">
         <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: start;">
             <div>
                 <div style="margin-bottom: 0.5rem;">
-                    <strong style="font-size: 0.95rem; color: #495057;">Major Disease:</strong>
+                    <strong style="font-size: 0.95rem; color: #495057;">Major Condition:</strong>
                     <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">{{ major_disease_name }}</span>
                 </div>
                 <div>
@@ -22,7 +22,7 @@
             {% if comorbid_disease_names %}
             <div>
                 <div style="margin-bottom: 0.5rem;">
-                    <strong style="font-size: 0.95rem; color: #495057;">Co-morbid Diseases:</strong>
+                    <strong style="font-size: 0.95rem; color: #495057;">Co-morbid Conditions:</strong>
                     <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">
                         {% for disease_name in comorbid_disease_names %}
                             {{ disease_name }}{% if not loop.last %}, {% endif %}
@@ -68,7 +68,7 @@
                                 <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
                                 <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 90px;">Code</th>
                                 <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">RCT</th>
-                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 110px;">Selected diseases</th>
+                                <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 110px;">Selected conditions</th>
                                 <th style="padding: 0.5rem; text-align: center; border: 1px solid #ddd; font-weight: 600; width: 80px;">CVR</th>
                                 <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">RCT Citations</th>
                             </tr>
@@ -95,7 +95,7 @@
                                 </td>
                                 <td style="padding: 0.5rem; text-align: center; border: 1px solid #ddd;">
                                     {% if practice.cvr_score is not none %}
-                                    <span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">{{ "%.2f"|format(practice.cvr_score) }}</span>
+                                    <span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">{{ practice.cvr_score }}</span>
                                     {% else %}
                                     <span style="color: #999; font-size: 0.85rem;">N/A</span>
                                     {% endif %}
@@ -139,7 +139,7 @@
                 <tr style="background: #ffc107; color: #856404;">
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Practice</th>
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Category</th>
-                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Diseases</th>
+                    <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Conditions</th>
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Safety notes</th>
                     <th style="padding: 0.5rem; text-align: left; border: 1px solid #ddd; font-weight: 600;">Citation</th>
                 </tr>

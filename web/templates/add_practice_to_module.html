@@ -48,10 +48,10 @@
             {{ module.developed_by or 'N/A' }}
         {% endif %}
         <br>
-        <strong>Disease:</strong> {{ module.disease.name if module.disease else 'N/A' }}
+        <strong>Condition:</strong> {{ module.disease.name if module.disease else 'N/A' }}
     </p>
     <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">
-        This practice will be automatically associated with the disease: <strong>{{ module.disease.name if module.disease else 'N/A' }}</strong>
+        This practice will be automatically associated with the condition: <strong>{{ module.disease.name if module.disease else 'N/A' }}</strong>
     </p>
 
     {% if existing_practices %}
@@ -147,7 +147,7 @@
     <div class="compact-grid" style="margin-bottom: 1.25rem;">
         <div class="form-group">
             <label for="cvr_score">CVR Score</label>
-            <input type="number" step="0.01" id="cvr_score" name="cvr_score" placeholder="e.g., 0.82">
+            <input type="number" step="any" min="-1" max="1" id="cvr_score" name="cvr_score" placeholder="e.g., 0.82347">
         </div>
     </div>
     
@@ -168,19 +168,29 @@ const autocompleteDiv = document.getElementById('autocomplete-results');
 
 // Category to Kosha mapping
 const categoryToKosha = {
+    'Preparatory practices': 'Annamaya Kosha',
     'Preparatory Practice': 'Annamaya Kosha',
     'Yogasana': 'Annamaya Kosha',
+    'Kriya (cleansing)': 'Annamaya Kosha',
     'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential yogic practices': 'Annamaya Kosha',
     'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Lifestyle modifications': 'Annamaya Kosha',
     'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+    'Yogic diet': 'Annamaya Kosha',
     'Yogic diet (Anna)': 'Annamaya Kosha',
+    'Chair Yoga': 'Annamaya Kosha',
     'Chair Yoga (Anna)': 'Annamaya Kosha',
+    'Breathing practices': 'Pranamaya Kosha',
     'Breathing Practice': 'Pranamaya Kosha',
     'Pranayama': 'Pranamaya Kosha',
+    'Relaxation': 'Annamaya Kosha',
     'Meditation': 'Manomaya Kosha',
     'Chanting': 'Manomaya Kosha',
+    'Yogic counselling': 'Vijnanamaya Kosha',
     'Yogic Counselling': 'Vijnanamaya Kosha',
-    'Additional Practices': ''  // Can be left empty or determined by user
+    'Additional practices': '',
+    'Additional Practices': ''
 };
 
 // Auto-fill Kosha based on Category selection
@@ -312,18 +322,28 @@ function selectPractice(id) {
         } else if (koshaField && practiceSegmentField && practice.practice_segment) {
             // Auto-fill kosha based on category if not provided
             const categoryToKosha = {
+                'Preparatory practices': 'Annamaya Kosha',
                 'Preparatory Practice': 'Annamaya Kosha',
                 'Yogasana': 'Annamaya Kosha',
+                'Kriya (cleansing)': 'Annamaya Kosha',
                 'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+                'Sequential yogic practices': 'Annamaya Kosha',
                 'Sequential Yogic Practice': 'Annamaya Kosha',
+                'Lifestyle modifications': 'Annamaya Kosha',
                 'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+                'Yogic diet': 'Annamaya Kosha',
                 'Yogic diet (Anna)': 'Annamaya Kosha',
+                'Chair Yoga': 'Annamaya Kosha',
                 'Chair Yoga (Anna)': 'Annamaya Kosha',
+                'Breathing practices': 'Pranamaya Kosha',
                 'Breathing Practice': 'Pranamaya Kosha',
                 'Pranayama': 'Pranamaya Kosha',
+                'Relaxation': 'Annamaya Kosha',
                 'Meditation': 'Manomaya Kosha',
                 'Chanting': 'Manomaya Kosha',
+                'Yogic counselling': 'Vijnanamaya Kosha',
                 'Yogic Counselling': 'Vijnanamaya Kosha',
+                'Additional practices': '',
                 'Additional Practices': ''
             };
             const mappedKosha = categoryToKosha[practice.practice_segment];
@@ -480,18 +500,28 @@ function selectPracticeByCode(id) {
         } else if (koshaField && practiceSegmentField && practice.practice_segment) {
             // Auto-fill kosha based on category if not provided
             const categoryToKosha = {
+                'Preparatory practices': 'Annamaya Kosha',
                 'Preparatory Practice': 'Annamaya Kosha',
                 'Yogasana': 'Annamaya Kosha',
+                'Kriya (cleansing)': 'Annamaya Kosha',
                 'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+                'Sequential yogic practices': 'Annamaya Kosha',
                 'Sequential Yogic Practice': 'Annamaya Kosha',
+                'Lifestyle modifications': 'Annamaya Kosha',
                 'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+                'Yogic diet': 'Annamaya Kosha',
                 'Yogic diet (Anna)': 'Annamaya Kosha',
+                'Chair Yoga': 'Annamaya Kosha',
                 'Chair Yoga (Anna)': 'Annamaya Kosha',
+                'Breathing practices': 'Pranamaya Kosha',
                 'Breathing Practice': 'Pranamaya Kosha',
                 'Pranayama': 'Pranamaya Kosha',
+                'Relaxation': 'Annamaya Kosha',
                 'Meditation': 'Manomaya Kosha',
                 'Chanting': 'Manomaya Kosha',
+                'Yogic counselling': 'Vijnanamaya Kosha',
                 'Yogic Counselling': 'Vijnanamaya Kosha',
+                'Additional practices': '',
                 'Additional Practices': ''
             };
             const mappedKosha = categoryToKosha[practice.practice_segment];

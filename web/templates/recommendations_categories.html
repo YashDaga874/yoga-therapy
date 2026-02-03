@@ -10,11 +10,11 @@
 
     <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
         <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem;">
-            <strong>Major Disease:</strong> {{ major_module.disease.name if major_module.disease else 'N/A' }} ({{ major_module.developed_by or 'N/A' }})
+            <strong>Major Condition:</strong> {{ major_module.disease.name if major_module.disease else 'N/A' }} ({{ major_module.developed_by or 'N/A' }})
         </div>
         {% if comorbid_modules %}
         <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem;">
-            <strong>Co-morbid Diseases:</strong> 
+            <strong>Co-morbid Conditions:</strong> 
             {% for m in comorbid_modules %}
                 {{ m.disease.name if m.disease else 'N/A' }} ({{ m.developed_by or 'N/A' }}){% if not loop.last %}, {% endif %}
             {% endfor %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Diseases{% endblock %}
+{% block title %}Conditions{% endblock %}
 
 {% block content %}
 <style>
@@ -30,14 +30,15 @@
 </style>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h2>Diseases & Conditions</h2>
-</div>
+    <h2>Conditions</h2>
+    </div>
 
 {% if diseases %}
     <table>
         <thead>
             <tr>
-                <th>Disease Name</th>
+                <th>Condition Name</th>
+                <th>Condition Code</th>
                 <th>Modules (with Practice Count)</th>
             </tr>
         </thead>
@@ -45,6 +46,7 @@
             {% for disease in diseases %}
             <tr class="clickable-row" onclick="window.location.href='/disease/{{ disease.id }}'">
                 <td><strong>{{ disease.name }}</strong></td>
+                <td><span style="color: #495057; font-weight: 600;">{{ disease.code or 'N/A' }}</span></td>
                 <td>
                     {% if disease.modules %}
                         {% for module in disease.modules %}
@@ -85,9 +87,9 @@
     {% endif %}
 {% else %}
     <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center;">
-        <p>No diseases found in the database.</p>
+        <p>No conditions found in the database.</p>
         <p style="margin-top: 1rem;">
-            <a href="/disease/add" class="btn">Add Your First Disease</a>
+            <a href="/disease/add" class="btn">Add Your First Condition</a>
         </p>
     </div>
 {% endif %}

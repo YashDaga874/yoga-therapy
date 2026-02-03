@@ -48,8 +48,7 @@ def from_json_filter(value):
         return []
 
 # Enumerations enforced across the app
-ALLOWED_CATEGORIES = [
-    # Canonical names
+CANONICAL_CATEGORIES = [
     'Preparatory practices',
     'Breathing practices',
     'Sequential yogic practices',
@@ -60,10 +59,14 @@ ALLOWED_CATEGORIES = [
     'Additional practices',
     'Kriya (cleansing)',
     'Yogic counselling',
-    'Lifestyle modifications (Anna)',
-    'Yogic diet (Anna)',
-    'Chair Yoga (Anna)',
-    # Backward-compatible legacy spellings
+    'Relaxation',
+    'Lifestyle modifications',
+    'Yogic diet',
+    'Chair Yoga',
+]
+
+# Legacy spellings kept for backward compatibility with older data/imports
+LEGACY_CATEGORIES = [
     'Preparatory Practice',
     'Breathing Practice',
     'Sequential Yogic Practice',
@@ -71,7 +74,12 @@ ALLOWED_CATEGORIES = [
     'Kriya (Cleansing Techniques)',
     'Yogic Counselling',
     'Suryanamaskara',
+    'Lifestyle modifications (Anna)',
+    'Yogic diet (Anna)',
+    'Chair Yoga (Anna)',
 ]
+
+ALLOWED_CATEGORIES = CANONICAL_CATEGORIES + LEGACY_CATEGORIES
 
 ALLOWED_KOSHAS = [
     'Annamaya',
@@ -273,6 +281,55 @@ def generate_practice_code(sanskrit_name, session=None, existing_codes=None):
     
     return code
 
+
+def _generate_generic_code(name, session, model_cls):
+    """
+    Generate a code based on the provided name, ensuring uniqueness within the given model.
+    Follows the same approach as practice codes: initials/first letters + numeric suffix if needed.
+    """
+    import re
+    if not name or not name.strip():
+        return None
+
+    # Pull existing codes for uniqueness
+    existing_codes = set()
+    try:
+        all_rows = session.query(model_cls).filter(model_cls.code.isnot(None)).all()
+        existing_codes = {row.code for row in all_rows if row.code}
+    except Exception:
+        existing_codes = set()
+
+    cleaned = name.strip()
+    words = cleaned.split()
+    if len(words) == 1:
+        base_code = cleaned[:3].upper()
+    else:
+        base_code = ''.join([w[0].upper() for w in words if w])
+
+    base_code = re.sub(r'[^A-Z]', '', base_code)
+    if not base_code:
+        base_code = 'COD'
+
+    code = base_code
+    counter = 1
+    while code in existing_codes:
+        code = f"{base_code}{counter:02d}"
+        counter += 1
+        if counter > 99:
+            import hashlib
+            hash_suffix = hashlib.md5(cleaned.encode()).hexdigest()[:2].upper()
+            code = f"{base_code}{hash_suffix}"
+            break
+    return code
+
+
+def generate_disease_code(name, session):
+    return _generate_generic_code(name, session, Disease)
+
+
+def generate_module_code(name, session):
+    return _generate_generic_code(name, session, Module)
+
 def ensure_practice_code_column():
     """Ensure practices.code column exists for older databases."""
     try:
@@ -294,9 +351,49 @@ def ensure_practice_code_column():
         # Avoid crashing startup for non-SQLite or locked DB; surface in logs.
         print(f"Warning: failed to ensure practices.code column: {exc}")
 
+
+def ensure_disease_code_column():
+    """Ensure diseases.code column exists for older databases."""
+    try:
+        engine = get_engine()
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('diseases')]
+        if 'code' in columns:
+            return
+
+        dialect = engine.dialect.name
+        alter_sql = "ALTER TABLE diseases ADD COLUMN code VARCHAR(50)"
+        if dialect.startswith('postgres'):
+            alter_sql = "ALTER TABLE IF NOT EXISTS diseases ADD COLUMN code VARCHAR(50)"
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
+    except Exception as exc:
+        print(f"Warning: failed to ensure diseases.code column: {exc}")
+
+
+def ensure_module_code_column():
+    """Ensure modules.code column exists for older databases."""
+    try:
+        engine = get_engine()
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('modules')]
+        if 'code' in columns:
+            return
+
+        dialect = engine.dialect.name
+        alter_sql = "ALTER TABLE modules ADD COLUMN code VARCHAR(50)"
+        if dialect.startswith('postgres'):
+            alter_sql = "ALTER TABLE IF NOT EXISTS modules ADD COLUMN code VARCHAR(50)"
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
+    except Exception as exc:
+        print(f"Warning: failed to ensure modules.code column: {exc}")
+
 # Initialize database on startup
 create_database(DB_PATH)
 ensure_practice_code_column()
+ensure_disease_code_column()
+ensure_module_code_column()
 
 
 def get_db_session():
@@ -338,14 +435,19 @@ def paginate_query(query, page, per_page, error_out=False):
     return Pagination(query, page, per_page, total, items)
 
 
-def _get_or_create_disease_by_name(session, disease_name: str):
-    """Fetch a disease by name (case-insensitive) or create it."""
+def _get_or_create_disease_by_name(session, disease_name: str, disease_code: str = None):
+    """Fetch a disease by code or name (case-insensitive) or create it."""
     normalized = _normalize_str(disease_name)
-    if not normalized:
-        return None
-    disease = session.query(Disease).filter(func.lower(Disease.name) == normalized.lower()).first()
+    normalized_code = _normalize_str(disease_code)
+
+    disease = None
+    if normalized_code:
+        disease = session.query(Disease).filter(func.lower(Disease.code) == normalized_code.lower()).first()
+    if not disease and normalized:
+        disease = session.query(Disease).filter(func.lower(Disease.name) == normalized.lower()).first()
+
     if not disease:
-        disease = Disease(name=normalized)
+        disease = Disease(name=normalized or normalized_code, code=normalized_code or None)
         session.add(disease)
         session.flush()
     return disease
@@ -413,20 +515,184 @@ def _import_modules_rows(session, rows):
         parts = [part.strip() for part in normalized.replace('|', ',').split(',') if part.strip()]
         return json.dumps(parts) if parts else None
 
+
+def _import_practices_into_module(session, module, rows):
+    """
+    Import practices scoped to a specific module.
+    Headers supported (case-insensitive):
+    practice_sanskrit, practice_english, code, practice_segment/category, sub_category, kosha,
+    rounds, time_minutes, strokes_per_min, strokes_per_cycle, rest_between_cycles_sec, cvr_score,
+    description, how_to_do, variations, steps
+    """
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
+
+    def _p_int(val, field, idx):
+        if val is None or val == '':
+            return None
+        try:
+            return int(float(val))
+        except ValueError:
+            stats['errors'].append(f'Row {idx}: {field} must be a number (got "{val}").')
+            return None
+
+    def _p_float(val, field, idx):
+        if val is None or val == '':
+            return None
+        try:
+            return float(val)
+        except ValueError:
+            stats['errors'].append(f'Row {idx}: {field} must be a number (got "{val}").')
+            return None
+
+    def _p_list(val):
+        normalized = _normalize_str(val)
+        if not normalized:
+            return None
+        parts = [part.strip() for part in normalized.replace('|', ',').split(',') if part.strip()]
+        return json.dumps(parts) if parts else None
+
+    for idx, row in enumerate(rows, start=2):
+        practice_english = _normalize_str(row.get('practice_english') or row.get('english_name'))
+        practice_sanskrit = _normalize_str(row.get('practice_sanskrit') or row.get('sanskrit_name'))
+        practice_segment = _match_allowed_category(
+            row.get('practice_segment') or row.get('category')
+        )
+        sub_category = _normalize_str(row.get('sub_category'))
+        kosha = _normalize_str(row.get('kosha'))
+        code = _normalize_str(row.get('code') or row.get('practice_code'))
+        rounds = _p_int(row.get('rounds'), 'rounds', idx)
+        time_minutes = _p_float(row.get('time_minutes') or row.get('duration'), 'time_minutes', idx)
+        strokes_per_min = _p_int(row.get('strokes_per_min'), 'strokes_per_min', idx)
+        strokes_per_cycle = _p_int(row.get('strokes_per_cycle'), 'strokes_per_cycle', idx)
+        rest_between_cycles_sec = _p_int(row.get('rest_between_cycles_sec') or row.get('rest_secs'), 'rest_between_cycles_sec', idx)
+        cvr_score = _p_float(row.get('cvr_score'), 'cvr_score', idx)
+        description = _normalize_str(row.get('description'))
+        how_to_do = _normalize_str(row.get('how_to_do'))
+        variations = _p_list(row.get('variations'))
+        steps = _p_list(row.get('steps'))
+
+        if not practice_english and not practice_sanskrit:
+            stats['errors'].append(f'Row {idx}: practice_english or practice_sanskrit is required.')
+            continue
+        if not practice_segment:
+            stats['errors'].append(f'Row {idx}: practice_segment/category is required.')
+            continue
+
+        # Find existing practice within this module
+        existing = None
+        if code:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.code) == code.lower()
+            ).first()
+        if not existing and practice_sanskrit:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.practice_sanskrit) == practice_sanskrit.lower()
+            ).first()
+        if not existing and practice_english:
+            existing = session.query(Practice).filter(
+                Practice.module_id == module.id,
+                func.lower(Practice.practice_english) == practice_english.lower(),
+                func.lower(Practice.practice_segment) == practice_segment.lower()
+            ).first()
+
+        if existing:
+            changes = 0
+            for field_name, value in [
+                ('practice_sanskrit', practice_sanskrit),
+                ('practice_english', practice_english or practice_sanskrit),
+                ('practice_segment', practice_segment),
+                ('sub_category', sub_category),
+                ('kosha', kosha),
+                ('rounds', rounds),
+                ('time_minutes', time_minutes),
+                ('strokes_per_min', strokes_per_min),
+                ('strokes_per_cycle', strokes_per_cycle),
+                ('rest_between_cycles_sec', rest_between_cycles_sec),
+                ('cvr_score', cvr_score),
+                ('code', code),
+                ('description', description),
+                ('how_to_do', how_to_do),
+            ]:
+                if value not in (None, '') and getattr(existing, field_name) != value:
+                    setattr(existing, field_name, value)
+                    changes += 1
+
+            if variations is not None and existing.variations != variations:
+                existing.variations = variations
+                changes += 1
+            if steps is not None and existing.steps != steps:
+                existing.steps = steps
+                changes += 1
+
+            if existing.module_id != module.id:
+                existing.module_id = module.id
+                changes += 1
+
+            if module.disease and module.disease not in existing.diseases:
+                existing.diseases.append(module.disease)
+                changes += 1
+
+            if changes:
+                stats['updated'] += 1
+            else:
+                stats['skipped'] += 1
+            continue
+
+        # New practice
+        practice_code = code or generate_practice_code(practice_sanskrit or practice_english, session)
+        practice = Practice(
+            practice_sanskrit=practice_sanskrit or None,
+            practice_english=practice_english or practice_sanskrit,
+            practice_segment=practice_segment,
+            sub_category=sub_category or None,
+            kosha=kosha or None,
+            rounds=rounds,
+            time_minutes=time_minutes,
+            strokes_per_min=strokes_per_min,
+            strokes_per_cycle=strokes_per_cycle,
+            rest_between_cycles_sec=rest_between_cycles_sec,
+            cvr_score=cvr_score,
+            code=practice_code,
+            description=description or None,
+            how_to_do=how_to_do or None,
+            module_id=module.id
+        )
+        if variations:
+            practice.variations = variations
+        if steps:
+            practice.steps = steps
+        if module.disease:
+            practice.diseases.append(module.disease)
+        session.add(practice)
+        stats['created'] += 1
+
+    return stats
+
     for idx, row in enumerate(rows, start=2):
         disease_name = _normalize_str(row.get('disease') or row.get('disease_name'))
+        disease_code = _normalize_str(row.get('disease_code'))
         developed_by = _normalize_str(row.get('developed_by') or row.get('module_developed_by'))
         paper_link = _normalize_str(row.get('paper_link'))
         module_description = _normalize_str(row.get('module_description'))
+        module_code = _normalize_str(row.get('module_code'))
 
         if not disease_name:
             stats['errors'].append(f'Row {idx}: disease_name is required for modules import.')
             continue
 
-        disease = _get_or_create_disease_by_name(session, disease_name)
+        disease = _get_or_create_disease_by_name(session, disease_name, disease_code)
         if not disease:
             stats['errors'].append(f'Row {idx}: could not create disease "{disease_name}".')
             continue
+        # If a code is provided and missing on the record, set it (if unique)
+        if disease_code and not disease.code:
+            conflict = session.query(Disease).filter(func.lower(Disease.code) == disease_code.lower(), Disease.id != disease.id).first()
+            if conflict:
+                stats['errors'].append(f'Row {idx}: disease_code "{disease_code}" already exists.')
+                continue
+            disease.code = disease_code
 
         # Use cache to minimize duplicate lookups per disease
         module = module_cache.get(disease.id)
@@ -435,8 +701,13 @@ def _import_modules_rows(session, rows):
             module_cache[disease.id] = module
 
         if not module:
+            final_module_code = module_code
+            if not final_module_code:
+                base_for_code = disease.name or developed_by or module_description
+                final_module_code = generate_module_code(base_for_code, session)
             module = Module(
                 disease_id=disease.id,
+                code=final_module_code,
                 developed_by=developed_by,
                 paper_link=paper_link,
                 module_description=module_description
@@ -447,6 +718,13 @@ def _import_modules_rows(session, rows):
             _record_module_status(module, 'created')
         else:
             changes = 0
+            if module_code and module.code != module_code:
+                conflict = session.query(Module).filter(func.lower(Module.code) == module_code.lower(), Module.id != module.id).first()
+                if conflict:
+                    stats['errors'].append(f'Row {idx}: module_code "{module_code}" already exists.')
+                    continue
+                module.code = module_code
+                changes += 1
             if developed_by and module.developed_by != developed_by:
                 module.developed_by = developed_by
                 changes += 1
@@ -734,7 +1012,11 @@ def _import_practices_rows(session, rows):
             if disease:
                 module = session.query(Module).filter(Module.disease_id == disease.id).first()
                 if not module:
-                    module = Module(disease_id=disease.id, developed_by=module_developed_by)
+                    module = Module(
+                        disease_id=disease.id,
+                        code=generate_module_code(disease.name, session),
+                        developed_by=module_developed_by
+                    )
                     session.add(module)
                     session.flush()
                 practice.module_id = module.id
@@ -971,7 +1253,7 @@ def list_diseases():
         query = session.query(Disease).options(
             selectinload(Disease.practices),
             selectinload(Disease.modules)
-        )
+        ).filter(Disease.modules.any())  # only diseases that have modules
         
         # Paginate results
         pagination = paginate_query(query, page, per_page)
@@ -985,6 +1267,115 @@ def list_diseases():
         session.close()
 
 
+@app.route('/module/<int:module_id>/practices/export')
+def export_module_practices_csv(module_id):
+    """Export all practices within a module to CSV"""
+    session = get_db_session()
+    try:
+        module = session.query(Module).get(module_id)
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            'practice_sanskrit', 'practice_english', 'code', 'practice_segment',
+            'sub_category', 'kosha', 'rounds', 'time_minutes', 'strokes_per_min',
+            'strokes_per_cycle', 'rest_between_cycles_sec', 'cvr_score',
+            'description', 'how_to_do', 'variations', 'steps'
+        ])
+
+        for practice in module.practices:
+            variations_str = ''
+            if practice.variations:
+                try:
+                    variations = json.loads(practice.variations)
+                    if isinstance(variations, list):
+                        variations_str = ', '.join([str(v) for v in variations])
+                    else:
+                        variations_str = practice.variations
+                except Exception:
+                    variations_str = practice.variations
+
+            steps_str = ''
+            if practice.steps:
+                try:
+                    steps = json.loads(practice.steps)
+                    if isinstance(steps, list):
+                        steps_str = ' | '.join([str(s) for s in steps])
+                    else:
+                        steps_str = practice.steps
+                except Exception:
+                    steps_str = practice.steps
+
+            writer.writerow([
+                practice.practice_sanskrit or '',
+                practice.practice_english or '',
+                practice.code or '',
+                practice.practice_segment or '',
+                practice.sub_category or '',
+                practice.kosha or '',
+                practice.rounds if practice.rounds is not None else '',
+                practice.time_minutes if practice.time_minutes is not None else '',
+                practice.strokes_per_min if practice.strokes_per_min is not None else '',
+                practice.strokes_per_cycle if practice.strokes_per_cycle is not None else '',
+                practice.rest_between_cycles_sec if practice.rest_between_cycles_sec is not None else '',
+                practice.cvr_score if practice.cvr_score is not None else '',
+                practice.description or '',
+                practice.how_to_do or '',
+                variations_str,
+                steps_str
+            ])
+
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=module_{module_id}_practices.csv'
+        return response
+    finally:
+        session.close()
+
+
+@app.route('/module/<int:module_id>/practices/import', methods=['POST'])
+def import_module_practices_csv(module_id):
+    """Import practices into a specific module from CSV/XLSX"""
+    session = get_db_session()
+    try:
+        module = session.query(Module).get(module_id)
+        if not module:
+            flash('Module not found', 'error')
+            return redirect(url_for('list_modules'))
+
+        upload = request.files.get('practices_file')
+        if not upload or not upload.filename:
+            flash('Please choose a CSV or XLSX file to upload.', 'error')
+            return redirect(url_for('view_module', module_id=module_id))
+
+        try:
+            rows = _load_tabular_rows(upload)
+        except ValueError as exc:
+            flash(str(exc), 'error')
+            return redirect(url_for('view_module', module_id=module_id))
+
+        if not rows:
+            flash('No rows found in the uploaded file.', 'error')
+            return redirect(url_for('view_module', module_id=module_id))
+
+        stats = _import_practices_into_module(session, module, rows)
+        session.commit()
+
+        flash(f'Import complete: {stats.get("created",0)} created, {stats.get("updated",0)} updated, {stats.get("skipped",0)} unchanged.', 'success')
+        if stats.get('errors'):
+            flash(f'{len(stats["errors"])} row(s) had issues. First: {stats["errors"][0]}', 'warning')
+        return redirect(url_for('view_module', module_id=module_id))
+    except Exception as exc:
+        session.rollback()
+        flash(f'Error importing practices: {exc}', 'error')
+        return redirect(url_for('view_module', module_id=module_id))
+    finally:
+        session.close()
+
 @app.route('/disease/add', methods=['GET', 'POST'])
 def add_disease():
     """Add a new disease"""
@@ -992,15 +1383,27 @@ def add_disease():
         session = get_db_session()
         
         try:
-            # Check if disease already exists
-            existing_disease = session.query(Disease).filter_by(name=request.form['name']).first()
+            disease_code_input = _normalize_str(request.form.get('disease_code'))
+            name_input = request.form['name']
+
+            # Check if disease already exists by name or code
+            existing_disease = session.query(Disease).filter(
+                func.lower(Disease.name) == name_input.lower()
+            ).first()
             if existing_disease:
-                flash(f'Disease "{request.form["name"]}" already exists!', 'error')
+                flash(f'Disease "{name_input}" already exists!', 'error')
                 session.close()
                 return render_template('add_disease.html')
+            if disease_code_input:
+                conflict = session.query(Disease).filter(func.lower(Disease.code) == disease_code_input.lower()).first()
+                if conflict:
+                    flash(f'Disease code "{disease_code_input}" already exists!', 'error')
+                    session.close()
+                    return render_template('add_disease.html')
             
             disease = Disease(
-                name=request.form['name'],
+                name=name_input,
+                code=disease_code_input or generate_disease_code(name_input, session),
                 description=request.form.get('description', '')
             )
             
@@ -1008,8 +1411,18 @@ def add_disease():
             
             # Add module information if provided
             if request.form.get('developed_by'):
+                module_code_input = _normalize_str(request.form.get('module_code'))
+                if module_code_input:
+                    conflict = session.query(Module).filter(func.lower(Module.code) == module_code_input.lower()).first()
+                    if conflict:
+                        flash(f'Module code "{module_code_input}" already exists.', 'error')
+                        session.rollback()
+                        session.close()
+                        return render_template('add_disease.html')
+
                 module = Module(
                     disease=disease,
+                    code=module_code_input or generate_module_code(name_input, session),
                     developed_by=request.form['developed_by'],
                     module_description=request.form.get('module_description', '')
                 )
@@ -1097,16 +1510,51 @@ def edit_disease(disease_id):
         if request.method == 'POST':
             disease.name = request.form['name']
             disease.description = request.form.get('description', '')
+
+            # Disease code handling
+            disease_code_input = _normalize_str(request.form.get('disease_code'))
+            if disease_code_input and disease.code != disease_code_input:
+                conflict = session.query(Disease).filter(
+                    func.lower(Disease.code) == disease_code_input.lower(),
+                    Disease.id != disease_id
+                ).first()
+                if conflict:
+                    flash(f'Disease code "{disease_code_input}" already exists.', 'error')
+                    session.close()
+                    return render_template('edit_disease.html', disease=disease, module=module)
+                disease.code = disease_code_input
+            elif not disease.code:
+                disease.code = generate_disease_code(disease.name, session)
             
             # Update module information
             if request.form.get('developed_by'):
+                module_code_input = _normalize_str(request.form.get('module_code'))
                 if module:
+                    if module_code_input and module.code != module_code_input:
+                        conflict = session.query(Module).filter(
+                            func.lower(Module.code) == module_code_input.lower(),
+                            Module.id != module.id
+                        ).first()
+                        if conflict:
+                            flash(f'Module code "{module_code_input}" already exists.', 'error')
+                            session.close()
+                            return render_template('edit_disease.html', disease=disease, module=module)
+                        module.code = module_code_input
+                    elif not module.code:
+                        module.code = generate_module_code(module.developed_by or disease.name, session)
                     module.developed_by = request.form['developed_by']
                     module.module_description = request.form.get('module_description', '')
                 else:
                     # Create new module
+                    if module_code_input:
+                        conflict = session.query(Module).filter(func.lower(Module.code) == module_code_input.lower()).first()
+                        if conflict:
+                            flash(f'Module code "{module_code_input}" already exists.', 'error')
+                            session.close()
+                            return render_template('edit_disease.html', disease=disease, module=module)
                     module = Module(
                         disease_id=disease.id,
+                        code=module_code_input or generate_module_code(disease.name, session),
                         developed_by=request.form['developed_by'],
                         module_description=request.form.get('module_description', '')
                     )
@@ -2137,7 +2585,7 @@ def add_contraindication():
         selected_disease = None
         existing_contras = []
 
-        practice_segments = ALLOWED_CATEGORIES
+        practice_segments = CANONICAL_CATEGORIES
 
         if disease_id:
             selected_disease = session.query(Disease).get(disease_id)
@@ -2327,6 +2775,7 @@ def add_module():
         try:
             disease_id = request.form.get('disease_id')
             disease_name = request.form.get('disease_name', '').strip()
+            module_code_input = _normalize_str(request.form.get('module_code'))
             
             # If disease_id is provided, use it
             if disease_id:
@@ -2341,7 +2790,17 @@ def add_module():
                 disease = session.query(Disease).filter_by(name=disease_name).first()
                 if not disease:
                     # Create new disease
-                    disease = Disease(name=disease_name)
+                    disease = Disease(
+                        name=disease_name,
+                        code=_normalize_str(request.form.get('disease_code')) or generate_disease_code(disease_name, session)
+                    )
+                    # Validate disease code uniqueness
+                    if disease.code:
+                        conflict = session.query(Disease).filter(func.lower(Disease.code) == disease.code.lower()).first()
+                        if conflict:
+                            flash(f'Disease code "{disease.code}" already exists.', 'error')
+                            diseases = session.query(Disease).all()
+                            return render_template('add_module.html', diseases=diseases)
                     session.add(disease)
                     session.flush()  # Get the ID
                     flash(f'New disease "{disease_name}" created!', 'success')
@@ -2351,8 +2810,21 @@ def add_module():
                 diseases = session.query(Disease).all()
                 return render_template('add_module.html', diseases=diseases)
             
+            # Determine module code
+            final_module_code = module_code_input
+            if not final_module_code:
+                base_for_code = disease.name if disease else request.form.get('developed_by', '')
+                final_module_code = generate_module_code(base_for_code, session)
+            else:
+                conflict = session.query(Module).filter(func.lower(Module.code) == final_module_code.lower()).first()
+                if conflict:
+                    flash(f'Module code "{final_module_code}" already exists.', 'error')
+                    diseases = session.query(Disease).all()
+                    return render_template('add_module.html', diseases=diseases)
+
             module = Module(
                 disease_id=disease_id,
+                code=final_module_code,
                 developed_by=request.form.get('developed_by', ''),
                 paper_link=request.form.get('paper_link', ''),
                 module_description=request.form.get('module_description', '')
@@ -2407,12 +2879,13 @@ def view_module(module_id):
             'Pranayama',
             'Meditation',
             'Chanting',
+            'Relaxation',
             'Additional practices',
             'Kriya (cleansing)',
             'Yogic counselling',
-            'Lifestyle modifications (Anna)',
-            'Yogic diet (Anna)',
-            'Chair Yoga (Anna)',
+            'Lifestyle modifications',
+            'Yogic diet',
+            'Chair Yoga',
             # legacy spellings
             'Preparatory Practice',
             'Breathing Practice',
@@ -2421,6 +2894,9 @@ def view_module(module_id):
             'Kriya (Cleansing Techniques)',
             'Yogic Counselling',
             'Suryanamaskara',
+            'Lifestyle modifications (Anna)',
+            'Yogic diet (Anna)',
+            'Chair Yoga (Anna)',
         ]
 
         if module.practices:
@@ -2475,6 +2951,17 @@ def edit_module(module_id):
         
         if request.method == 'POST':
             try:
+                module_code_input = _normalize_str(request.form.get('module_code'))
+                if module_code_input and module.code != module_code_input:
+                    conflict = session.query(Module).filter(func.lower(Module.code) == module_code_input.lower(), Module.id != module_id).first()
+                    if conflict:
+                        flash(f'Module code "{module_code_input}" already exists.', 'error')
+                        diseases = session.query(Disease).all()
+                        return render_template('edit_module.html', module=module, diseases=diseases)
+                    module.code = module_code_input
+                elif not module.code:
+                    module.code = generate_module_code(module.developed_by or (module.disease.name if module.disease else ''), session)
+
                 module.developed_by = request.form.get('developed_by', '')
                 module.paper_link = request.form.get('paper_link', '')
                 module.module_description = request.form.get('module_description', '')
@@ -2580,7 +3067,7 @@ def add_practice_to_module(module_id):
                     if practice_sanskrit and practice_sanskrit.lower() != existing_sanskrit.lower():
                         flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
                         session.close()
-                        practice_segments = ALLOWED_CATEGORIES
+                        practice_segments = CANONICAL_CATEGORIES
                         existing_practices = get_existing_practices_list(module)
                         return render_template('add_practice_to_module.html', 
                                              module=module, 
@@ -2631,7 +3118,7 @@ def add_practice_to_module(module_id):
                 flash(f'Error adding practice: {str(e)}', 'error')
         
         # Get practice segments for dropdown (now called "Category")
-        practice_segments = ALLOWED_CATEGORIES
+        practice_segments = CANONICAL_CATEGORIES
         
         existing_practices = get_existing_practices_list(module)
         return render_template('add_practice_to_module.html', 
@@ -2706,7 +3193,7 @@ def edit_practice_in_module(module_id, practice_id):
                     if new_sanskrit and new_sanskrit.lower() != existing_sanskrit.lower():
                         flash(f'Error: Code "{user_provided_code}" already exists for practice "{existing_sanskrit}". Practices with the same code must have the same Sanskrit name.', 'error')
                         session.close()
-                        practice_segments = ALLOWED_CATEGORIES
+                        practice_segments = CANONICAL_CATEGORIES
                         return render_template(
                             'edit_practice_in_module.html',
                             module=module,
@@ -2823,7 +3310,9 @@ def edit_practice_in_module(module_id, practice_id):
                 session.rollback()
                 flash(f'Error updating practice: {str(e)}', 'error')
 
-        practice_segments = ALLOWED_CATEGORIES
+        practice_segments = list(CANONICAL_CATEGORIES)
+        if practice.practice_segment and practice.practice_segment not in practice_segments:
+            practice_segments.append(practice.practice_segment)
 
         return render_template(
             'edit_practice_in_module.html',

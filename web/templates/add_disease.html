@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Add Disease{% endblock %}
+{% block title %}Add Condition{% endblock %}
 
 {% block content %}
-<h2>Add New Disease/Condition</h2>
+<h2>Add New Condition</h2>
 
 <form method="POST" style="max-width: 800px;">
     <div class="form-group">
-        <label for="name">Disease Name *</label>
+        <label for="name">Condition Name *</label>
         <input type="text" id="name" name="name" required placeholder="e.g., Depression, GAD, Anxiety">
+    </div>
+
+    <div class="form-group">
+        <label for="disease_code">Condition Code</label>
+        <input type="text" id="disease_code" name="disease_code" placeholder="Auto-generates if left empty" maxlength="50">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Unique short code for this condition (similar to practice codes).
+        </small>
     </div>
     
     <div class="form-group">
@@ -24,6 +32,14 @@
             <input type="text" id="developed_by" name="developed_by" 
                    placeholder="e.g., Dr Naveen GH et al., 2013" required>
         </div>
+
+    <div class="form-group">
+        <label for="module_code">Module Code</label>
+        <input type="text" id="module_code" name="module_code" placeholder="Auto-generates if left empty" maxlength="50">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Unique short code for this module.
+        </small>
+    </div>
         
         <div class="form-group">
             <label for="module_description">Module Description</label>
@@ -33,7 +49,7 @@
     </div>
     
     <div style="display: flex; gap: 1rem;">
-        <button type="submit" class="btn">Add Disease</button>
+        <button type="submit" class="btn">Add Condition</button>
         <a href="/" class="btn btn-secondary">Cancel</a>
     </div>
 </form>

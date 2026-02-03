@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.models import (
     Disease, Practice, Citation, Contraindication, Module,
-    create_database, get_session
+    create_database, get_session, get_database_url
 )
 
 
@@ -23,11 +23,11 @@ class DataImporter:
     Imports yoga therapy data from JSON into the database
     """
     
-    def __init__(self, db_path='sqlite:///yoga_therapy.db'):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        self.db_path = db_path or get_database_url()
         # Create database if it doesn't exist
-        create_database(db_path)
-        self.session = get_session(db_path)
+        create_database(self.db_path)
+        self.session = get_session(self.db_path)
         
         # Cache to avoid duplicate citations
         self.citation_cache = {}

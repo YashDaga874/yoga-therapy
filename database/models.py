@@ -40,6 +40,7 @@ class Disease(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(200), unique=True, nullable=False)
     description = Column(Text)
+    code = Column(String(50), unique=True)  # Short unique identifier
     
     # Relationships
     practices = relationship(
@@ -60,6 +61,7 @@ class Disease(Base):
 
 # Indexes for Disease table
 Index('idx_disease_name', Disease.name)
+Index('idx_disease_code', Disease.code)
 
 
 class Practice(Base):
@@ -226,6 +228,7 @@ class Module(Base):
     disease = relationship('Disease', backref='modules')
     
     # Module identification
+    code = Column(String(50), unique=True)  # Short unique identifier for module
     developed_by = Column(String(500))  # Citation (e.g., "Naveen et al., 2013")
     paper_link = Column(String(1000))  # Link to research paper
     module_description = Column(Text)
@@ -240,6 +243,7 @@ class Module(Base):
 # Indexes for Module table
 Index('idx_module_disease_id', Module.disease_id)
 Index('idx_module_developed_by', Module.developed_by)
+Index('idx_module_code', Module.code)
 
 
 # Association table for RCT and symptoms (many-to-many)

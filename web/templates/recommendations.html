@@ -9,16 +9,16 @@
     </h2>
 
     <form method="POST" id="recommendation-form" action="{{ url_for('recommendations') }}">
-        <!-- Major Disease -->
+        <!-- Major Condition -->
         <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
             <label for="major_module" style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Major Disease <span style="color: #dc3545;">*</span>
+                Major Condition <span style="color: #dc3545;">*</span>
             </label>
             
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: start;">
                 <div style="position: relative;">
                     <input type="text" id="major_module" name="major_module_display" 
-                           placeholder="Type disease name (e.g., Depression (Naveen et al., 2013))" 
+                           placeholder="Type condition name (e.g., Depression (Naveen et al., 2013))" 
                            autocomplete="off" required
                            style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; transition: all 0.2s;">
                     <input type="hidden" id="major_module_id" name="major_module_id">
@@ -32,10 +32,10 @@
             </div>
         </div>
         
-        <!-- Co-morbid Diseases -->
+        <!-- Co-morbid Conditions -->
         <div style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
             <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Co-morbid Diseases
+                Co-morbid Conditions
             </label>
             
             <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
@@ -47,7 +47,7 @@
                      style="min-height: 36px; padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; 
                             background: white; display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;">
                     <input type="text" id="comorbid_module" 
-                           placeholder="Type disease name to add (e.g., GAD (Naveen et al., 2017))" 
+                           placeholder="Type condition name to add (e.g., GAD (Naveen et al., 2017))" 
                            autocomplete="off"
                            style="border: none; outline: none; background: transparent; flex: 1; min-width: 150px; font-size: 0.85rem; padding: 0.2rem;">
                 </div>
@@ -68,7 +68,7 @@
                         Step 2: Give weightage (Total = 100)
                     </div>
                     <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.75rem; font-style: italic;">
-                        Extra practices (from rounding) go to the <strong>major disease</strong>, then comorbidities in the order you added them.
+                        Extra practices (from rounding) go to the <strong>major condition</strong>, then comorbidities in the order you added them.
                     </div>
                 </div>
                 <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; min-width: 150px;">

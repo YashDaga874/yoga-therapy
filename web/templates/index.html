@@ -1,67 +1,30 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Personalized Yoga Therapy Management System</h2>
-<p style="font-size: 1.1rem; color: #667eea; font-weight: 600; margin-bottom: 2rem;">Evidence based database based on IAYT module</p>
+<h2>Evidence-Based Personalised Yoga Therapy Module Prescription System</h2>
+<p style="font-size: 1.1rem; color: #667eea; font-weight: 600; margin-bottom: 2rem;">
+    The Evidence-Based Personalised Yoga Therapy System refers to a rule-based clinical decision-support system that prescribes structured, standardised, and personalised yoga therapy modules grounded in empirical evidence, expert validation, and organised in accordance with the Integrated Yoga Therapy (IAYT) framework.
+</p>
 
 <div style="margin-top: 2rem; padding: 2rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
     <h3 style="margin-bottom: 1rem; color: #2c3e50;">Purpose</h3>
     <p style="margin-bottom: 1.5rem; line-height: 1.8; color: #555;">
-        This system is designed to manage and organize yoga therapy practices based on evidence from research papers and clinical studies. 
-        It enables researchers and practitioners to create structured therapy modules for various diseases and conditions, 
-        track supporting evidence through Randomized Controlled Trials (RCTs), and generate personalized practice recommendations 
-        based on scientific data.
+        Although evidence for yoga-based interventions is increasing, Yoga consultants often rely on individual experience and subjective judgement when selecting practices, leading to variability, inconsistency, and challenges in managing complex or multiple health conditions. This system is intended to support yoga therapy consulatants by providing a structured yet flexible approach to module selection that preserves individualisation while ensuring consistency, safety, and alignment with available evidence. By organising therapeutic recommendations within an integrated yogic framework, the system seeks to make evidence-informed yoga therapy more transparent, reproducible, and practically usable, without constraining professional judgement or reducing the holistic nature of yoga therapy.
     </p>
 </div>
 
 <div style="margin-top: 3rem; padding: 2rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
     <h3 style="margin-bottom: 1rem; color: #2c3e50;">System Logic & How It Works</h3>
     
-    <div style="margin-bottom: 1.5rem;">
-        <h4 style="color: #495057; margin-bottom: 0.8rem;">1. Module-Based Structure</h4>
-        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
-            The system is organized around <strong>Modules</strong>, where each module represents a research paper or study 
-            that focuses on yoga therapy for a specific disease. A single disease can have multiple modules, as different 
-            research papers may propose different sets of practices for the same condition.
-        </p>
-        <p style="line-height: 1.8; color: #555;">
-            For example, <em>Depression</em> may have Module A (developed by Naveen et al., 2013) with one set of practices, 
-            and Module B (developed by another research team) with a different set of practices. Each module is linked to 
-            its source research paper through a hyperlink.
-        </p>
-    </div>
-    
-    <div style="margin-bottom: 1.5rem;">
-        <h4 style="color: #495057; margin-bottom: 0.8rem;">2. Practices Within Modules</h4>
-        <p style="line-height: 1.8; color: #555;">
-            Each module contains multiple <strong>Yoga Practices</strong> organized across nine practice segments: 
-            Preparatory Practice, Breathing Practice, Suryanamaskara, Yogasana, Pranayama, Meditation, 
-            Additional Practices, Kriya (Cleansing Techniques), and Yogic Counselling. Practices are automatically 
-            associated with the disease that the module addresses.
-        </p>
-    </div>
-    
-    <div style="margin-bottom: 1.5rem;">
-        <h4 style="color: #495057; margin-bottom: 0.8rem;">3. RCT Database & Evidence Scoring</h4>
-        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
-            The system maintains a comprehensive <strong>RCT (Randomized Controlled Trial) Database</strong> that tracks 
-            clinical studies and research papers supporting specific practice-disease combinations. Each RCT entry includes 
-            detailed information about the study, participants, interventions, and results.
-        </p>
-        <p style="line-height: 1.8; color: #555;">
-            <strong>RCT Score:</strong> The system calculates an RCT count for each practice within a disease context. 
-            The higher the RCT score (number of supporting research studies), the stronger the evidence for that practice 
-            in treating that particular disease. This scoring mechanism helps prioritize practices with stronger scientific 
-            backing when generating recommendations.
-        </p>
-    </div>
-    
     <div>
-        <h4 style="color: #495057; margin-bottom: 0.8rem;">4. Recommendation Generation</h4>
+        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
+            The system begins with a set of yoga practices that have already been carefully selected using research evidence and expert agreement. Each practice is clearly defined, linked to specific health conditions, and checked for safety. When a yoga therapist enters an individual’s main health concern along with any additional conditions, the system first considers how important each condition is relative to the others. This helps the system decide where more emphasis is needed.
+        </p>
+        <p style="line-height: 1.8; color: #555; margin-bottom: 1rem;">
+            The system then looks at all relevant yoga practices and removes anything that may be unsafe for any of the selected conditions. Among the remaining practices, those with stronger research support and greater expert agreement are given higher priority. Based on this prioritisation, the system selects and organises a set of practices in a balanced way, ensuring that no single condition dominates unfairly unless clinically required.
+        </p>
         <p style="line-height: 1.8; color: #555;">
-            When generating therapy recommendations, the system combines practices from relevant modules, removes duplicates, 
-            applies contraindications based on disease combinations, and prioritizes practices with higher RCT scores. 
-            This ensures that recommendations are evidence-based, safe, and personalized to the specific disease profile.
+            Finally, the selected practices are arranged into a coherent yoga therapy module that reflects an integrated understanding of the body, breath, mind, and lifestyle. The result is a yoga therapy module that follows a consistent structure, adapts to individual needs, and remains grounded in evidence and professional judgment.
         </p>
     </div>
 </div>

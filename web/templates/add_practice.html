@@ -90,19 +90,20 @@
             <label for="practice_segment">Category *</label>
             <select id="practice_segment" name="practice_segment" required>
                 <option value="">Select Category</option>
-                <option value="Preparatory Practice">Preparatory Practice</option>
-                <option value="Breathing Practice">Breathing Practice</option>
-                <option value="Sequential Yogic Practice">Sequential Yogic Practice</option>
+                <option value="Preparatory practices">Preparatory practices</option>
+                <option value="Breathing practices">Breathing practices</option>
+                <option value="Sequential yogic practices">Sequential yogic practices</option>
                 <option value="Yogasana">Yogasana</option>
                 <option value="Pranayama">Pranayama</option>
                 <option value="Meditation">Meditation</option>
                 <option value="Chanting">Chanting</option>
-                <option value="Additional Practices">Additional Practices</option>
-                <option value="Kriya (Cleansing Techniques)">Kriya (Cleansing Techniques)</option>
-                <option value="Yogic Counselling">Yogic Counselling</option>
-                <option value="Lifestyle modifications (Anna)">Lifestyle modifications (Anna)</option>
-                <option value="Yogic diet (Anna)">Yogic diet (Anna)</option>
-                <option value="Chair Yoga (Anna)">Chair Yoga (Anna)</option>
+                <option value="Additional practices">Additional practices</option>
+                <option value="Kriya (cleansing)">Kriya (cleansing)</option>
+                <option value="Yogic counselling">Yogic counselling</option>
+                <option value="Relaxation">Relaxation</option>
+                <option value="Lifestyle modifications">Lifestyle modifications</option>
+                <option value="Yogic diet">Yogic diet</option>
+                <option value="Chair Yoga">Chair Yoga</option>
             </select>
         </div>
         
@@ -318,21 +319,31 @@ if (practiceForm) {
     });
 }
 
-// Category to Kosha mapping
+// Category to Kosha mapping (supports legacy labels)
 const categoryToKosha = {
+    'Preparatory practices': 'Annamaya Kosha',
     'Preparatory Practice': 'Annamaya Kosha',
     'Yogasana': 'Annamaya Kosha',
+    'Kriya (cleansing)': 'Annamaya Kosha',
     'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+    'Sequential yogic practices': 'Annamaya Kosha',
     'Sequential Yogic Practice': 'Annamaya Kosha',
+    'Lifestyle modifications': 'Annamaya Kosha',
     'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+    'Yogic diet': 'Annamaya Kosha',
     'Yogic diet (Anna)': 'Annamaya Kosha',
+    'Chair Yoga': 'Annamaya Kosha',
     'Chair Yoga (Anna)': 'Annamaya Kosha',
+    'Breathing practices': 'Pranamaya Kosha',
     'Breathing Practice': 'Pranamaya Kosha',
     'Pranayama': 'Pranamaya Kosha',
+    'Relaxation': 'Annamaya Kosha',
     'Meditation': 'Manomaya Kosha',
     'Chanting': 'Manomaya Kosha',
+    'Yogic counselling': 'Vijnanamaya Kosha',
     'Yogic Counselling': 'Vijnanamaya Kosha',
-    'Additional Practices': ''  // Can be left empty or determined by user
+    'Additional practices': '',
+    'Additional Practices': ''
 };
 
 // Auto-fill Kosha based on Category selection
@@ -476,18 +487,28 @@ function selectPractice(id) {
         } else if (koshaField && practiceSegmentField && practice.practice_segment) {
             // Auto-fill kosha based on category if not provided
             const categoryToKosha = {
+                'Preparatory practices': 'Annamaya Kosha',
                 'Preparatory Practice': 'Annamaya Kosha',
                 'Yogasana': 'Annamaya Kosha',
+                'Kriya (cleansing)': 'Annamaya Kosha',
                 'Kriya (Cleansing Techniques)': 'Annamaya Kosha',
+                'Sequential yogic practices': 'Annamaya Kosha',
                 'Sequential Yogic Practice': 'Annamaya Kosha',
+                'Lifestyle modifications': 'Annamaya Kosha',
                 'Lifestyle modifications (Anna)': 'Annamaya Kosha',
+                'Yogic diet': 'Annamaya Kosha',
                 'Yogic diet (Anna)': 'Annamaya Kosha',
+                'Chair Yoga': 'Annamaya Kosha',
                 'Chair Yoga (Anna)': 'Annamaya Kosha',
+                'Breathing practices': 'Pranamaya Kosha',
                 'Breathing Practice': 'Pranamaya Kosha',
                 'Pranayama': 'Pranamaya Kosha',
+                'Relaxation': 'Annamaya Kosha',
                 'Meditation': 'Manomaya Kosha',
                 'Chanting': 'Manomaya Kosha',
+                'Yogic counselling': 'Vijnanamaya Kosha',
                 'Yogic Counselling': 'Vijnanamaya Kosha',
+                'Additional practices': '',
                 'Additional Practices': ''
             };
             const mappedKosha = categoryToKosha[practice.practice_segment];

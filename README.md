@@ -16,6 +16,8 @@ This system is **production-ready** with:
 - ✅ **Connection pooling** for high concurrency
 - ✅ **Git LFS** for database file management
 
+**Multi-system / shared database:** set `DATABASE_URL` (or `DB_*` vars) to a single PostgreSQL instance and all app servers will automatically use it. Example: `DATABASE_URL=postgresql://user:pass@db-host:5432/yoga_therapy python web/app.py`. Leave unset to keep the default local SQLite file for single-user use.
+
 ## Quick Start
 
 > **For detailed step-by-step instructions, see [QUICK_START.md](QUICK_START.md) or [START_HERE.md](START_HERE.md)**

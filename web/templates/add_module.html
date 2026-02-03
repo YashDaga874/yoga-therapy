@@ -7,13 +7,22 @@
 
 <form method="POST" style="max-width: 800px;">
     <div class="form-group">
-        <label for="disease_name">Disease *</label>
+        <label for="disease_name">Condition *</label>
         <input type="text" id="disease_name" name="disease_name" 
-               placeholder="Type disease name (e.g., Depression)" autocomplete="off" required>
+               placeholder="Type condition name (e.g., Depression)" autocomplete="off" required>
         <input type="hidden" id="disease_id" name="disease_id">
         <div id="disease-autocomplete-results" style="position: relative;"></div>
         <small style="color: #666; display: block; margin-top: 0.5rem;">
-            Type to search existing diseases or create a new one. Press Enter to create new disease.
+            Type to search existing conditions or create a new one. Press Enter to create new condition.
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="disease_code">Condition Code (optional)</label>
+        <input type="text" id="disease_code" name="disease_code"
+               placeholder="Auto-generates if left empty" maxlength="50">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Unique short code for the condition (used when creating a new condition from here).
         </small>
     </div>
     
@@ -23,6 +32,15 @@
                placeholder="e.g., Naveen et al., 2013" required>
         <small style="color: #666; display: block; margin-top: 0.5rem;">
             Enter the citation (e.g., "Dr Naveen GH et al., 2013")
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="module_code">Module Code</label>
+        <input type="text" name="module_code" id="module_code" 
+               placeholder="Auto-generates if left empty" maxlength="50">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Unique short code for this module (similar to practice codes).
         </small>
     </div>
     

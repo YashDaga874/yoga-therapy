@@ -74,16 +74,13 @@
     </div>
     
     <div class="disease-actions">
-        <a href="/diseases" class="btn-outline">
-            <i class="icon">←</i> Back to Diseases
-        </a>
         <a href="/disease/{{ disease.id }}/edit" class="btn-primary">
-            <i class="icon">✏️</i> Edit Disease
+            <i class="icon">✏️</i> Edit Condition
         </a>
         <form method="POST" action="/disease/{{ disease.id }}/delete" style="display: inline;" 
               onsubmit="return confirm('Are you sure you want to delete {{ disease.name }}?')">
             <button type="submit" class="btn" style="background: #dc3545; color: white;">
-                <i class="icon">🗑️</i> Delete Disease
+                <i class="icon">🗑️</i> Delete Condition
             </button>
         </form>
     </div>

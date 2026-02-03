@@ -139,6 +139,27 @@ python add_database_indexes.py
 
 4. **Import data:**
    - Use the web interface to re-enter data
+
+## Consolidating Data from Multiple SQLite Files
+
+If three machines have been collecting data separately:
+
+1. Export each SQLite DB to SQL:
+   ```bash
+   sqlite3 yoga_therapy.db .dump > machine1.sql
+   sqlite3 other_machine_path/yoga_therapy.db .dump > machine2.sql
+   sqlite3 third_machine_path/yoga_therapy.db .dump > machine3.sql
+   ```
+2. Stand up a staging PostgreSQL database and create tables (see above).
+3. Import dumps one at a time, resolving conflicts (duplicate primary keys/codes) as needed:
+   ```bash
+   psql $DATABASE_URL -f machine1.sql
+   psql $DATABASE_URL -f machine2.sql
+   psql $DATABASE_URL -f machine3.sql
+   ```
+4. Run `python add_practice_code_field.py`, `python add_kosha_field.py`, and `python add_cvr_score_field.py` if columns are missing.
+5. Run `python add_database_indexes.py` for performance.
+6. Point all app instances to this single PostgreSQL URL (set `DATABASE_URL`) and retire local SQLite writes.
    - OR use the import script if you have JSON data
    - OR manually migrate using SQL
 

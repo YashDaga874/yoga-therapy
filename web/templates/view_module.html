@@ -90,9 +90,16 @@
     {% endif %}
 </div>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <h2>Practices</h2>
-    <a href="/module/{{ module.id }}/practice/add" class="btn">Add Practice to Module</a>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <h2 style="margin: 0;">Practices</h2>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <a href="/module/{{ module.id }}/practice/add" class="btn">Add Practice to Module</a>
+        <a href="/module/{{ module.id }}/practices/export" class="btn btn-secondary">Download CSV</a>
+        <form method="POST" action="/module/{{ module.id }}/practices/import" enctype="multipart/form-data" style="display: inline-flex; align-items: center;">
+            <input type="file" id="practices_file" name="practices_file" accept=".csv,.xlsx,.xlsm" required style="display: none;">
+            <button type="button" id="upload-trigger" class="btn btn-secondary">Upload CSV/XLSX</button>
+        </form>
+    </div>
 </div>
 
 {% if practices_by_kosha %}
@@ -216,3 +223,20 @@
 </div>
 {% endblock %}
 
+{% block scripts %}
+<script>
+// File chooser label update for practices upload
+const practicesFileInput = document.getElementById('practices_file');
+const uploadTrigger = document.getElementById('upload-trigger');
+if (uploadTrigger && practicesFileInput) {
+    uploadTrigger.addEventListener('click', () => {
+        practicesFileInput.click();
+    });
+    practicesFileInput.addEventListener('change', () => {
+        if (practicesFileInput.files && practicesFileInput.files.length > 0) {
+            uploadTrigger.closest('form').submit();
+        }
+    });
+}
+</script>
+{% endblock %}

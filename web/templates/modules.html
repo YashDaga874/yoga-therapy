@@ -36,10 +36,10 @@
 <div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
     <form method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Disease:</label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Search Condition:</label>
             <div style="position: relative;">
                 <input type="text" id="disease-search" name="disease_name" value="{{ selected_disease_name or '' }}" 
-                       placeholder="Start typing disease name..." autocomplete="off"
+                       placeholder="Start typing condition name..." autocomplete="off"
                        style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px;">
                 <input type="hidden" id="disease_id" name="disease_id" value="{{ selected_disease_id or '' }}">
                 <div id="disease-search-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
@@ -57,8 +57,9 @@
     <table>
         <thead>
             <tr>
-                <th>Disease Name</th>
-                <th>Module (Developed By)</th>
+                <th>Condition Name</th>
+                <th>Module Code</th>
+                <th>Module Citation</th>
             </tr>
         </thead>
         <tbody>
@@ -72,6 +73,9 @@
                     {% else %}
                         N/A
                     {% endif %}
+                </td>
+                <td>
+                    <span style="color: #495057; font-weight: 600;">{{ module.code or 'N/A' }}</span>
                 </td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">

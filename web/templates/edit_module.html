@@ -25,6 +25,15 @@
         <input type="text" name="developed_by" id="developed_by" 
                value="{{ module.developed_by or '' }}" required>
     </div>
+
+    <div class="form-group">
+        <label for="module_code">Module Code</label>
+        <input type="text" name="module_code" id="module_code"
+               value="{{ module.code or '' }}" placeholder="Auto-generates if left empty" maxlength="50">
+        <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Unique short code for this module (similar to practice codes).
+        </small>
+    </div>
     
     <div class="form-group">
         <label for="paper_link">Research Paper Link</label>
