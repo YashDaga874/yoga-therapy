@@ -24,8 +24,9 @@ from werkzeug.datastructures import FileStorage
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response, session as flask_session
-from sqlalchemy import text, func, inspect
+from sqlalchemy import text, func, inspect, or_
 from sqlalchemy.orm import joinedload, selectinload
+from collections import defaultdict
 from database.models import (
     Disease, Practice, Citation, Contraindication, DiseaseCombination, Module,
     RCT, RCTSymptom,
@@ -81,13 +82,24 @@ LEGACY_CATEGORIES = [
 
 ALLOWED_CATEGORIES = CANONICAL_CATEGORIES + LEGACY_CATEGORIES
 
-ALLOWED_KOSHAS = [
+KOSHA_CANONICAL = [
+    'Annamaya Kosha',
+    'Pranamaya Kosha',
+    'Manomaya Kosha',
+    'Vijnanamaya Kosha',
+    'Anandamaya Kosha',
+]
+
+# Legacy/short variants kept for backward compatibility with older imports
+KOSHA_LEGACY = [
     'Annamaya',
     'Pranamaya',
     'Manomaya',
     'Vijnanamaya',
     'Anandamaya',
 ]
+
+ALLOWED_KOSHAS = KOSHA_CANONICAL + KOSHA_LEGACY
 
 # Database path (respects DATABASE_URL / DB_* env vars; defaults to SQLite)
 DB_PATH = get_database_url()
@@ -98,7 +110,13 @@ def _is_valid_category(category: str) -> bool:
 
 
 def _is_valid_kosha(kosha: str) -> bool:
-    return kosha in ALLOWED_KOSHAS
+    if not kosha:
+        return False
+    cleaned = kosha.strip().lower()
+    for allowed in ALLOWED_KOSHAS:
+        if cleaned == allowed.lower():
+            return True
+    return False
 
 
 def _ensure_category_and_kosha(practice_segment: str, kosha: str):
@@ -154,6 +172,28 @@ def _match_allowed_category(category: str) -> str:
         if cleaned.lower() == allowed.lower():
             return allowed
     return cleaned
+
+
+def _split_to_list(raw_value: str):
+    """
+    Normalize a comma/newline separated string into a list of unique items.
+    Use case-insensitive de-duplication to avoid duplicate work.
+    """
+    if not raw_value:
+        return []
+    items = []
+    seen = set()
+    normalized = raw_value.replace('\n', ',')
+    for part in normalized.split(','):
+        cleaned = part.strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        items.append(cleaned)
+    return items
 
 
 def _load_tabular_rows(file_storage: FileStorage):
@@ -1722,6 +1762,11 @@ def add_practice():
         # Handle practice code
         practice_sanskrit = request.form.get('practice_sanskrit', '').strip()
         user_provided_code = request.form.get('code', '').strip()
+        contraindicated_conditions_raw = request.form.get('contraindicated_conditions', '')
+        contraindicated_diseases = _split_to_list(contraindicated_conditions_raw)
+        created_contra_for = []
+        skipped_existing_contra = []
+        missing_contra_diseases = []
         
         # DATA INTEGRITY RULE 1: Same Sanskrit name MUST have same code
         # Check if a practice with the same Sanskrit name exists
@@ -1825,6 +1870,45 @@ def add_practice():
         
         session.add(practice)
         session.flush()  # Flush to get the ID
+
+        # Auto-create placeholder contraindications (disease list supplied while adding the practice)
+        if contraindicated_diseases:
+            for disease_name in contraindicated_diseases:
+                disease = session.query(Disease).filter(
+                    func.lower(Disease.name) == disease_name.lower()
+                ).first()
+
+                if not disease:
+                    missing_contra_diseases.append(disease_name)
+                    continue
+
+                # Skip if a contraindication already exists for this disease/practice combo
+                existing_contra = (
+                    session.query(Contraindication)
+                    .join(Contraindication.diseases)
+                    .filter(Disease.id == disease.id)
+                    .filter(func.lower(Contraindication.practice_english) == practice.practice_english.lower())
+                    .filter(func.lower(Contraindication.practice_segment) == practice.practice_segment.lower())
+                    .first()
+                )
+                if existing_contra:
+                    skipped_existing_contra.append(disease.name)
+                    continue
+
+                contra = Contraindication(
+                    practice_sanskrit=practice.practice_sanskrit,
+                    practice_english=practice.practice_english,
+                    practice_segment=practice.practice_segment,
+                    sub_category=practice.sub_category or '',
+                    reason='',
+                    source_type='',
+                    source_name='',
+                    page_number='',
+                    apa_citation=''
+                )
+                contra.diseases.append(disease)
+                session.add(contra)
+                created_contra_for.append(disease.name)
         
         # Handle file uploads after we have the ID
         if 'photo' in request.files:
@@ -1865,6 +1949,23 @@ def add_practice():
         
         session.commit()
         
+        if created_contra_for:
+            flash(
+                f'Contraindication placeholders created for: {", ".join(created_contra_for)}. '
+                'Fill in the details later from the Contraindications tab.',
+                'info'
+            )
+        if skipped_existing_contra:
+            flash(
+                f'Skipped contraindications already present for: {", ".join(skipped_existing_contra)}.',
+                'warning'
+            )
+        if missing_contra_diseases:
+            flash(
+                f'Could not find diseases for contraindicated conditions: {", ".join(missing_contra_diseases)}.',
+                'warning'
+            )
+
         flash(f'Practice "{practice.practice_english}" added successfully!', 'success')
         session.close()
         return redirect(url_for('list_practices'))
@@ -2547,21 +2648,39 @@ def add_contraindication():
             practice_english_input = (request.form.get('practice_english') or '').strip()
             practice_segment_input = (request.form.get('practice_segment') or '').strip()
             sub_category_input = (request.form.get('sub_category') or '').strip()
+            kosha_input = (request.form.get('kosha') or '').strip()
 
             practice_sanskrit_value = practice_sanskrit_input or (practice.practice_sanskrit or '')
             practice_english_value = practice_english_input or practice.practice_english
             practice_segment_value = practice_segment_input or practice.practice_segment
             sub_category_value = sub_category_input or (practice.sub_category or '')
+            kosha_value = kosha_input or (practice.kosha or '')
 
             if not practice_english_value:
                 flash('Practice English name is required.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+            # Handle age range from min_age and max_age
+            min_age = request.form.get('min_age', '').strip()
+            max_age = request.form.get('max_age', '').strip()
+            age_range = None
+            if min_age or max_age:
+                if min_age and max_age:
+                    age_range = f"{min_age}-{max_age}"
+                elif min_age:
+                    age_range = f"{min_age}+"
+                elif max_age:
+                    age_range = f"0-{max_age}"
 
             contraindication = Contraindication(
                 practice_sanskrit=practice_sanskrit_value,
                 practice_english=practice_english_value,
                 practice_segment=practice_segment_value,
                 sub_category=sub_category_value,
+                kosha=kosha_value or None,
+                age_range=age_range,
+                gender=request.form.get('gender', '').strip() or None,
+                severity=request.form.get('severity', '').strip() or None,
                 reason=reason_html,
                 source_type=request.form.get('parenthetical_citation', ''),
                 source_name=request.form.get('reference_link', ''),
@@ -2619,6 +2738,20 @@ def edit_contraindication(contraindication_id):
             contraindication.apa_citation = request.form.get('reference_full', '')
             contraindication.source_type = request.form.get('parenthetical_citation', '')
             contraindication.source_name = request.form.get('reference_link', '')
+            # Handle age range from min_age and max_age
+            min_age = request.form.get('min_age', '').strip()
+            max_age = request.form.get('max_age', '').strip()
+            age_range = None
+            if min_age or max_age:
+                if min_age and max_age:
+                    age_range = f"{min_age}-{max_age}"
+                elif min_age:
+                    age_range = f"{min_age}+"
+                elif max_age:
+                    age_range = f"0-{max_age}"
+            contraindication.age_range = age_range
+            contraindication.gender = request.form.get('gender', '').strip() or None
+            contraindication.severity = request.form.get('severity', '').strip() or None
             
             session.commit()
             flash('Contraindication updated successfully!', 'success')
@@ -2822,11 +2955,26 @@ def add_module():
                     diseases = session.query(Disease).all()
                     return render_template('add_module.html', diseases=diseases)
 
+            # Handle age range from min_age and max_age
+            min_age = request.form.get('min_age', '').strip()
+            max_age = request.form.get('max_age', '').strip()
+            age_range = None
+            if min_age or max_age:
+                if min_age and max_age:
+                    age_range = f"{min_age}-{max_age}"
+                elif min_age:
+                    age_range = f"{min_age}+"
+                elif max_age:
+                    age_range = f"0-{max_age}"
+            
             module = Module(
                 disease_id=disease_id,
                 code=final_module_code,
                 developed_by=request.form.get('developed_by', ''),
                 paper_link=request.form.get('paper_link', ''),
+                age_range=age_range,
+                gender=request.form.get('gender', '').strip() or None,
+                severity=request.form.get('severity', '').strip() or None,
                 module_description=request.form.get('module_description', '')
             )
             
@@ -2964,6 +3112,20 @@ def edit_module(module_id):
 
                 module.developed_by = request.form.get('developed_by', '')
                 module.paper_link = request.form.get('paper_link', '')
+                # Handle age range from min_age and max_age
+                min_age = request.form.get('min_age', '').strip()
+                max_age = request.form.get('max_age', '').strip()
+                age_range = None
+                if min_age or max_age:
+                    if min_age and max_age:
+                        age_range = f"{min_age}-{max_age}"
+                    elif min_age:
+                        age_range = f"{min_age}+"
+                    elif max_age:
+                        age_range = f"0-{max_age}"
+                module.age_range = age_range
+                module.gender = request.form.get('gender', '').strip() or None
+                module.severity = request.form.get('severity', '').strip() or None
                 module.module_description = request.form.get('module_description', '')
                 
                 session.commit()
@@ -3773,6 +3935,117 @@ def api_search_modules_for_recommendation():
         session.close()
 
 
+@app.route('/api/module/filter', methods=['GET'])
+def api_filter_modules():
+    """
+    API endpoint to filter modules by condition, severity, age, and gender
+    Query parameters:
+    - disease_ids: comma-separated list of disease IDs
+    - severity: Mild, Moderate, Severe, Not mentioned
+    - age_min: minimum age (optional)
+    - age_max: maximum age (optional)
+    - gender: Male, Female, Other, Not mentioned (optional)
+    """
+    from sqlalchemy import or_
+    
+    session = get_db_session()
+    
+    try:
+        # Get filter parameters
+        disease_ids_str = request.args.get('disease_ids', '').strip()
+        severity = request.args.get('severity', '').strip()
+        age_min = request.args.get('age_min', '').strip()
+        age_max = request.args.get('age_max', '').strip()
+        gender = request.args.get('gender', '').strip()
+        
+        # Build query
+        query = session.query(Module).join(Disease)
+        
+        # Filter by disease IDs
+        if disease_ids_str:
+            disease_ids = [int(did) for did in disease_ids_str.split(',') if did.strip().isdigit()]
+            if disease_ids:
+                query = query.filter(Module.disease_id.in_(disease_ids))
+        
+        # Filter by severity
+        if severity:
+            query = query.filter(
+                or_(
+                    Module.severity == severity,
+                    Module.severity == None,
+                    Module.severity == 'Not mentioned'
+                )
+            )
+        
+        # Filter by age range
+        if age_min or age_max:
+            # Parse age_range field (format: "18-65" or "18+" or "0-65")
+            # For now, we'll do a simple text match - can be improved
+            if age_min and age_max:
+                age_range_str = f"{age_min}-{age_max}"
+                query = query.filter(
+                    or_(
+                        Module.age_range == age_range_str,
+                        Module.age_range.like(f"{age_min}%"),
+                        Module.age_range.like(f"%-{age_max}"),
+                        Module.age_range == None,
+                        Module.age_range == ''
+                    )
+                )
+            elif age_min:
+                query = query.filter(
+                    or_(
+                        Module.age_range.like(f"{age_min}%"),
+                        Module.age_range == None,
+                        Module.age_range == ''
+                    )
+                )
+            elif age_max:
+                query = query.filter(
+                    or_(
+                        Module.age_range.like(f"%-{age_max}"),
+                        Module.age_range == None,
+                        Module.age_range == ''
+                    )
+                )
+        
+        # Filter by gender
+        if gender:
+            query = query.filter(
+                or_(
+                    Module.gender == gender,
+                    Module.gender == None,
+                    Module.gender == 'Not mentioned',
+                    Module.gender == ''
+                )
+            )
+        
+        # Get filtered modules
+        modules = query.all()
+        
+        results = []
+        for module in modules:
+            disease_name = module.disease.name if module.disease else 'N/A'
+            module_name = module.developed_by or 'N/A'
+            display_name = f"{disease_name} ({module_name})"
+            
+            results.append({
+                'id': module.id,
+                'module_id': module.id,
+                'disease_id': module.disease_id,
+                'disease_name': disease_name,
+                'module_name': module_name,
+                'display_name': display_name
+            })
+        
+        # Sort by disease name, then module name
+        results.sort(key=lambda x: (x['disease_name'], x['module_name']))
+        
+        return jsonify(results)
+    finally:
+        session.close()
+
+
 @app.route('/api/module/practice-counts', methods=['POST'])
 def api_get_practice_counts():
     """
@@ -4170,20 +4443,59 @@ def recommendations_categories():
                 
                 selected_practices = []
                 seen = set()
+                ties_to_resolve = []  # List of {category, needed_count, tied_practices, rank_key}
                 
-                def take_from_category_list(practice_list, want):
+                def take_from_category_list(practice_list, want, category_name):
                     picked = 0
+                    
+                    # Filter out already seen practices and calculate rank keys
+                    available_practices = []
                     for p in practice_list:
                         ident = _practice_identifier(p)
                         if not ident or ident in seen:
                             continue
-                        # attach selected disease repetition for downstream display
                         p.selected_disease_count = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
-                        seen.add(ident)
-                        selected_practices.append(p)
-                        picked += 1
+                        rank_key = _rank_key(p, selected_disease_ids)
+                        available_practices.append((p, rank_key))
+                    
+                    if not available_practices:
+                        return picked
+                    
+                    # Group practices by rank key to detect ties
+                    practices_by_rank = defaultdict(list)
+                    for p, rank_key in available_practices:
+                        practices_by_rank[rank_key].append(p)
+                    
+                    # Process practices in rank order
+                    sorted_ranks = sorted(practices_by_rank.keys())
+                    
+                    for rank_key in sorted_ranks:
+                        practices_at_rank = practices_by_rank[rank_key]
+                        remaining_needed = want - picked
+                        
+                        if len(practices_at_rank) > remaining_needed and remaining_needed > 0:
+                            # TIE DETECTED: More practices with same rank than needed
+                            ties_to_resolve.append({
+                                'category': category_name,
+                                'needed_count': remaining_needed,
+                                'tied_practices': practices_at_rank,
+                                'rank_key': rank_key
+                            })
+                            # Stop here - user needs to resolve tie
+                            break
+                        else:
+                            # No tie or can pick all - pick all practices at this rank
+                            for p in practices_at_rank:
+                                ident = _practice_identifier(p)
+                                seen.add(ident)
+                                selected_practices.append(p)
+                                picked += 1
+                                if picked >= want:
+                                    break
+                        
                         if picked >= want:
                             break
+                    
                     return picked
                 
                 # Process each category
@@ -4202,37 +4514,116 @@ def recommendations_categories():
                         remaining -= 1
                         idx += 1
                     
+                    # Check if this category already has a tie (skip fallback if so)
+                    category_has_tie = False
+                    
                     # Select practices from each module for this category
                     picked_total = 0
                     # Major module
                     major_cat_practices = major_practices_by_cat.get(category, [])
-                    picked_total += take_from_category_list(major_cat_practices, base_counts.get(major_module.id, 0))
+                    picked_major = take_from_category_list(major_cat_practices, base_counts.get(major_module.id, 0), category)
+                    picked_total += picked_major
+                    # Check if tie was detected
+                    if ties_to_resolve and any(t['category'] == category for t in ties_to_resolve):
+                        category_has_tie = True
                     
-                    # Comorbid modules
-                    for m in comorbid_modules:
-                        comorbid_cat_practices = comorbid_practices_by_cat.get(m.id, {}).get(category, [])
-                        picked_total += take_from_category_list(comorbid_cat_practices, base_counts.get(m.id, 0))
+                    # Comorbid modules (only if no tie detected yet)
+                    if not category_has_tie:
+                        for m in comorbid_modules:
+                            comorbid_cat_practices = comorbid_practices_by_cat.get(m.id, {}).get(category, [])
+                            picked_comorbid = take_from_category_list(comorbid_cat_practices, base_counts.get(m.id, 0), category)
+                            picked_total += picked_comorbid
+                            # Check if tie was detected
+                            if ties_to_resolve and any(t['category'] == category for t in ties_to_resolve):
+                                category_has_tie = True
+                                break
                     
-                    # Fallback allocation if deficit remains: pull remaining ranked items in severity order
+                    # Fallback allocation if deficit remains and no tie detected: pull remaining ranked items in severity order
                     deficit = user_selected_count - picked_total
-                    if deficit > 0:
+                    if deficit > 0 and not category_has_tie:
                         fallback_candidates = []
                         for m in order_modules:
                             cat_list = major_cat_practices if m.id == major_module.id else comorbid_practices_by_cat.get(m.id, {}).get(category, [])
                             for p in cat_list:
                                 ident = _practice_identifier(p)
                                 if ident and ident not in seen:
-                                    fallback_candidates.append((m.id, p))
-                        for _, p in fallback_candidates:
-                            if deficit <= 0:
-                                break
-                            ident = _practice_identifier(p)
-                            if not ident or ident in seen:
-                                continue
-                            p.selected_disease_count = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
-                            seen.add(ident)
-                            selected_practices.append(p)
-                            deficit -= 1
+                                    p.selected_disease_count = len([d for d in p.diseases if d.id in selected_disease_ids]) if getattr(p, 'diseases', None) else 0
+                                    rank_key = _rank_key(p, selected_disease_ids)
+                                    fallback_candidates.append((m.id, p, rank_key))
+                        
+                        if fallback_candidates:
+                            # Group fallback candidates by rank key to detect ties
+                            fallback_by_rank = defaultdict(list)
+                            for m_id, p, rank_key in fallback_candidates:
+                                fallback_by_rank[rank_key].append((m_id, p))
+                            
+                            # Process in rank order
+                            sorted_fallback_ranks = sorted(fallback_by_rank.keys())
+                            
+                            for rank_key in sorted_fallback_ranks:
+                                candidates_at_rank = fallback_by_rank[rank_key]
+                                remaining_deficit = deficit
+                                
+                                if len(candidates_at_rank) > remaining_deficit and remaining_deficit > 0:
+                                    # TIE DETECTED in fallback
+                                    tied_practices = [p for _, p in candidates_at_rank]
+                                    ties_to_resolve.append({
+                                        'category': category,
+                                        'needed_count': remaining_deficit,
+                                        'tied_practices': tied_practices,
+                                        'rank_key': rank_key
+                                    })
+                                    category_has_tie = True
+                                    deficit = 0  # Stop here
+                                    break
+                                else:
+                                    # No tie or can pick all
+                                    for _, p in candidates_at_rank:
+                                        if deficit <= 0:
+                                            break
+                                        ident = _practice_identifier(p)
+                                        if not ident or ident in seen:
+                                            continue
+                                        seen.add(ident)
+                                        selected_practices.append(p)
+                                        deficit -= 1
+                                
+                                if deficit <= 0:
+                                    break
+                
+                # Check if there are ties to resolve
+                if ties_to_resolve:
+                    # Store tie information in session for resolution
+                    import json
+                    ties_data = []
+                    for tie in ties_to_resolve:
+                        practice_data = []
+                        for p in tie['tied_practices']:
+                            practice_data.append({
+                                'id': p.id,
+                                'practice_english': p.practice_english or '',
+                                'practice_sanskrit': p.practice_sanskrit or '',
+                                'code': p.code or '',
+                                'rct_count': p.rct_count if p.rct_count is not None else 0,
+                                'selected_disease_count': p.selected_disease_count,
+                                'cvr_score': p.cvr_score if p.cvr_score is not None else 0,
+                                'practice_segment': p.practice_segment or '',
+                                'sub_category': p.sub_category or '',
+                                'kosha': p.kosha or ''
+                            })
+                        ties_data.append({
+                            'category': tie['category'],
+                            'needed_count': tie['needed_count'],
+                            'practices': practice_data,
+                            'rct_count': tie['rank_key'][0] * -1,  # Convert back from negative
+                            'selected_disease_count': tie['rank_key'][1] * -1,
+                            'cvr_score': tie['rank_key'][2] * -1
+                        })
+                    
+                    flask_session['tie_resolution_data'] = json.dumps(ties_data)
+                    flask_session['partial_selected_practices'] = [p.id for p in selected_practices]
+                    flask_session['category_selections'] = category_selections
+                    return redirect(url_for('resolve_ties'))
                 
                 if len(selected_practices) == 0:
                     flash('No practices selected after filtering contraindications/duplicates', 'error')
@@ -4441,6 +4832,255 @@ def recommendations_categories():
         session.close()
 
 
+@app.route('/recommendations/resolve-ties', methods=['GET', 'POST'])
+def resolve_ties():
+    """Resolve ties when multiple practices have same RCT, repeatability, and CVR"""
+    session = get_db_session()
+    
+    try:
+        if request.method == 'POST':
+            # Get selected practice IDs from form
+            selected_practice_ids = request.form.getlist('selected_practices')
+            
+            if not selected_practice_ids:
+                flash('Please select at least one practice for each tie', 'error')
+                return redirect(url_for('resolve_ties'))
+            
+            # Get tie resolution data from session
+            ties_data_json = flask_session.get('tie_resolution_data')
+            if not ties_data_json:
+                flash('Tie resolution data not found. Please start over.', 'error')
+                return redirect(url_for('recommendations'))
+            
+            ties_data = json.loads(ties_data_json)
+            partial_practice_ids = flask_session.get('partial_selected_practices', [])
+            
+            # Validate selections
+            selected_ids_set = set(int(pid) for pid in selected_practice_ids)
+            for tie in ties_data:
+                tie_practice_ids = [p['id'] for p in tie['practices']]
+                selected_from_tie = [pid for pid in selected_ids_set if pid in tie_practice_ids]
+                if len(selected_from_tie) < tie['needed_count']:
+                    flash(f'Please select at least {tie["needed_count"]} practices for {tie["category"]}', 'error')
+                    return redirect(url_for('resolve_ties'))
+            
+            # Combine partial selected practices with user-selected practices from ties
+            all_selected_practice_ids = partial_practice_ids + [int(pid) for pid in selected_practice_ids]
+            
+            # Get the full practice objects
+            selected_practices = session.query(Practice).filter(Practice.id.in_(all_selected_practice_ids)).all()
+            
+            # Get category selections from session
+            category_selections = flask_session.get('category_selections', {})
+            
+            # Continue with recommendation generation using selected practices
+            # Get modules and other data from session
+            major_module_id = flask_session.get('recommendation_major_module_id')
+            comorbid_module_ids = flask_session.get('recommendation_comorbid_module_ids', [])
+            weight_major = flask_session.get('recommendation_weight_major', 0)
+            comorbid_weights = flask_session.get('recommendation_comorbid_weights', {})
+            
+            if not major_module_id:
+                flash('Session expired. Please start over.', 'error')
+                return redirect(url_for('recommendations'))
+            
+            major_module = session.query(Module).options(
+                joinedload(Module.disease),
+                joinedload(Module.practices)
+            ).filter(Module.id == major_module_id).first()
+            
+            if not major_module:
+                flash('Major module not found', 'error')
+                return redirect(url_for('recommendations'))
+            
+            comorbid_modules = []
+            for mid in comorbid_module_ids:
+                module = session.query(Module).options(
+                    joinedload(Module.disease),
+                    joinedload(Module.practices)
+                ).filter(Module.id == mid).first()
+                if module:
+                    comorbid_modules.append(module)
+            
+            all_modules = [major_module] + comorbid_modules
+            selected_disease_ids = set()
+            for m in all_modules:
+                if m.disease:
+                    selected_disease_ids.add(m.disease.id)
+            
+            # Get contraindications
+            all_contraindications = []
+            contraindicated_keys = set()
+            for m in all_modules:
+                if m.disease:
+                    for contra in m.disease.contraindications:
+                        all_contraindications.append(contra)
+                        contraindicated_keys.add((
+                            (contra.practice_english or '').lower().strip(),
+                            contra.practice_segment
+                        ))
+            
+            # Remove duplicates from contraindications
+            seen_contra = set()
+            unique_contraindications = []
+            for contra in all_contraindications:
+                key = (contra.practice_english, contra.practice_segment)
+                if key not in seen_contra:
+                    seen_contra.add(key)
+                    unique_contraindications.append(contra)
+            
+            # Filter selected practices to remove contraindicated ones
+            filtered_practices = []
+            for p in selected_practices:
+                pk = (
+                    (p.practice_english or '').lower().strip(),
+                    p.practice_segment
+                )
+                if pk not in contraindicated_keys:
+                    filtered_practices.append(p)
+            
+            # Get RCTs for practices
+            all_practice_disease_ids = set()
+            practice_disease_map = {}
+            for practice in filtered_practices:
+                practice_disease_ids = [d.id for d in practice.diseases]
+                practice_disease_map[practice.id] = practice_disease_ids
+                all_practice_disease_ids.update(practice_disease_ids)
+            
+            matching_rcts = []
+            if all_practice_disease_ids:
+                matching_rcts = session.query(RCT).join(
+                    rct_disease_association
+                ).filter(
+                    rct_disease_association.c.disease_id.in_(list(all_practice_disease_ids))
+                ).options(
+                    selectinload(RCT.diseases)
+                ).all()
+            
+            practice_rcts = {}
+            for practice in filtered_practices:
+                practice_rcts[practice.id] = []
+                practice_disease_ids = practice_disease_map[practice.id]
+                
+                for rct in matching_rcts:
+                    rct_disease_ids = [d.id for d in rct.diseases]
+                    if any(did in practice_disease_ids for did in rct_disease_ids):
+                        if rct.intervention_practices:
+                            try:
+                                intervention_list = json.loads(rct.intervention_practices)
+                                for intervention in intervention_list:
+                                    practice_name = intervention.get('name', '').strip()
+                                    intervention_category = intervention.get('category', '').strip()
+                                    
+                                    if (practice_name and 
+                                        ((practice.practice_sanskrit and practice.practice_sanskrit.lower() == practice_name.lower()) or
+                                         (practice.practice_english and practice.practice_english.lower() == practice_name.lower()))):
+                                        if rct.parenthetical_citation:
+                                            practice_rcts[practice.id].append(rct.parenthetical_citation)
+                                            break
+                                    elif intervention_category and practice.practice_segment == intervention_category:
+                                        if rct.parenthetical_citation:
+                                            practice_rcts[practice.id].append(rct.parenthetical_citation)
+                                            break
+                            except:
+                                pass
+            
+            # Organize practices by Kosha, then Category, then Subcategory
+            kosha_order = {
+                'Annamaya Kosha': 1,
+                'Pranamaya Kosha': 2,
+                'Manomaya Kosha': 3,
+                'Anandamaya Kosha': 4,
+                'Vijnanamaya Kosha': 5
+            }
+            
+            organized_practices = {}
+            for practice in filtered_practices:
+                if not hasattr(practice, 'selected_disease_count'):
+                    practice.selected_disease_count = len([d for d in practice.diseases if d.id in selected_disease_ids]) if getattr(practice, 'diseases', None) else 0
+                kosha = practice.kosha or 'Unknown'
+                category = practice.practice_segment or 'Unknown'
+                subcategory = practice.sub_category or 'None'
+                
+                if kosha not in organized_practices:
+                    organized_practices[kosha] = {}
+                if category not in organized_practices[kosha]:
+                    organized_practices[kosha][category] = {}
+                if subcategory not in organized_practices[kosha][category]:
+                    organized_practices[kosha][category][subcategory] = []
+                
+                organized_practices[kosha][category][subcategory].append({
+                    'practice': practice,
+                    'rcts': practice_rcts.get(practice.id, [])
+                })
+            
+            # Sort practices within each subcategory
+            for kosha in organized_practices:
+                for category in organized_practices[kosha]:
+                    for subcategory in organized_practices[kosha][category]:
+                        organized_practices[kosha][category][subcategory].sort(
+                            key=lambda x: (
+                                -(x['practice'].rct_count if x['practice'].rct_count is not None else 0),
+                                -(getattr(x['practice'], 'selected_disease_count', 0)),
+                                -(x['practice'].cvr_score if x['practice'].cvr_score is not None else 0),
+                                x['practice'].practice_english or ''
+                            )
+                        )
+            
+            major_disease_name = major_module.disease.name if major_module.disease else 'N/A'
+            major_module_name = major_module.developed_by or 'N/A'
+            
+            comorbid_disease_names = [
+                m.disease.name if m.disease else 'N/A' 
+                for m in comorbid_modules
+            ]
+            comorbid_module_names = [
+                m.developed_by or 'N/A'
+                for m in comorbid_modules
+            ]
+            
+            sorted_koshas = sorted(
+                organized_practices.keys(),
+                key=lambda x: kosha_order.get(x, 999)
+            )
+            
+            # Clear session data
+            flask_session.pop('recommendation_major_module_id', None)
+            flask_session.pop('recommendation_comorbid_module_ids', None)
+            flask_session.pop('recommendation_weight_major', None)
+            flask_session.pop('recommendation_comorbid_weights', None)
+            flask_session.pop('tie_resolution_data', None)
+            flask_session.pop('partial_selected_practices', None)
+            flask_session.pop('category_selections', None)
+            
+            return render_template('recommendations_result.html',
+                                 major_disease_name=major_disease_name,
+                                 major_module_name=major_module_name,
+                                 comorbid_disease_names=comorbid_disease_names,
+                                 comorbid_module_names=comorbid_module_names,
+                                 organized_practices=organized_practices,
+                                 contraindications=unique_contraindications,
+                                 kosha_order=kosha_order,
+                                 sorted_koshas=sorted_koshas)
+        
+        # GET request - show tie resolution form
+        ties_data_json = flask_session.get('tie_resolution_data')
+        if not ties_data_json:
+            flash('No ties to resolve. Redirecting to recommendations.', 'info')
+            return redirect(url_for('recommendations'))
+        
+        ties_data = json.loads(ties_data_json)
+        
+        return render_template('resolve_ties.html', ties_data=ties_data)
+    except Exception as e:
+        flash(f'Error resolving ties: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('recommendations'))
+    finally:
+        session.close()
+
+
 # ============================================================================
 # RCT Database Routes
 # ============================================================================
@@ -4583,17 +5223,71 @@ def list_rcts():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         per_page = min(per_page, 100)  # Cap at 100 per page
+
+        # Optional filters
+        disease_filter = (request.args.get('disease') or '').strip()
+        practice_filter = (request.args.get('practice') or '').strip()
         
         # Use eager loading for RCTs
         query = session.query(RCT).options(
             selectinload(RCT.diseases),
             selectinload(RCT.symptoms)
         ).order_by(RCT.id.desc())
+
+        # Filter by disease name (joins disease association)
+        if disease_filter:
+            query = query.join(RCT.diseases).filter(func.lower(Disease.name) == disease_filter.lower())
+
+        # Filter by practice name (search intervention_practices text fields and metadata)
+        if practice_filter:
+            like_term = f"%{practice_filter}%"
+            query = query.filter(
+                or_(
+                    RCT.intervention_practices.ilike(like_term),
+                    RCT.title.ilike(like_term),
+                    RCT.parenthetical_citation.ilike(like_term),
+                    RCT.keywords.ilike(like_term),
+                    RCT.results.ilike(like_term),
+                    RCT.conclusion.ilike(like_term)
+                )
+            )
         
+        filtered_query = query  # keep reference for grouping without pagination
+
         # Paginate RCTs
         pagination = paginate_query(query, page, per_page)
         
         rcts = pagination.items
+
+        # Grouped view for practice filter: condition vs RCT count and citations
+        grouped_practice_rcts = []
+        if practice_filter:
+            rows = filtered_query.all()
+            grouped = {}
+            for rct in rows:
+                # Collect citation text (parenthetical preferred, else title)
+                citation_text = (rct.parenthetical_citation or '').strip()
+                if not citation_text:
+                    citation_text = (rct.title or '').strip()
+                citation_link = (rct.citation_link or '').strip() if hasattr(rct, 'citation_link') else ''
+
+                for disease in rct.diseases:
+                    key = disease.name
+                    if key not in grouped:
+                        grouped[key] = {
+                            'condition': disease.name,
+                            'rct_count': 0,
+                            'citations': []
+                        }
+                    grouped[key]['rct_count'] += 1
+                    grouped[key]['citations'].append({
+                        'text': citation_text or 'Untitled',
+                        'link': citation_link
+                    })
+
+            grouped_practice_rcts = list(grouped.values())
+            # Sort by count desc, then condition name
+            grouped_practice_rcts.sort(key=lambda x: (-x['rct_count'], x['condition'].lower()))
         
         # Get all diseases and practices for filters (these are small, no pagination needed)
         diseases = session.query(Disease).order_by(Disease.name).all()
@@ -4603,7 +5297,10 @@ def list_rcts():
                              rcts=rcts,
                              pagination=pagination,
                              diseases=diseases, 
-                             practices=practices)
+                             practices=practices,
+                             filter_disease=disease_filter,
+                             filter_practice=practice_filter,
+                             grouped_practice_rcts=grouped_practice_rcts)
     except Exception as e:
         flash(f'Error loading RCTs: {str(e)}', 'error')
         return render_template('rcts.html', rcts=[], pagination=None, diseases=[], practices=[])
@@ -4703,7 +5400,8 @@ def add_rct():
                 frequency_per_duration=request.form.get('frequency_per_duration', ''),
                 results=request.form.get('results', ''),
                 conclusion=request.form.get('conclusion', ''),
-                remarks=request.form.get('remarks', '')
+                remarks=request.form.get('remarks', ''),
+                severity=request.form.get('severity', '').strip() or None
             )
             
             # Calculate age range
@@ -4845,6 +5543,7 @@ def edit_rct(rct_id):
             rct.results = request.form.get('results', '')
             rct.conclusion = request.form.get('conclusion', '')
             rct.remarks = request.form.get('remarks', '')
+            rct.severity = request.form.get('severity', '').strip() or None
             
             # Calculate age range
             if rct.age_mean and rct.age_std_dev:

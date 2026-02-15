@@ -181,6 +181,24 @@
         <input type="hidden" id="symptom_count" name="symptom_count" value="0">
     </div>
 
+    <!-- Severity Section -->
+    <div class="form-section">
+        <h3>Severity</h3>
+        <div class="form-group">
+            <label for="severity">Severity</label>
+            <select name="severity" id="severity">
+                <option value="">Select Severity</option>
+                <option value="Mild" {% if rct.severity == 'Mild' %}selected{% endif %}>Mild</option>
+                <option value="Moderate" {% if rct.severity == 'Moderate' %}selected{% endif %}>Moderate</option>
+                <option value="Severe" {% if rct.severity == 'Severe' %}selected{% endif %}>Severe</option>
+                <option value="Not mentioned" {% if rct.severity == 'Not mentioned' %}selected{% endif %}>Not mentioned</option>
+            </select>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">
+                Select the severity level of the condition(s) studied in this RCT
+            </small>
+        </div>
+    </div>
+
     <!-- Disease Type Section -->
     <div class="form-section">
         <h3>Type of Disease</h3>

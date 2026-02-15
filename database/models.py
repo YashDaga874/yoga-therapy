@@ -189,6 +189,12 @@ class Contraindication(Base):
     # Which practice segment does this contraindication apply to
     practice_segment = Column(String(50), nullable=False)
     sub_category = Column(String(100))
+    kosha = Column(String(50))  # Annamaya Kosha, Pranamaya Kosha, etc.
+    
+    # Demographics and severity
+    age_range = Column(String(200))  # Age range (e.g., "18-65", "Not mentioned")
+    gender = Column(String(50))  # Male, Female, Other, Not mentioned
+    severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
     
     # Reason for contraindication
     reason = Column(Text)
@@ -231,6 +237,12 @@ class Module(Base):
     code = Column(String(50), unique=True)  # Short unique identifier for module
     developed_by = Column(String(500))  # Citation (e.g., "Naveen et al., 2013")
     paper_link = Column(String(1000))  # Link to research paper
+    
+    # Demographics and severity
+    age_range = Column(String(200))  # Age range (e.g., "18-65", "Not mentioned")
+    gender = Column(String(50))  # Male, Female, Other, Not mentioned
+    severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
+    
     module_description = Column(Text)
     
     # Relationship to practices
@@ -330,6 +342,9 @@ class RCT(Base):
     results = Column(Text)
     conclusion = Column(Text)  # A line or so
     remarks = Column(Text)  # Optional: report contraindications or special cases
+    
+    # Severity
+    severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
     
     # Relationships
     symptoms = relationship(

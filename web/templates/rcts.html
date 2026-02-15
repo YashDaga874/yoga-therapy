@@ -19,33 +19,77 @@
         <div class="form-group" style="margin-bottom: 0; position: relative;">
             <label for="filter_disease" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Disease</label>
             <input type="text" id="filter_disease" name="filter_disease" 
-                   placeholder="Type or select disease" style="width: 100%; padding: 0.75rem;" autocomplete="off">
+                   placeholder="Type or select disease" style="width: 100%; padding: 0.75rem;" autocomplete="off"
+                   value="{{ filter_disease or '' }}">
             <div id="disease-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
         </div>
         
         <div class="form-group" style="margin-bottom: 0; position: relative;">
             <label for="filter_practice" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Practice</label>
             <input type="text" id="filter_practice" name="filter_practice" 
-                   placeholder="Type or select practice" style="width: 100%; padding: 0.75rem;" autocomplete="off">
+                   placeholder="Type or select practice" style="width: 100%; padding: 0.75rem;" autocomplete="off"
+                   value="{{ filter_practice or '' }}">
             <div id="practice-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
         </div>
         
-        <button type="button" class="btn" onclick="checkRctCount()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Check Count</button>
+        <button type="button" class="btn" onclick="checkRctOrFilter()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Check / Filter</button>
     </div>
     
     <div id="rct_count_result" style="margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none;"></div>
 </div>
 
+{% if filter_practice %}
+<div style="margin-bottom: 2rem;">
+    <h3 style="margin-top: 0; margin-bottom: 0.75rem; color: #495057;">
+        RCTs for "{{ filter_practice }}"
+    </h3>
+    {% if grouped_practice_rcts %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
+        <thead>
+            <tr>
+                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left;">Condition</th>
+                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left; width: 120px;">RCT NO</th>
+                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left;">Parenthetical Citations</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in grouped_practice_rcts %}
+            <tr>
+                <td style="border: 1px solid #333; padding: 0.6rem;">{{ row.condition }}</td>
+                <td style="border: 1px solid #333; padding: 0.6rem;">{{ row.rct_count }}</td>
+                <td style="border: 1px solid #333; padding: 0.6rem;">
+                    {% for cite in row.citations %}
+                        {% if cite.link %}
+                            <a href="{{ cite.link }}" target="_blank" style="color: #1a73e8;">{{ cite.text }}</a>
+                        {% else %}
+                            {{ cite.text }}
+                        {% endif %}
+                        {% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p style="color: #666; margin: 0.25rem 0 0 0;">No RCTs found for this practice.</p>
+    {% endif %}
+</div>
+{% endif %}
+
 <script>
-function checkRctCount() {
+function checkRctOrFilter() {
     const diseaseName = document.getElementById('filter_disease').value.trim();
     const practiceName = document.getElementById('filter_practice').value.trim();
     const resultDiv = document.getElementById('rct_count_result');
     
+    // If only one filter is provided, redirect to filtered list view
     if (!diseaseName || !practiceName) {
-        resultDiv.innerHTML = '<p style="color: #dc3545; margin: 0;">Please select both disease and practice.</p>';
-        resultDiv.style.display = 'block';
-        resultDiv.style.background = '#f8d7da';
+        const params = new URLSearchParams();
+        if (diseaseName) params.append('disease', diseaseName);
+        if (practiceName) params.append('practice', practiceName);
+        const queryString = params.toString();
+        window.location = queryString ? `/rcts?${queryString}` : '/rcts';
         return;
     }
     
@@ -316,7 +360,7 @@ document.addEventListener('click', function(e) {
 }
 </style>
 
-{% if rcts %}
+{% if rcts and not filter_practice %}
 <table class="data-table">
     <thead>
         <tr>
@@ -360,10 +404,10 @@ document.addEventListener('click', function(e) {
     </tbody>
 </table>
 
-{% if pagination and pagination.pages > 1 %}
+{% if pagination and pagination.pages > 1 and not filter_practice %}
 <div style="margin-top: 2rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">
     {% if pagination.has_prev %}
-        <a href="?page={{ pagination.prev_num }}{% if request.args.get('per_page') %}&per_page={{ request.args.get('per_page') }}{% endif %}" class="btn btn-secondary">Previous</a>
+        <a href="?page={{ pagination.prev_num }}{% if request.args.get('per_page') %}&per_page={{ request.args.get('per_page') }}{% endif %}{% if filter_disease %}&disease={{ filter_disease }}{% endif %}" class="btn btn-secondary">Previous</a>
     {% endif %}
     
     <span style="color: #666;">
@@ -372,14 +416,25 @@ document.addEventListener('click', function(e) {
     </span>
     
     {% if pagination.has_next %}
-        <a href="?page={{ pagination.next_num }}{% if request.args.get('per_page') %}&per_page={{ request.args.get('per_page') }}{% endif %}" class="btn btn-secondary">Next</a>
+        <a href="?page={{ pagination.next_num }}{% if request.args.get('per_page') %}&per_page={{ request.args.get('per_page') }}{% endif %}{% if filter_disease %}&disease={{ filter_disease }}{% endif %}" class="btn btn-secondary">Next</a>
     {% endif %}
 </div>
 {% endif %}
-{% else %}
+{% elif not filter_practice %}
 <div style="padding: 2rem; text-align: center; background: #f8f9fa; border-radius: 8px;">
-    <p style="color: #666; margin-bottom: 1rem;">No RCT entries found.</p>
-    <a href="/rct/add" class="btn">Add First RCT Entry</a>
+    {% if filter_disease or filter_practice %}
+        <p style="color: #666; margin-bottom: 0.5rem;">No RCT entries match your filters.</p>
+        <p style="color: #666; margin-bottom: 1rem;">
+            {% if filter_disease %}Disease: <strong>{{ filter_disease }}</strong>{% endif %}
+            {% if filter_disease and filter_practice %} &nbsp;|&nbsp; {% endif %}
+            {% if filter_practice %}Practice: <strong>{{ filter_practice }}</strong>{% endif %}
+        </p>
+        <a href="/rcts" class="btn btn-secondary" style="margin-right: 0.5rem;">Clear Filters</a>
+        <a href="/rct/add" class="btn">Add RCT Entry</a>
+    {% else %}
+        <p style="color: #666; margin-bottom: 1rem;">No RCT entries found.</p>
+        <a href="/rct/add" class="btn">Add First RCT Entry</a>
+    {% endif %}
 </div>
 {% endif %}
 

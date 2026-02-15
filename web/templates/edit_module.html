@@ -42,6 +42,54 @@
                placeholder="https://example.com/paper.pdf">
     </div>
     
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        <div class="form-group">
+            <label>Age Range</label>
+            {% if module.age_range and '-' in module.age_range %}
+                {% set age_parts = module.age_range.split('-') %}
+                {% set min_age_val = age_parts[0].strip() %}
+                {% set max_age_val = age_parts[1].strip() if age_parts|length > 1 else '' %}
+            {% else %}
+                {% set min_age_val = '' %}
+                {% set max_age_val = '' %}
+            {% endif %}
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" name="min_age" id="min_age" 
+                       value="{{ min_age_val }}"
+                       placeholder="Min" min="0" max="150" style="flex: 1;">
+                <span style="color: #666;">-</span>
+                <input type="number" name="max_age" id="max_age" 
+                       value="{{ max_age_val }}"
+                       placeholder="Max" min="0" max="150" style="flex: 1;">
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">
+                Leave empty for "Not mentioned"
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="gender">Gender</label>
+            <select name="gender" id="gender">
+                <option value="">Select Gender</option>
+                <option value="Male" {% if module.gender == 'Male' %}selected{% endif %}>Male</option>
+                <option value="Female" {% if module.gender == 'Female' %}selected{% endif %}>Female</option>
+                <option value="Other" {% if module.gender == 'Other' %}selected{% endif %}>Other</option>
+                <option value="Not mentioned" {% if module.gender == 'Not mentioned' %}selected{% endif %}>Not mentioned</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="severity">Severity</label>
+            <select name="severity" id="severity">
+                <option value="">Select Severity</option>
+                <option value="Mild" {% if module.severity == 'Mild' %}selected{% endif %}>Mild</option>
+                <option value="Moderate" {% if module.severity == 'Moderate' %}selected{% endif %}>Moderate</option>
+                <option value="Severe" {% if module.severity == 'Severe' %}selected{% endif %}>Severe</option>
+                <option value="Not mentioned" {% if module.severity == 'Not mentioned' %}selected{% endif %}>Not mentioned</option>
+            </select>
+        </div>
+    </div>
+    
     <div class="form-group">
         <label for="module_description">Module Description</label>
         <textarea name="module_description" id="module_description" rows="5">{{ module.module_description or '' }}</textarea>

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Resolve Ties{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; padding: 0.75rem;">
+    <h2 style="font-size: 1.4rem; font-weight: 600; color: #333; margin-bottom: 0.75rem;">
+        Resolve Ties in Practice Selection
+    </h2>
+
+    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.9rem; color: #856404; font-weight: 600; margin-bottom: 0.5rem;">
+            ⚠️ Tie Detected
+        </div>
+        <div style="font-size: 0.85rem; color: #856404;">
+            Some practices have the same RCT count, selected conditions count, and CVR score. 
+            Please select which practices to include in your recommendation plan.
+        </div>
+    </div>
+
+    <form method="POST" id="tie-resolution-form">
+        {% for tie in ties_data %}
+        <div style="background: white; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <div style="font-size: 1rem; font-weight: 600; color: #495057; margin-bottom: 0.75rem;">
+                Category: <span style="color: #667eea;">{{ tie.category }}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem;">
+                <strong>Required:</strong> Select <span style="color: #dc3545; font-weight: 600;">{{ tie.needed_count }}</span> practice(s) from the {{ tie.practices|length }} tied practices below
+            </div>
+            <div style="font-size: 0.85rem; color: #6c757d; margin-bottom: 1rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;">
+                <strong>Common values:</strong> RCT Count: {{ tie.rct_count }}, Selected Conditions: {{ tie.selected_disease_count }}, CVR Score: {{ tie.cvr_score }}
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 0.6rem; text-align: left; font-weight: 600; color: #495057; width: 40px;">
+                            <input type="checkbox" 
+                                   id="select-all-{{ loop.index0 }}" 
+                                   onchange="toggleAllTie({{ loop.index0 }}, {{ tie.needed_count }})"
+                                   style="cursor: pointer;">
+                        </th>
+                        <th style="padding: 0.6rem; text-align: left; font-weight: 600; color: #495057;">Practice</th>
+                        <th style="padding: 0.6rem; text-align: center; font-weight: 600; color: #495057; width: 100px;">RCT</th>
+                        <th style="padding: 0.6rem; text-align: center; font-weight: 600; color: #495057; width: 120px;">Conditions</th>
+                        <th style="padding: 0.6rem; text-align: center; font-weight: 600; color: #495057; width: 100px;">CVR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for practice in tie.practices %}
+                    <tr style="border-bottom: 1px solid #e5e7eb;" class="tie-row-{{ loop.parent.loop.index0 }}">
+                        <td style="padding: 0.6rem; text-align: center;">
+                            <input type="checkbox" 
+                                   name="selected_practices" 
+                                   value="{{ practice.id }}"
+                                   data-tie-index="{{ loop.parent.loop.index0 }}"
+                                   onchange="updateTieSelection({{ loop.parent.loop.index0 }}, {{ tie.needed_count }})"
+                                   style="cursor: pointer;">
+                        </td>
+                        <td style="padding: 0.6rem;">
+                            <div style="font-weight: 500; color: #333;">
+                                {{ practice.practice_english }}
+                            </div>
+                            {% if practice.practice_sanskrit %}
+                            <div style="font-size: 0.8rem; color: #666; font-style: italic; margin-top: 0.2rem;">
+                                {{ practice.practice_sanskrit }}
+                            </div>
+                            {% endif %}
+                            {% if practice.code %}
+                            <div style="font-size: 0.75rem; color: #999; margin-top: 0.2rem;">
+                                Code: {{ practice.code }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.6rem; text-align: center; color: #495057; font-weight: 600;">
+                            {{ practice.rct_count }}
+                        </td>
+                        <td style="padding: 0.6rem; text-align: center; color: #495057; font-weight: 600;">
+                            {{ practice.selected_disease_count }}
+                        </td>
+                        <td style="padding: 0.6rem; text-align: center; color: #495057; font-weight: 600;">
+                            {{ practice.cvr_score if practice.cvr_score else 'N/A' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div id="tie-status-{{ loop.index0 }}" style="margin-top: 0.75rem; padding: 0.5rem; border-radius: 4px; font-size: 0.85rem; display: none;">
+                <!-- Status message will appear here -->
+            </div>
+        </div>
+        {% endfor %}
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="submit" id="submit-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" disabled>
+                Generate Recommendation Plan
+            </button>
+            <a href="{{ url_for('recommendations') }}" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem; text-decoration: none; display: inline-block;">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function updateTieSelection(tieIndex, neededCount) {
+    const checkboxes = document.querySelectorAll(`input[data-tie-index="${tieIndex}"]:checked`);
+    const selectedCount = checkboxes.length;
+    const statusDiv = document.getElementById(`tie-status-${tieIndex}`);
+    const selectAllCheckbox = document.getElementById(`select-all-${tieIndex}`);
+    
+    if (selectedCount === 0) {
+        statusDiv.style.display = 'none';
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (selectedCount < neededCount) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#fff3cd';
+        statusDiv.style.border = '1px solid #ffc107';
+        statusDiv.style.color = '#856404';
+        statusDiv.textContent = `Please select at least ${neededCount} practice(s). Currently selected: ${selectedCount}`;
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    } else {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#d4edda';
+        statusDiv.style.border = '1px solid #28a745';
+        statusDiv.style.color = '#155724';
+        statusDiv.textContent = `✓ Selected ${selectedCount} practice(s) (required: ${neededCount})`;
+        if (selectedCount === neededCount) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        }
+    }
+    
+    updateSubmitButton();
+}
+
+function toggleAllTie(tieIndex, neededCount) {
+    const selectAllCheckbox = document.getElementById(`select-all-${tieIndex}`);
+    const checkboxes = document.querySelectorAll(`input[data-tie-index="${tieIndex}"]`);
+    
+    if (selectAllCheckbox.checked) {
+        // Select all
+        checkboxes.forEach(cb => cb.checked = true);
+    } else {
+        // Deselect all
+        checkboxes.forEach(cb => cb.checked = false);
+    }
+    
+    updateTieSelection(tieIndex, neededCount);
+}
+
+function updateSubmitButton() {
+    const submitBtn = document.getElementById('submit-btn');
+    const allTies = document.querySelectorAll('[id^="tie-status-"]');
+    let allValid = true;
+    
+    allTies.forEach(statusDiv => {
+        if (statusDiv.style.display === 'none' || !statusDiv.textContent.includes('✓')) {
+            allValid = false;
+        }
+    });
+    
+    submitBtn.disabled = !allValid;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    {% for tie in ties_data %}
+    updateTieSelection({{ loop.index0 }}, {{ tie.needed_count }});
+    {% endfor %}
+});
+
+// Form validation
+document.getElementById('tie-resolution-form').addEventListener('submit', function(e) {
+    {% for tie in ties_data %}
+    const tie{{ loop.index0 }}Checkboxes = document.querySelectorAll(`input[data-tie-index="{{ loop.index0 }}"]:checked`);
+    if (tie{{ loop.index0 }}Checkboxes.length < {{ tie.needed_count }}) {
+        e.preventDefault();
+        alert('Please select at least {{ tie.needed_count }} practice(s) for {{ tie.category }}');
+        return false;
+    }
+    {% endfor %}
+    return true;
+});
+</script>
+
+<style>
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.tie-row-0:hover,
+.tie-row-1:hover,
+.tie-row-2:hover,
+.tie-row-3:hover,
+.tie-row-4:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

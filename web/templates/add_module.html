@@ -53,6 +53,44 @@
         </small>
     </div>
     
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        <div class="form-group">
+            <label>Age Range</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" name="min_age" id="min_age" 
+                       placeholder="Min" min="0" max="150" style="flex: 1;">
+                <span style="color: #666;">-</span>
+                <input type="number" name="max_age" id="max_age" 
+                       placeholder="Max" min="0" max="150" style="flex: 1;">
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">
+                Leave empty for "Not mentioned"
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="gender">Gender</label>
+            <select name="gender" id="gender">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+                <option value="Not mentioned">Not mentioned</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="severity">Severity</label>
+            <select name="severity" id="severity">
+                <option value="">Select Severity</option>
+                <option value="Mild">Mild</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Severe">Severe</option>
+                <option value="Not mentioned">Not mentioned</option>
+            </select>
+        </div>
+    </div>
+    
     <div class="form-group">
         <label for="module_description">Module Description</label>
         <textarea name="module_description" id="module_description" rows="5" 

@@ -12,6 +12,66 @@
 .clickable-row:hover {
     background-color: #f8f9fa;
 }
+
+.table-container {
+    overflow-x: auto;
+    width: 100%;
+    margin-top: 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-container table {
+    width: 100%;
+    min-width: 800px;
+    table-layout: fixed;
+    margin-top: 0;
+}
+
+table th:nth-child(1),
+table td:nth-child(1) {
+    width: 15%;
+    max-width: 150px;
+}
+
+table th:nth-child(2),
+table td:nth-child(2) {
+    width: 15%;
+    max-width: 150px;
+}
+
+table th:nth-child(3),
+table td:nth-child(3) {
+    width: 12%;
+    max-width: 120px;
+}
+
+table th:nth-child(4),
+table td:nth-child(4) {
+    width: 12%;
+    max-width: 120px;
+}
+
+table th:nth-child(5),
+table td:nth-child(5) {
+    width: 46%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+table td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    vertical-align: top;
+    padding: 1rem 0.75rem;
+}
+
+table td:nth-child(5) {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    white-space: normal;
+}
 </style>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
@@ -28,28 +88,37 @@
     <div style="margin-bottom: 3rem; padding: 1.5rem; background: #fff; border-radius: 8px; border: 1px solid #ddd;">
         <h3 style="margin-bottom: 1rem; color: #667eea;">{{ disease.name }}</h3>
         
-        <table>
-            <thead>
-                <tr>
-                    <th>Practice (Sanskrit)</th>
-                    <th>Practice (English)</th>
-                    <th>Segment</th>
-                    <th>Sub-Category</th>
-                    <th>Reason</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for contra in contraindications %}
-                <tr class="clickable-row" onclick="window.location.href='/contraindication/{{ contra.id }}/edit'">
-                    <td>{{ contra.practice_sanskrit or '-' }}</td>
-                    <td><strong>{{ contra.practice_english }}</strong></td>
-                    <td>{{ contra.practice_segment }}</td>
-                    <td>{{ contra.sub_category or '-' }}</td>
-                    <td>{% if contra.reason %}{{ contra.reason|safe }}{% else %}-{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Practice (Sanskrit)</th>
+                        <th>Practice (English)</th>
+                        <th>Segment</th>
+                        <th>Sub-Category</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contra in contraindications %}
+                    <tr class="clickable-row" onclick="window.location.href='/contraindication/{{ contra.id }}/edit'">
+                        <td>{{ contra.practice_sanskrit or '-' }}</td>
+                        <td><strong>{{ contra.practice_english }}</strong></td>
+                        <td>{{ contra.practice_segment }}</td>
+                        <td>{{ contra.sub_category or '-' }}</td>
+                        <td>
+                            {% if contra.reason %}
+                                {% set reason_text = contra.reason|striptags|truncate(150) %}
+                                <span title="{{ contra.reason|striptags }}">{{ reason_text }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     {% endfor %}
     

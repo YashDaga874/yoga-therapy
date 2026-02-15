@@ -6,40 +6,30 @@
 <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Practice Recommendations</h2>
 
 <div style="margin-bottom: 1.5rem;">
-    <!-- Condition Names and Modules -->
-    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #e7f3ff; border-radius: 4px; border-left: 3px solid #2196F3;">
-        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: start;">
-            <div>
-                <div style="margin-bottom: 0.5rem;">
-                    <strong style="font-size: 0.95rem; color: #495057;">Major Condition:</strong>
-                    <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">{{ major_disease_name }}</span>
-                </div>
-                <div>
-                    <strong style="font-size: 0.95rem; color: #495057;">Module:</strong>
-                    <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">{{ major_module_name }}</span>
-                </div>
-            </div>
-            {% if comorbid_disease_names %}
-            <div>
-                <div style="margin-bottom: 0.5rem;">
-                    <strong style="font-size: 0.95rem; color: #495057;">Co-morbid Conditions:</strong>
-                    <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">
-                        {% for disease_name in comorbid_disease_names %}
-                            {{ disease_name }}{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    </span>
-                </div>
-                <div>
-                    <strong style="font-size: 0.95rem; color: #495057;">Modules:</strong>
-                    <span style="font-size: 0.95rem; color: #667eea; margin-left: 0.3rem;">
-                        {% for module_name in comorbid_module_names %}
-                            {{ module_name }}{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    </span>
-                </div>
-            </div>
-            {% endif %}
-        </div>
+    <!-- Conditions and Modules Table -->
+    <div style="padding: 0.75rem; background: #e7f3ff; border-radius: 4px; border-left: 3px solid #2196F3;">
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
+            <thead>
+                <tr style="background: #2196F3; color: white;">
+                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd; font-weight: 600; font-size: 0.95rem;">Condition</th>
+                    <th style="padding: 0.75rem; text-align: left; border: 1px solid #ddd; font-weight: 600; font-size: 0.95rem;">Module</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.95rem; color: #212529; font-weight: 500;">{{ major_disease_name }}</td>
+                    <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.95rem; color: #667eea;">{{ major_module_name }}</td>
+                </tr>
+                {% if comorbid_disease_names %}
+                    {% for disease_name in comorbid_disease_names %}
+                    <tr>
+                        <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.95rem; color: #212529; font-weight: 500;">{{ disease_name }}</td>
+                        <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.95rem; color: #667eea;">{{ comorbid_module_names[loop.index0] }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
 
