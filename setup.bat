@@ -58,11 +58,15 @@ echo ========================================
 echo Running database migration...
 echo ========================================
 echo.
-REM Run database migration to ensure all columns exist
-python add_kosha_field.py
-if errorlevel 1 (
-    echo WARNING: Database migration had issues, but continuing...
-    echo You may need to run: python add_kosha_field.py
+REM Run database migration to ensure all columns exist (if helper script is present)
+if exist "add_kosha_field.py" (
+    python add_kosha_field.py
+    if errorlevel 1 (
+        echo WARNING: Database migration had issues, but continuing...
+        echo You may need to run: python add_kosha_field.py
+    )
+) else (
+    echo Skipping add_kosha_field.py (helper script not found). Database schema is assumed up-to-date.
 )
 
 echo.
@@ -70,10 +74,14 @@ echo ========================================
 echo Adding database indexes for performance...
 echo ========================================
 echo.
-REM Add database indexes
-python add_database_indexes.py
-if errorlevel 1 (
-    echo WARNING: Index creation had issues, but continuing...
+REM Add database indexes (if helper script is present)
+if exist "add_database_indexes.py" (
+    python add_database_indexes.py
+    if errorlevel 1 (
+        echo WARNING: Index creation had issues, but continuing...
+    )
+) else (
+    echo Skipping add_database_indexes.py (helper script not found). Using existing indexes.
 )
 
 echo.

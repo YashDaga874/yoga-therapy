@@ -43,22 +43,36 @@ if errorlevel 1 (
     pip install Werkzeug
 )
 
-REM Run database migration to ensure all columns exist
+REM Run database migration to ensure all columns exist (if helper script is present)
 echo.
 echo Checking database schema...
+if exist "add_kosha_field.py" goto run_kosha_migration
+echo Skipping add_kosha_field.py (helper script not found). Database schema is assumed up-to-date.
+goto after_kosha_migration
+
+:run_kosha_migration
 python add_kosha_field.py
 if errorlevel 1 (
     echo WARNING: Database migration had issues, but continuing...
     echo If you encounter database errors, run: python add_kosha_field.py
 )
 
-REM Add database indexes for performance
+:after_kosha_migration
+
+REM Add database indexes for performance (if helper script is present)
 echo.
 echo Optimizing database indexes...
+if exist "add_database_indexes.py" goto run_add_indexes
+echo Skipping add_database_indexes.py (helper script not found). Using existing indexes.
+goto after_add_indexes
+
+:run_add_indexes
 python add_database_indexes.py
 if errorlevel 1 (
     echo WARNING: Index creation had issues, but continuing...
 )
+
+:after_add_indexes
 
 REM Run the app from the web directory
 echo.

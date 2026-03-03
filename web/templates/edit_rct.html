@@ -31,6 +31,17 @@
     align-items: center;
 }
 
+@media (max-width: 992px) {
+    .symptom-row {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: auto;
+    }
+
+    .symptom-row > * {
+        min-width: 0;
+    }
+}
+
 .remove-btn {
     background: #dc3545;
     color: white;
@@ -80,7 +91,7 @@
 
 <h2>Edit RCT Entry</h2>
 
-<form method="POST" style="max-width: 1400px;">
+<form id="rct-form" method="POST" style="max-width: 1400px;">
     <!-- Data Enrolled Section -->
     <div class="form-section">
         <h3>Data Collection Information</h3>
@@ -92,9 +103,9 @@
             </div>
             
             <div class="form-group">
-                <label for="database_journal">Database/Journal *</label>
-                <div style="position: relative;">
-                    <input type="text" id="database_journal" name="database_journal" required
+                <label for="database_journal">Database/Journal</label>
+                <div style="position: relative; margin-bottom: 0.5rem;">
+                    <input type="text" id="database_journal" name="database_journal"
                            placeholder="Type database/journal name (e.g., PubMed, Embase)" 
                            autocomplete="off"
                            list="database_journal_suggestions"
@@ -107,6 +118,29 @@
                         <option value="Web of Science">
                         <option value="Other">
                     </datalist>
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span style="font-weight: 600;">OR</span>
+                        <label style="margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                            <input type="checkbox" id="is_review_paper" name="is_review_paper" value="1"
+                                   {% if rct.database_journal and rct.database_journal.startswith('Review Paper') %}checked{% endif %}>
+                            Review Paper
+                        </label>
+                    </div>
+                    {% set review_title = '' %}
+                    {% if rct.database_journal and rct.database_journal.startswith('Review Paper:') %}
+                        {% set review_title = rct.database_journal.split(':', 1)[1].strip() %}
+                    {% endif %}
+                    <div id="review-paper-section" style="{% if not (rct.database_journal and rct.database_journal.startswith('Review Paper')) %}display: none;{% endif %}">
+                        <input type="text" id="review_paper_name" name="review_paper_name"
+                               placeholder="Enter review paper title (e.g., Systematic review on yoga for anxiety)"
+                               value="{{ review_title }}"
+                               style="width: 100%; margin-bottom: 0.25rem;">
+                        <small style="color: #666;">
+                            If this RCT data is extracted from a review article, optionally enter the review paper name.
+                        </small>
+                    </div>
                 </div>
             </div>
             
@@ -356,23 +390,8 @@ let symptomCount = 0;
 let diseaseCount = 0;
 let practiceCount = 0;
 
-// Scale options for symptoms
-const scaleOptions = [
-    'HAM-D', 'HAMD', 'Hamilton Depression Rating Scale',
-    'GAD-7', 'GAD7', 'Generalized Anxiety Disorder 7',
-    'BDI', 'Beck Depression Inventory',
-    'BAI', 'Beck Anxiety Inventory',
-    'PSS', 'Perceived Stress Scale',
-    'PHQ-9', 'PHQ9', 'Patient Health Questionnaire',
-    'PSS-10', 'PSS10',
-    'SF-36', 'SF36', 'Short Form 36',
-    'QOL', 'Quality of Life',
-    'PSQI', 'Pittsburgh Sleep Quality Index',
-    'ISI', 'Insomnia Severity Index',
-    'Y-BOCS', 'Yale-Brown Obsessive Compulsive Scale',
-    'PANSS', 'Positive and Negative Syndrome Scale',
-    'Other'
-];
+// All practices for category auto-fill (name -> segment)
+window.ALL_PRACTICES = {{ practices_js|tojson }};
 
 // Load existing symptoms
 {% if rct.symptoms %}
@@ -382,11 +401,6 @@ const container = document.getElementById('symptoms-container');
 const div = document.createElement('div');
 div.className = 'symptom-row';
 div.id = `symptom-row-${symptomCount}`;
-
-const scaleSelect = scaleOptions.map(scale => {
-    const selected = scale === '{{ symptom.scale or '' }}' ? 'selected' : '';
-    return `<option value="${scale}" ${selected}>${scale}</option>`;
-}).join('');
 
 div.innerHTML = `
     <input type="text" name="symptom_name_${symptomCount}" value="{{ symptom.symptom_name }}" placeholder="Symptom/Disease Name" required>
@@ -398,10 +412,7 @@ div.innerHTML = `
         <option value="=" {% if symptom.p_value_operator == '=' %}selected{% endif %}>=</option>
     </select>
     <input type="number" name="p_value_${symptomCount}" step="0.0001" value="{{ symptom.p_value }}" placeholder="P-value" required id="p_value_${symptomCount}">
-    <select name="scale_${symptomCount}" required>
-        <option value="">Select Scale</option>
-        ${scaleSelect}
-    </select>
+    <input type="text" name="scale_${symptomCount}" value="{{ symptom.scale or '' }}" placeholder="Scale (e.g., HAM-D, BDI)" list="scale-list" autocomplete="off">
     <span id="significance_${symptomCount}" style="padding: 0.5rem; background: #e9ecef; border-radius: 4px; display: flex; align-items: center;">
         {% if symptom.is_significant %}
         <strong style="color: green;">Status: Significant</strong>
@@ -460,8 +471,6 @@ document.getElementById('add-symptom').addEventListener('click', function() {
     div.className = 'symptom-row';
     div.id = `symptom-row-${symptomCount}`;
     
-    const scaleSelect = scaleOptions.map(scale => `<option value="${scale}">${scale}</option>`).join('');
-    
     div.innerHTML = `
         <input type="text" name="symptom_name_${symptomCount}" placeholder="Symptom/Disease Name" required>
         <select name="p_operator_${symptomCount}" required id="p_operator_${symptomCount}">
@@ -472,10 +481,7 @@ document.getElementById('add-symptom').addEventListener('click', function() {
             <option value="=">=</option>
         </select>
         <input type="number" name="p_value_${symptomCount}" step="0.0001" placeholder="P-value" required id="p_value_${symptomCount}">
-        <select name="scale_${symptomCount}" required>
-            <option value="">Select Scale</option>
-            ${scaleSelect}
-        </select>
+        <input type="text" name="scale_${symptomCount}" placeholder="Scale (e.g., HAM-D, BDI)" list="scale-list" autocomplete="off">
         <span id="significance_${symptomCount}" style="padding: 0.5rem; background: #e9ecef; border-radius: 4px; display: flex; align-items: center;">
             Status: -
         </span>
@@ -733,17 +739,49 @@ function autofillCategory(index) {
     const practiceInput = document.getElementById(`practice_name_${index}`);
     const categorySelect = document.getElementById(`practice_category_${index}`);
     
-    // Try to find the practice in current practices
+    if (!practiceInput || !categorySelect) return;
+
+    const rawValue = practiceInput.value ? practiceInput.value.trim() : '';
+    if (!rawValue) return;
+    const valueLower = rawValue.toLowerCase();
+
+    let match = null;
+
+    // Try to find the practice in results fetched for this row
     if (window.currentPracticesMap && window.currentPracticesMap[index]) {
         const practices = window.currentPracticesMap[index];
-        const match = practices.find(p => 
-            (p.practice_sanskrit && p.practice_sanskrit === practiceInput.value) ||
-            (p.practice_english === practiceInput.value)
+        match = practices.find(p =>
+            (p.practice_sanskrit && p.practice_sanskrit.toLowerCase() === valueLower) ||
+            (p.practice_english && p.practice_english.toLowerCase() === valueLower)
         );
-        
-        if (match) {
-            categorySelect.value = match.practice_segment;
+    }
+
+    // Fallback: search across all practices from the database
+    if (!match && window.ALL_PRACTICES) {
+        match = window.ALL_PRACTICES.find(p =>
+            (p.practice_sanskrit && p.practice_sanskrit.toLowerCase() === valueLower) ||
+            (p.practice_english && p.practice_english.toLowerCase() === valueLower)
+        );
+    }
+
+    // Last fallback: match against datalist options by value
+    if (!match) {
+        const dataList = document.getElementById('practice-list');
+        if (dataList) {
+            const options = dataList.querySelectorAll('option');
+            options.forEach(opt => {
+                if (!match && opt.value.toLowerCase() === valueLower) {
+                    const segment = opt.getAttribute('data-segment');
+                    if (segment) {
+                        match = { practice_segment: segment };
+                    }
+                }
+            });
         }
+    }
+
+    if (match && match.practice_segment) {
+        categorySelect.value = match.practice_segment;
     }
 }
 
@@ -784,6 +822,11 @@ function setupPracticeAutocompleteForRow(rowIndex) {
                     displayPracticeAutocompleteResults(data, rowIndex);
                 });
         }, 300);
+    });
+
+    // Also try to auto-fill category when the user leaves the input
+    practiceInput.addEventListener('blur', function() {
+        autofillCategory(rowIndex);
     });
     
     // Close autocomplete when clicking outside
@@ -906,7 +949,58 @@ function updateAgeRange() {
 
 document.getElementById('age_mean').addEventListener('input', updateAgeRange);
 document.getElementById('age_std_dev').addEventListener('input', updateAgeRange);
+
+// Validate Database/Journal vs Review Paper on submit
+const rctForm = document.getElementById('rct-form');
+if (rctForm) {
+    // Toggle review paper section visibility
+    const reviewCheckbox = document.getElementById('is_review_paper');
+    const reviewSection = document.getElementById('review-paper-section');
+    if (reviewCheckbox && reviewSection) {
+        const updateReviewVisibility = () => {
+            reviewSection.style.display = reviewCheckbox.checked ? 'block' : 'none';
+        };
+        reviewCheckbox.addEventListener('change', updateReviewVisibility);
+        // initial state (for edit, checkbox may be pre-checked)
+        updateReviewVisibility();
+    }
+
+    rctForm.addEventListener('submit', function (e) {
+        const dbInput = document.getElementById('database_journal');
+        const reviewNameInput = document.getElementById('review_paper_name');
+        const hasDb = dbInput && dbInput.value.trim().length > 0;
+        const isReview = reviewCheckbox && reviewCheckbox.checked;
+
+        if (!hasDb && !isReview) {
+            e.preventDefault();
+            alert('Please either enter a Database/Journal or select "Review Paper" in the Data Collection Information section.');
+            if (dbInput) {
+                dbInput.focus();
+            }
+            return;
+        }
+
+        // If user chose Review Paper, push a clear marker (and optional title) into database_journal
+        if (isReview && dbInput) {
+            const title = reviewNameInput && reviewNameInput.value.trim().length > 0
+                ? reviewNameInput.value.trim()
+                : '';
+
+            if (title) {
+                dbInput.value = `Review Paper: ${title}`;
+            } else if (!hasDb) {
+                dbInput.value = 'Review Paper';
+            }
+        }
+    });
+}
 </script>
+
+<datalist id="scale-list">
+    {% for scale in scales %}
+    <option value="{{ scale }}">
+    {% endfor %}
+</datalist>
 
 <style>
 .autocomplete-item:hover {

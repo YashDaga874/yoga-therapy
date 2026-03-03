@@ -1312,7 +1312,7 @@ def export_module_practices_csv(module_id):
     """Export all practices within a module to CSV"""
     session = get_db_session()
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         if not module:
             flash('Module not found', 'error')
             return redirect(url_for('list_modules'))
@@ -1382,7 +1382,7 @@ def import_module_practices_csv(module_id):
     """Import practices into a specific module from CSV/XLSX"""
     session = get_db_session()
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         if not module:
             flash('Module not found', 'error')
             return redirect(url_for('list_modules'))
@@ -1491,7 +1491,7 @@ def view_disease(disease_id):
     session = get_db_session()
     
     try:
-        disease = session.query(Disease).get(disease_id)
+        disease = session.get(Disease, disease_id)
         
         if not disease:
             flash('Disease not found', 'error')
@@ -1539,7 +1539,7 @@ def edit_disease(disease_id):
     session = get_db_session()
     
     try:
-        disease = session.query(Disease).get(disease_id)
+        disease = session.get(Disease, disease_id)
         
         if not disease:
             flash('Disease not found', 'error')
@@ -1618,7 +1618,7 @@ def delete_disease(disease_id):
     session = get_db_session()
     
     try:
-        disease = session.query(Disease).get(disease_id)
+        disease = session.get(Disease, disease_id)
         
         if not disease:
             flash('Disease not found', 'error')
@@ -1981,7 +1981,7 @@ def edit_practice(practice_id):
     session = get_db_session()
     
     try:
-        practice = session.query(Practice).get(practice_id)
+        practice = session.get(Practice, practice_id)
         
         if not practice:
             flash('Practice not found', 'error')
@@ -2265,7 +2265,7 @@ def edit_practice(practice_id):
                 for p in related_practices:
                     p.diseases = []
                 for disease_id in disease_ids:
-                    disease = session.query(Disease).get(int(disease_id))
+                    disease = session.get(Disease, int(disease_id))
                     if disease:
                         for p in related_practices:
                             if disease not in p.diseases:
@@ -2290,12 +2290,12 @@ def edit_practice(practice_id):
                 
                 # Create new practice entries for modules that don't have a practice yet
                 for disease_id, module_ids in modules_by_disease.items():
-                    disease = session.query(Disease).get(disease_id)
+                    disease = session.get(Disease, disease_id)
                     if not disease:
                         continue
                     
                     for module_id in module_ids:
-                        module = session.query(Module).get(module_id)
+                        module = session.get(Module, module_id)
                         if not module or module.disease_id != disease_id:
                             continue
                         
@@ -2463,7 +2463,7 @@ def delete_practice(practice_id):
     session = get_db_session()
     
     try:
-        practice = session.query(Practice).get(practice_id)
+        practice = session.get(Practice, practice_id)
         
         if not practice:
             flash('Practice not found', 'error')
@@ -2488,7 +2488,7 @@ def view_practice(practice_id):
     session = get_db_session()
     
     try:
-        practice = session.query(Practice).get(practice_id)
+        practice = session.get(Practice, practice_id)
         
         if not practice:
             flash('Practice not found', 'error')
@@ -2630,7 +2630,7 @@ def add_contraindication():
                 flash('Please select a disease before adding a contraindication.', 'error')
                 return redirect(url_for('add_contraindication'))
 
-            disease = session.query(Disease).get(int(disease_id))
+            disease = session.get(Disease, int(disease_id))
             if not disease:
                 flash('Selected disease could not be found.', 'error')
                 return redirect(url_for('add_contraindication'))
@@ -2639,7 +2639,7 @@ def add_contraindication():
                 flash('Please select a practice to add as a contraindication.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
 
-            practice = session.query(Practice).get(int(practice_id))
+            practice = session.get(Practice, int(practice_id))
             if not practice:
                 flash('Selected practice could not be found.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
@@ -2707,7 +2707,7 @@ def add_contraindication():
         practice_segments = CANONICAL_CATEGORIES
 
         if disease_id:
-            selected_disease = session.query(Disease).get(disease_id)
+            selected_disease = session.get(Disease, disease_id)
             if selected_disease:
                 existing_contras = list(selected_disease.contraindications)
 
@@ -2727,7 +2727,7 @@ def edit_contraindication(contraindication_id):
     session = get_db_session()
     
     try:
-        contraindication = session.query(Contraindication).get(contraindication_id)
+        contraindication = session.get(Contraindication, contraindication_id)
         
         if not contraindication:
             flash('Contraindication not found', 'error')
@@ -2774,7 +2774,7 @@ def delete_contraindication(contraindication_id):
     session = get_db_session()
     
     try:
-        contraindication = session.query(Contraindication).get(contraindication_id)
+        contraindication = session.get(Contraindication, contraindication_id)
         
         if not contraindication:
             flash('Contraindication not found', 'error')
@@ -2871,7 +2871,7 @@ def list_modules():
             try:
                 disease_id_int = int(disease_id)
                 query = query.filter(Module.disease_id == disease_id_int)
-                disease_obj = session.query(Disease).get(disease_id_int)
+                disease_obj = session.get(Disease, disease_id_int)
                 if disease_obj:
                     selected_disease_name = disease_obj.name
                     selected_disease_id = str(disease_id_int)
@@ -2912,7 +2912,7 @@ def add_module():
             
             # If disease_id is provided, use it
             if disease_id:
-                disease = session.query(Disease).get(disease_id)
+                disease = session.get(Disease, disease_id)
                 if not disease:
                     flash('Disease not found', 'error')
                     diseases = session.query(Disease).all()
@@ -3004,7 +3004,7 @@ def view_module(module_id):
     session = get_db_session()
     
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         
         if not module:
             flash('Module not found', 'error')
@@ -3091,7 +3091,7 @@ def edit_module(module_id):
     session = get_db_session()
     
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         
         if not module:
             flash('Module not found', 'error')
@@ -3147,7 +3147,7 @@ def delete_module(module_id):
     session = get_db_session()
     
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         
         if not module:
             flash('Module not found', 'error')
@@ -3173,7 +3173,7 @@ def add_practice_to_module(module_id):
     session = get_db_session()
     
     try:
-        module = session.query(Module).get(module_id)
+        module = session.get(Module, module_id)
         
         if not module:
             flash('Module not found', 'error')
@@ -3297,8 +3297,8 @@ def edit_practice_in_module(module_id, practice_id):
     session = get_db_session()
 
     try:
-        module = session.query(Module).get(module_id)
-        practice = session.query(Practice).get(practice_id)
+        module = session.get(Module, module_id)
+        practice = session.get(Practice, practice_id)
 
         if not module:
             flash('Module not found', 'error')
@@ -3761,7 +3761,7 @@ def api_contraindications_by_disease(disease_id):
     """Return existing contraindications for a disease."""
     session = get_db_session()
     try:
-        disease = session.query(Disease).get(disease_id)
+        disease = session.get(Disease, disease_id)
         if not disease:
             return jsonify([])
 
@@ -4395,7 +4395,7 @@ def recommendations_categories():
                 
                 contraindications = []
                 for disease_id in selected_disease_ids:
-                    disease = session.query(Disease).get(disease_id)
+                    disease = session.get(Disease, disease_id)
                     if disease:
                         for contraindication in disease.contraindications:
                             contraindications.append(contraindication)
@@ -4792,7 +4792,7 @@ def recommendations_categories():
         
         contraindications = []
         for disease_id in selected_disease_ids:
-            disease = session.query(Disease).get(disease_id)
+            disease = session.get(Disease, disease_id)
             if disease:
                 for contraindication in disease.contraindications:
                     contraindications.append(contraindication)
@@ -5479,7 +5479,34 @@ def add_rct():
         # GET request - show form
         diseases = session.query(Disease).order_by(Disease.name).all()
         practices = session.query(Practice).order_by(Practice.practice_english).all()
-        return render_template('add_rct.html', diseases=diseases, practices=practices)
+
+        # Prepare lightweight practice data for JS (for category auto-fill)
+        practices_js = [
+            {
+                'practice_sanskrit': p.practice_sanskrit or '',
+                'practice_english': p.practice_english or '',
+                'practice_segment': p.practice_segment,
+            }
+            for p in practices
+        ]
+
+        # Collect distinct scale names already used in symptoms for typeahead
+        scale_rows = (
+            session.query(RCTSymptom.scale)
+            .filter(RCTSymptom.scale.isnot(None), RCTSymptom.scale != '')
+            .distinct()
+            .order_by(RCTSymptom.scale.asc())
+            .all()
+        )
+        scales = [row[0] for row in scale_rows]
+
+        return render_template(
+            'add_rct.html',
+            diseases=diseases,
+            practices=practices,
+            practices_js=practices_js,
+            scales=scales,
+        )
     
     except Exception as e:
         session.rollback()
@@ -5498,7 +5525,7 @@ def view_rct(rct_id):
     """View a specific RCT entry"""
     session = get_db_session()
     try:
-        rct = session.query(RCT).get(rct_id)
+        rct = session.get(RCT, rct_id)
         if not rct:
             flash('RCT entry not found', 'error')
             return redirect(url_for('list_rcts'))
@@ -5514,7 +5541,7 @@ def edit_rct(rct_id):
     session = get_db_session()
     
     try:
-        rct = session.query(RCT).get(rct_id)
+        rct = session.get(RCT, rct_id)
         if not rct:
             flash('RCT entry not found', 'error')
             return redirect(url_for('list_rcts'))
@@ -5617,7 +5644,33 @@ def edit_rct(rct_id):
         # GET request - show form
         diseases = session.query(Disease).order_by(Disease.name).all()
         practices = session.query(Practice).order_by(Practice.practice_english).all()
-        return render_template('edit_rct.html', rct=rct, diseases=diseases, practices=practices)
+
+        practices_js = [
+            {
+                'practice_sanskrit': p.practice_sanskrit or '',
+                'practice_english': p.practice_english or '',
+                'practice_segment': p.practice_segment,
+            }
+            for p in practices
+        ]
+
+        scale_rows = (
+            session.query(RCTSymptom.scale)
+            .filter(RCTSymptom.scale.isnot(None), RCTSymptom.scale != '')
+            .distinct()
+            .order_by(RCTSymptom.scale.asc())
+            .all()
+        )
+        scales = [row[0] for row in scale_rows]
+
+        return render_template(
+            'edit_rct.html',
+            rct=rct,
+            diseases=diseases,
+            practices=practices,
+            practices_js=practices_js,
+            scales=scales,
+        )
     
     except Exception as e:
         session.rollback()
@@ -5678,7 +5731,7 @@ def delete_rct(rct_id):
     """Delete an RCT entry"""
     session = get_db_session()
     try:
-        rct = session.query(RCT).get(rct_id)
+        rct = session.get(RCT, rct_id)
         if not rct:
             flash('RCT entry not found', 'error')
             return redirect(url_for('list_rcts'))
