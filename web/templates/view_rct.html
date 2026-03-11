@@ -28,6 +28,12 @@
                 <span class="label">Database/Journal:</span>
                 <span class="value">{{ rct.database_journal or 'N/A' }}</span>
             </div>
+            {% if rct.review_doi %}
+            <div class="info-item">
+                <span class="label">Review Paper DOI:</span>
+                <span class="value">{{ rct.review_doi }}</span>
+            </div>
+            {% endif %}
             <div class="info-item" style="grid-column: 1 / -1;">
                 <span class="label">Keywords, Boolean, Filters:</span>
                 <span class="value">{{ rct.keywords or 'N/A' }}</span>
@@ -76,6 +82,7 @@
     {% if rct.symptoms %}
     <div class="info-card" style="margin-bottom: 2rem;">
         <h3>Symptoms/Disease Names with P-Values</h3>
+        <div class="table-responsive">
         <table class="data-table">
             <thead>
                 <tr>
@@ -158,6 +165,7 @@
         {% if rct.intervention_practices %}
             {% set practices = (rct.intervention_practices|from_json) if rct.intervention_practices else [] %}
             {% if practices %}
+            <div class="table-responsive">
             <table class="data-table" style="margin-bottom: 1rem;">
                 <thead>
                     <tr>

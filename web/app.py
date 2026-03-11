@@ -2660,17 +2660,9 @@ def add_contraindication():
                 flash('Practice English name is required.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
 
-            # Handle age range from min_age and max_age
-            min_age = request.form.get('min_age', '').strip()
-            max_age = request.form.get('max_age', '').strip()
-            age_range = None
-            if min_age or max_age:
-                if min_age and max_age:
-                    age_range = f"{min_age}-{max_age}"
-                elif min_age:
-                    age_range = f"{min_age}+"
-                elif max_age:
-                    age_range = f"0-{max_age}"
+            # Handle age categories from checkboxes
+            age_categories = request.form.getlist('age_categories')
+            age_categories_json = json.dumps(age_categories) if age_categories else None
 
             contraindication = Contraindication(
                 practice_sanskrit=practice_sanskrit_value,
@@ -2678,7 +2670,7 @@ def add_contraindication():
                 practice_segment=practice_segment_value,
                 sub_category=sub_category_value,
                 kosha=kosha_value or None,
-                age_range=age_range,
+                age_categories=age_categories_json,
                 gender=request.form.get('gender', '').strip() or None,
                 severity=request.form.get('severity', '').strip() or None,
                 reason=reason_html,
@@ -2738,18 +2730,9 @@ def edit_contraindication(contraindication_id):
             contraindication.apa_citation = request.form.get('reference_full', '')
             contraindication.source_type = request.form.get('parenthetical_citation', '')
             contraindication.source_name = request.form.get('reference_link', '')
-            # Handle age range from min_age and max_age
-            min_age = request.form.get('min_age', '').strip()
-            max_age = request.form.get('max_age', '').strip()
-            age_range = None
-            if min_age or max_age:
-                if min_age and max_age:
-                    age_range = f"{min_age}-{max_age}"
-                elif min_age:
-                    age_range = f"{min_age}+"
-                elif max_age:
-                    age_range = f"0-{max_age}"
-            contraindication.age_range = age_range
+            # Handle age categories from checkboxes
+            age_categories = request.form.getlist('age_categories')
+            contraindication.age_categories = json.dumps(age_categories) if age_categories else None
             contraindication.gender = request.form.get('gender', '').strip() or None
             contraindication.severity = request.form.get('severity', '').strip() or None
             
@@ -2955,24 +2938,16 @@ def add_module():
                     diseases = session.query(Disease).all()
                     return render_template('add_module.html', diseases=diseases)
 
-            # Handle age range from min_age and max_age
-            min_age = request.form.get('min_age', '').strip()
-            max_age = request.form.get('max_age', '').strip()
-            age_range = None
-            if min_age or max_age:
-                if min_age and max_age:
-                    age_range = f"{min_age}-{max_age}"
-                elif min_age:
-                    age_range = f"{min_age}+"
-                elif max_age:
-                    age_range = f"0-{max_age}"
+            # Handle age categories from checkboxes
+            age_categories = request.form.getlist('age_categories')
+            age_categories_json = json.dumps(age_categories) if age_categories else None
             
             module = Module(
                 disease_id=disease_id,
                 code=final_module_code,
                 developed_by=request.form.get('developed_by', ''),
                 paper_link=request.form.get('paper_link', ''),
-                age_range=age_range,
+                age_categories=age_categories_json,
                 gender=request.form.get('gender', '').strip() or None,
                 severity=request.form.get('severity', '').strip() or None,
                 module_description=request.form.get('module_description', '')
@@ -3112,18 +3087,9 @@ def edit_module(module_id):
 
                 module.developed_by = request.form.get('developed_by', '')
                 module.paper_link = request.form.get('paper_link', '')
-                # Handle age range from min_age and max_age
-                min_age = request.form.get('min_age', '').strip()
-                max_age = request.form.get('max_age', '').strip()
-                age_range = None
-                if min_age or max_age:
-                    if min_age and max_age:
-                        age_range = f"{min_age}-{max_age}"
-                    elif min_age:
-                        age_range = f"{min_age}+"
-                    elif max_age:
-                        age_range = f"0-{max_age}"
-                module.age_range = age_range
+                # Handle age categories from checkboxes
+                age_categories = request.form.getlist('age_categories')
+                module.age_categories = json.dumps(age_categories) if age_categories else None
                 module.gender = request.form.get('gender', '').strip() or None
                 module.severity = request.form.get('severity', '').strip() or None
                 module.module_description = request.form.get('module_description', '')
@@ -3941,7 +3907,7 @@ def api_filter_modules():
     API endpoint to filter modules by condition, severity, age, and gender
     Query parameters:
     - disease_ids: comma-separated list of disease IDs
-    - severity: Mild, Moderate, Severe, Not mentioned
+    - severity: Mild, Moderate, Severe, Not Applicable
     - age_min: minimum age (optional)
     - age_max: maximum age (optional)
     - gender: Male, Female, Other, Not mentioned (optional)
@@ -5378,11 +5344,15 @@ def add_rct():
     try:
         if request.method == 'POST':
             # Create RCT entry
+            age_categories = request.form.getlist('age_categories')
+            age_categories_json = json.dumps(age_categories) if age_categories else None
+            
             rct = RCT(
                 data_enrolled_date=request.form.get('data_enrolled_date', ''),
                 database_journal=request.form.get('database_journal', ''),
                 keywords=request.form.get('keywords', ''),
                 doi=request.form.get('doi', ''),
+                review_doi=request.form.get('review_doi', ''),
                 pmic_nmic=request.form.get('pmic_nmic', ''),
                 title=request.form.get('title', ''),
                 parenthetical_citation=request.form.get('parenthetical_citation', ''),
@@ -5392,6 +5362,7 @@ def add_rct():
                 participant_type=request.form.get('participant_type', ''),
                 age_mean=float(request.form.get('age_mean', 0)) if request.form.get('age_mean') else None,
                 age_std_dev=float(request.form.get('age_std_dev', 0)) if request.form.get('age_std_dev') else None,
+                age_categories=age_categories_json,
                 gender_male=int(request.form.get('gender_male', 0)) if request.form.get('gender_male') else 0,
                 gender_female=int(request.form.get('gender_female', 0)) if request.form.get('gender_female') else 0,
                 gender_not_mentioned=int(request.form.get('gender_not_mentioned', 0)) if request.form.get('gender_not_mentioned') else 0,
@@ -5552,6 +5523,7 @@ def edit_rct(rct_id):
             rct.database_journal = request.form.get('database_journal', '')
             rct.keywords = request.form.get('keywords', '')
             rct.doi = request.form.get('doi', '')
+            rct.review_doi = request.form.get('review_doi', '')
             rct.pmic_nmic = request.form.get('pmic_nmic', '')
             rct.title = request.form.get('title', '')
             rct.parenthetical_citation = request.form.get('parenthetical_citation', '')
@@ -5561,6 +5533,8 @@ def edit_rct(rct_id):
             rct.participant_type = request.form.get('participant_type', '')
             rct.age_mean = float(request.form.get('age_mean', 0)) if request.form.get('age_mean') else None
             rct.age_std_dev = float(request.form.get('age_std_dev', 0)) if request.form.get('age_std_dev') else None
+            age_categories = request.form.getlist('age_categories')
+            rct.age_categories = json.dumps(age_categories) if age_categories else None
             rct.gender_male = int(request.form.get('gender_male', 0)) if request.form.get('gender_male') else 0
             rct.gender_female = int(request.form.get('gender_female', 0)) if request.form.get('gender_female') else 0
             rct.gender_not_mentioned = int(request.form.get('gender_not_mentioned', 0)) if request.form.get('gender_not_mentioned') else 0
@@ -5957,7 +5931,7 @@ def export_rcts_csv():
         
         # Write header
         writer.writerow([
-            'Data Enrolled Date', 'Database/Journal', 'Keywords', 'DOI', 'PMIC/NMIC',
+            'Data Enrolled Date', 'Database/Journal', 'Review DOI', 'Keywords', 'DOI', 'PMIC/NMIC',
             'Title', 'Citation', 'Citation Full', 'Citation Link',
             'Study Type', 'Participant Type', 'Age Mean', 'Age Std Dev', 'Age Range Calculated',
             'Gender Male', 'Gender Female', 'Gender Not Mentioned',
@@ -5996,6 +5970,7 @@ def export_rcts_csv():
             writer.writerow([
                 rct.data_enrolled_date or '',
                 rct.database_journal or '',
+                rct.review_doi or '',
                 rct.keywords or '',
                 rct.doi or '',
                 rct.pmic_nmic or '',

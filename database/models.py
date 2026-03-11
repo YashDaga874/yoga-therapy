@@ -192,7 +192,7 @@ class Contraindication(Base):
     kosha = Column(String(50))  # Annamaya Kosha, Pranamaya Kosha, etc.
     
     # Demographics and severity
-    age_range = Column(String(200))  # Age range (e.g., "18-65", "Not mentioned")
+    age_categories = Column(Text)  # JSON array of selected age categories
     gender = Column(String(50))  # Male, Female, Other, Not mentioned
     severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
     
@@ -239,7 +239,7 @@ class Module(Base):
     paper_link = Column(String(1000))  # Link to research paper
     
     # Demographics and severity
-    age_range = Column(String(200))  # Age range (e.g., "18-65", "Not mentioned")
+    age_categories = Column(Text)  # JSON array of selected age categories
     gender = Column(String(50))  # Male, Female, Other, Not mentioned
     severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
     
@@ -309,6 +309,8 @@ class RCT(Base):
     
     # Basic information
     doi = Column(String(500))
+    # DOI of the *RCT* itself; review paper DOI is stored separately below when applicable
+    review_doi = Column(String(500))
     pmic_nmic = Column(String(200))  # PMIC/NMIC or extra option if not available
     title = Column(Text)
     parenthetical_citation = Column(Text)  # Citation text (optional)
@@ -320,6 +322,7 @@ class RCT(Base):
     age_mean = Column(Float)  # Mean age
     age_std_dev = Column(Float)  # Standard deviation
     age_range_calculated = Column(String(100))  # Calculated from mean and std dev
+    age_categories = Column(Text)  # JSON array of selected age categories
     gender_male = Column(Integer)  # Count
     gender_female = Column(Integer)  # Count
     gender_not_mentioned = Column(Integer)  # Count

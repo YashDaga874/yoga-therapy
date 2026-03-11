@@ -55,16 +55,39 @@
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
         <div class="form-group">
-            <label>Age Range</label>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="number" name="min_age" id="min_age" 
-                       placeholder="Min" min="0" max="150" style="flex: 1;">
-                <span style="color: #666;">-</span>
-                <input type="number" name="max_age" id="max_age" 
-                       placeholder="Max" min="0" max="150" style="flex: 1;">
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Age Categories</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_1" name="age_categories" value="Young children (1–4 years)">
+                    <label for="age_cat_1" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young children (1–4 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_2" name="age_categories" value="Older children (5–9 years)">
+                    <label for="age_cat_2" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older children (5–9 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_3" name="age_categories" value="Young adolescents (10–14 years)">
+                    <label for="age_cat_3" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adolescents (10–14 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_4" name="age_categories" value="Older adolescents (15–19 years)">
+                    <label for="age_cat_4" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adolescents (15–19 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_5" name="age_categories" value="Young adults (20–24 years)">
+                    <label for="age_cat_5" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adults (20–24 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_6" name="age_categories" value="Adults (25–59 years)">
+                    <label for="age_cat_6" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Adults (25–59 years)</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="age_cat_7" name="age_categories" value="Older adults (60–99 years)">
+                    <label for="age_cat_7" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adults (60–99 years)</label>
+                </div>
             </div>
             <small style="color: #666; display: block; margin-top: 0.25rem;">
-                Leave empty for "Not mentioned"
+                Select one or more age categories
             </small>
         </div>
         
@@ -86,7 +109,7 @@
                 <option value="Mild">Mild</option>
                 <option value="Moderate">Moderate</option>
                 <option value="Severe">Severe</option>
-                <option value="Not mentioned">Not mentioned</option>
+                <option value="Not Applicable">Not Applicable</option>
             </select>
         </div>
     </div>

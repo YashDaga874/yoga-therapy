@@ -97,9 +97,9 @@
         <h3>Data Collection Information</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;">
             <div class="form-group">
-                <label for="data_enrolled_date">Data Enrolled Date *</label>
+                <label for="data_enrolled_date">Data Enrolled Date</label>
                 <input type="date" id="data_enrolled_date" name="data_enrolled_date" 
-                       value="{{ rct.data_enrolled_date }}" required>
+                       value="{{ rct.data_enrolled_date }}">
             </div>
             
             <div class="form-group">
@@ -137,8 +137,12 @@
                                placeholder="Enter review paper title (e.g., Systematic review on yoga for anxiety)"
                                value="{{ review_title }}"
                                style="width: 100%; margin-bottom: 0.25rem;">
+                        <input type="text" id="review_doi" name="review_doi"
+                               placeholder="Enter review paper DOI (e.g., 10.1234/review)"
+                               value="{{ rct.review_doi or '' }}"
+                               style="width: 100%; margin-bottom: 0.25rem;">
                         <small style="color: #666;">
-                            If this RCT data is extracted from a review article, optionally enter the review paper name.
+                            If this RCT data is extracted from a review article, optionally enter the review paper name and DOI.
                         </small>
                     </div>
                 </div>
@@ -225,7 +229,7 @@
                 <option value="Mild" {% if rct.severity == 'Mild' %}selected{% endif %}>Mild</option>
                 <option value="Moderate" {% if rct.severity == 'Moderate' %}selected{% endif %}>Moderate</option>
                 <option value="Severe" {% if rct.severity == 'Severe' %}selected{% endif %}>Severe</option>
-                <option value="Not mentioned" {% if rct.severity == 'Not mentioned' %}selected{% endif %}>Not mentioned</option>
+                <option value="Not Applicable" {% if rct.severity == 'Not Applicable' %}selected{% endif %}>Not Applicable</option>
             </select>
             <small style="color: #666; display: block; margin-top: 0.25rem;">
                 Select the severity level of the condition(s) studied in this RCT
@@ -276,6 +280,42 @@
         
         <div id="age_range_display" style="padding: 0.75rem; background: #e9ecef; border-radius: 4px; margin-bottom: 1.5rem;">
             <strong>Calculated Age Range:</strong> <span id="age_range">{{ rct.age_range_calculated or 'Enter mean and std dev to calculate' }}</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Age Categories</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #fff;">
+                {% set selected_categories = rct.age_categories|from_json if rct.age_categories else [] %}
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_1" name="age_categories" value="Young children (1–4 years)" {% if "Young children (1–4 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_1" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young children (1–4 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_2" name="age_categories" value="Older children (5–9 years)" {% if "Older children (5–9 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_2" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older children (5–9 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_3" name="age_categories" value="Young adolescents (10–14 years)" {% if "Young adolescents (10–14 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_3" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adolescents (10–14 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_4" name="age_categories" value="Older adolescents (15–19 years)" {% if "Older adolescents (15–19 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_4" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adolescents (15–19 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_5" name="age_categories" value="Young adults (20–24 years)" {% if "Young adults (20–24 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_5" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adults (20–24 years)</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <input type="checkbox" id="age_cat_6" name="age_categories" value="Adults (25–59 years)" {% if "Adults (25–59 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_6" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Adults (25–59 years)</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="age_cat_7" name="age_categories" value="Older adults (60–99 years)" {% if "Older adults (60–99 years)" in selected_categories %}checked{% endif %}>
+                    <label for="age_cat_7" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adults (60–99 years)</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">Select one or more age categories that the study comprised</small>
         </div>
         
         <div class="form-group">
@@ -958,7 +998,15 @@ if (rctForm) {
     const reviewSection = document.getElementById('review-paper-section');
     if (reviewCheckbox && reviewSection) {
         const updateReviewVisibility = () => {
-            reviewSection.style.display = reviewCheckbox.checked ? 'block' : 'none';
+            if (reviewCheckbox.checked) {
+                reviewSection.style.display = 'block';
+            } else {
+                reviewSection.style.display = 'none';
+                const nameField = document.getElementById('review_paper_name');
+                const doiField = document.getElementById('review_doi');
+                if (nameField) nameField.value = '';
+                if (doiField) doiField.value = '';
+            }
         };
         reviewCheckbox.addEventListener('change', updateReviewVisibility);
         // initial state (for edit, checkbox may be pre-checked)

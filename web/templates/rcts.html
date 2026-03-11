@@ -358,51 +358,194 @@ document.addEventListener('click', function(e) {
 .autocomplete-item:hover {
     background: #f0f0f0;
 }
+
+.rct-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.rct-data-table thead {
+    background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+    color: white;
+}
+
+.rct-data-table thead th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #2c3e50;
+}
+
+.rct-data-table tbody tr {
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
+}
+
+.rct-data-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.rct-data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.rct-data-table tbody td {
+    padding: 1rem;
+    font-size: 0.95rem;
+    color: #2c3e50;
+}
+
+.rct-citation-cell {
+    max-width: 200px;
+    word-break: break-word;
+}
+
+.rct-citation-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.rct-citation-link:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
+.rct-doi-cell {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #666;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rct-doi-cell[title] {
+    cursor: help;
+}
+
+.rct-study-type {
+    background: #e3f2fd;
+    color: #1565c0;
+    padding: 0.35rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.rct-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.rct-view-btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: background-color 0.2s;
+}
+
+.rct-view-btn:hover {
+    background: #764ba2;
+}
+
+@media (max-width: 1024px) {
+    .rct-data-table {
+        font-size: 0.9rem;
+    }
+    
+    .rct-data-table thead th,
+    .rct-data-table tbody td {
+        padding: 0.75rem;
+    }
+    
+    .rct-citation-cell,
+    .rct-doi-cell {
+        max-width: 100px;
+    }
+}
+
+@media (max-width: 768px) {
+    .rct-data-table thead th:nth-child(2),
+    .rct-data-table tbody td:nth-child(2),
+    .rct-data-table thead th:nth-child(3),
+    .rct-data-table tbody td:nth-child(3) {
+        display: none;
+    }
+}
 </style>
 
 {% if rcts and not filter_practice %}
-<table class="data-table">
+<div class="table-responsive">
+<table class="rct-data-table">
     <thead>
         <tr>
             <th>Citation</th>
+            <th>Review DOI</th>
             <th>DOI</th>
             <th>Study Type</th>
             <th>Diseases</th>
             <th>Date Enrolled</th>
-            <th>Actions</th>
+            <th style="text-align: center;">Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for rct in rcts %}
         <tr>
-            <td>
+            <td class="rct-citation-cell">
                 {% if rct.citation_link %}
-                <a href="{{ rct.citation_link }}" target="_blank" style="color: #667eea;">
-                    {{ rct.parenthetical_citation[:60] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 60 %}...{% endif %}
+                <a href="{{ rct.citation_link }}" target="_blank" class="rct-citation-link" title="{{ rct.parenthetical_citation or 'View paper' }}">
+                    {{ rct.parenthetical_citation[:50] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 50 %}...{% endif %}
                 </a>
                 {% else %}
-                    {{ rct.parenthetical_citation[:60] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 60 %}...{% endif %}
+                    <span title="{{ rct.parenthetical_citation or '' }}">{{ rct.parenthetical_citation[:50] if rct.parenthetical_citation else 'N/A' }}{% if rct.parenthetical_citation and rct.parenthetical_citation|length > 50 %}...{% endif %}</span>
                 {% endif %}
             </td>
-            <td>{{ rct.doi or '-' }}</td>
-            <td>{{ rct.study_type or '-' }}</td>
+            <td class="rct-doi-cell" title="{{ rct.review_doi or 'N/A' }}">{{ rct.review_doi or '-' }}</td>
+            <td class="rct-doi-cell" title="{{ rct.doi or 'N/A' }}">{{ rct.doi or '-' }}</td>
+            <td>
+                {% if rct.study_type %}
+                    <span class="rct-study-type">{{ rct.study_type }}</span>
+                {% else %}
+                    <span style="color: #999;">-</span>
+                {% endif %}
+            </td>
             <td>
                 {% if rct.diseases %}
                     {% for disease in rct.diseases %}
                         <span class="disease-tag-small">{{ disease.name }}</span>
                     {% endfor %}
                 {% else %}
-                    -
+                    <span style="color: #999;">-</span>
                 {% endif %}
             </td>
             <td>{{ rct.data_enrolled_date or '-' }}</td>
-            <td>
-                <a href="/rct/{{ rct.id }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; margin-right: 0.5rem;">View</a>
+            <td style="text-align: center;">
+                <a href="/rct/{{ rct.id }}" class="rct-view-btn">View</a>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 
 {% if pagination and pagination.pages > 1 and not filter_practice %}
 <div style="margin-top: 2rem; display: flex; justify-content: center; align-items: center; gap: 1rem;">

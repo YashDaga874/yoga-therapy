@@ -148,6 +148,18 @@
             overflow: hidden;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
             border: 1px solid #e9ecef;
+            /* allow tables to scroll horizontally when container is narrow */
+            display: table;
+        }
+        
+        /* wrapper class to make any table responsive */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .table-responsive table {
+            /* ensure minimum width so columns don't collapse too small */
+            min-width: 600px;
         }
         
         th, td {
