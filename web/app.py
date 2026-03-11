@@ -155,9 +155,24 @@ def allowed_mimetype(file: FileStorage):
     return mimetype in ALLOWED_MIME_TYPES or mimetype.startswith('image/') or mimetype.startswith('video/')
 
 
-def _normalize_str(value: str) -> str:
-    """Trim whitespace and coerce None to empty string."""
-    return (value or '').strip()
+def _normalize_str(value) -> str:
+    """
+    Trim whitespace and coerce non-string/None values to a reasonable string.
+    - None -> ''
+    - list/tuple -> ' | '-joined string
+    - other types -> str(value)
+    """
+    if value is None:
+        return ''
+    # Some parsers may return list values for multi-valued cells; join them
+    if isinstance(value, (list, tuple)):
+        try:
+            value = ' | '.join('' if v is None else str(v) for v in value)
+        except Exception:
+            value = str(value)
+    elif not isinstance(value, str):
+        value = str(value)
+    return value.strip()
 
 
 def _match_allowed_category(category: str) -> str:
@@ -211,7 +226,11 @@ def _load_tabular_rows(file_storage: FileStorage):
             raise ValueError('CSV file is missing header row.')
         rows = []
         for row in reader:
-            rows.append({(key or '').strip(): _normalize_str(value) for key, value in row.items()})
+            # Normalize headers to lowercase for case-insensitive matching
+            rows.append({
+                (key or '').strip().lower(): _normalize_str(value)
+                for key, value in row.items()
+            })
         return rows
 
     if ext in ('.xlsx', '.xlsm'):
@@ -233,7 +252,8 @@ def _load_tabular_rows(file_storage: FileStorage):
         for row in ws.iter_rows(min_row=2):
             entry = {}
             for header, cell in zip(headers, row):
-                entry[header] = _normalize_str(str(cell.value) if cell.value is not None else '')
+                key = (header or '').strip().lower()
+                entry[key] = _normalize_str(str(cell.value) if cell.value is not None else '')
             rows.append(entry)
         return rows
 
@@ -3908,11 +3928,13 @@ def api_filter_modules():
     Query parameters:
     - disease_ids: comma-separated list of disease IDs
     - severity: Mild, Moderate, Severe, Not Applicable
-    - age_min: minimum age (optional)
-    - age_max: maximum age (optional)
+    - age: single patient age in years (preferred)
+    - age_min: minimum age (optional, legacy)
+    - age_max: maximum age (optional, legacy)
     - gender: Male, Female, Other, Not mentioned (optional)
     """
     from sqlalchemy import or_
+    import json
     
     session = get_db_session()
     
@@ -3920,6 +3942,7 @@ def api_filter_modules():
         # Get filter parameters
         disease_ids_str = request.args.get('disease_ids', '').strip()
         severity = request.args.get('severity', '').strip()
+        age = request.args.get('age', '').strip()
         age_min = request.args.get('age_min', '').strip()
         age_max = request.args.get('age_max', '').strip()
         gender = request.args.get('gender', '').strip()
@@ -3943,51 +3966,108 @@ def api_filter_modules():
                 )
             )
         
-        # Filter by age range
-        if age_min or age_max:
+        # Helper: check if a given age (int) falls into any of the module's age categories
+        def _age_matches_categories(age_value: int, age_categories_json: str) -> bool:
+            """
+            Age categories are stored as JSON array of labels, e.g.
+            ["Young adults (20–24 years)", "Adults (25–59 years)"]
+            """
+            if age_value is None:
+                return True
+            if not age_categories_json:
+                # If no categories are specified, treat as not matching when age filter is used
+                return False
+            try:
+                categories = json.loads(age_categories_json) or []
+            except Exception:
+                return False
+            
+            # Mapping from label to numeric (min_age, max_age)
+            AGE_CATEGORY_RANGES = {
+                "Young children (1–4 years)": (1, 4),
+                "Older children (5–9 years)": (5, 9),
+                "Young adolescents (10–14 years)": (10, 14),
+                "Older adolescents (15–19 years)": (15, 19),
+                "Young adults (20–24 years)": (20, 24),
+                "Adults (25–59 years)": (25, 59),
+                "Older adults (60–99 years)": (60, 99),
+            }
+            
+            for label in categories:
+                bounds = AGE_CATEGORY_RANGES.get(label)
+                if not bounds:
+                    continue
+                low, high = bounds
+                if low <= age_value <= high:
+                    return True
+            return False
+        
+        # Filter by age - prefer single age value if provided
+        age_value = None
+        if age:
+            try:
+                age_value = int(age)
+            except (TypeError, ValueError):
+                age_value = None
+        
+        modules = query.all()
+        
+        if age_value is not None:
+            # Post-filter modules based on age_categories JSON
+            modules = [
+                m for m in modules
+                if _age_matches_categories(age_value, getattr(m, 'age_categories', None))
+            ]
+        elif age_min or age_max:
+            # Legacy support for old age_min/age_max based filtering
             # Parse age_range field (format: "18-65" or "18+" or "0-65")
-            # For now, we'll do a simple text match - can be improved
+            # For now, we'll do a simple text match
             if age_min and age_max:
                 age_range_str = f"{age_min}-{age_max}"
-                query = query.filter(
-                    or_(
-                        Module.age_range == age_range_str,
-                        Module.age_range.like(f"{age_min}%"),
-                        Module.age_range.like(f"%-{age_max}"),
-                        Module.age_range == None,
-                        Module.age_range == ''
+                modules = [
+                    m for m in modules
+                    if (
+                        (m.age_range == age_range_str) or
+                        (m.age_range or '').startswith(str(age_min)) or
+                        (m.age_range or '').endswith(f"-{age_max}") or
+                        not (m.age_range or '').strip()
                     )
-                )
+                ]
             elif age_min:
-                query = query.filter(
-                    or_(
-                        Module.age_range.like(f"{age_min}%"),
-                        Module.age_range == None,
-                        Module.age_range == ''
+                modules = [
+                    m for m in modules
+                    if (
+                        (m.age_range or '').startswith(str(age_min)) or
+                        not (m.age_range or '').strip()
                     )
-                )
+                ]
             elif age_max:
-                query = query.filter(
-                    or_(
-                        Module.age_range.like(f"%-{age_max}"),
-                        Module.age_range == None,
-                        Module.age_range == ''
+                modules = [
+                    m for m in modules
+                    if (
+                        (m.age_range or '').endswith(f"-{age_max}") or
+                        not (m.age_range or '').strip()
                     )
-                )
+                ]
         
+        # Helper: gender match (supports general "Male and Female" modules)
+        def _gender_matches(patient_gender: str, module_gender: str) -> bool:
+            if not patient_gender:
+                return True
+            if not module_gender or module_gender in ('', 'Not mentioned'):
+                return True
+            if module_gender == patient_gender:
+                return True
+            if module_gender == 'Male and Female' and patient_gender in ('Male', 'Female'):
+                return True
+            return False
+
         # Filter by gender
         if gender:
-            query = query.filter(
-                or_(
-                    Module.gender == gender,
-                    Module.gender == None,
-                    Module.gender == 'Not mentioned',
-                    Module.gender == ''
-                )
-            )
-        
-        # Get filtered modules
-        modules = query.all()
+            modules = [
+                m for m in modules
+                if _gender_matches(gender, getattr(m, 'gender', None))
+            ]
         
         results = []
         for module in modules:
@@ -5340,6 +5420,7 @@ def api_rct_count():
 def add_rct():
     """Add a new RCT entry"""
     session = get_db_session()
+    import json
     
     try:
         if request.method == 'POST':
@@ -5393,7 +5474,6 @@ def add_rct():
                     })
             
             if practice_list:
-                import json
                 rct.intervention_practices = json.dumps(practice_list)
             
             session.add(rct)
@@ -5486,7 +5566,30 @@ def add_rct():
         traceback.print_exc()
         diseases = session.query(Disease).order_by(Disease.name).all()
         practices = session.query(Practice).order_by(Practice.practice_english).all()
-        return render_template('add_rct.html', diseases=diseases, practices=practices)
+        # Prepare lightweight practice data and scales again for the template
+        practices_js = [
+            {
+                'practice_sanskrit': p.practice_sanskrit or '',
+                'practice_english': p.practice_english or '',
+                'practice_segment': p.practice_segment,
+            }
+            for p in practices
+        ]
+        scale_rows = (
+            session.query(RCTSymptom.scale)
+            .filter(RCTSymptom.scale.isnot(None), RCTSymptom.scale != '')
+            .distinct()
+            .order_by(RCTSymptom.scale.asc())
+            .all()
+        )
+        scales = [row[0] for row in scale_rows]
+        return render_template(
+            'add_rct.html',
+            diseases=diseases,
+            practices=practices,
+            practices_js=practices_js,
+            scales=scales,
+        )
     finally:
         session.close()
 

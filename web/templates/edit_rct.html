@@ -323,17 +323,17 @@
             <div class="gender-checkbox-group">
                 <label class="gender-checkbox">
                     <input type="checkbox" id="gender_male_checkbox" name="gender_selected" value="male"
-                           {% if rct.gender_male > 0 %}checked{% endif %}>
+                           {% if (rct.gender_male or 0) > 0 %}checked{% endif %}>
                     Male
                 </label>
                 <label class="gender-checkbox">
                     <input type="checkbox" id="gender_female_checkbox" name="gender_selected" value="female"
-                           {% if rct.gender_female > 0 %}checked{% endif %}>
+                           {% if (rct.gender_female or 0) > 0 %}checked{% endif %}>
                     Female
                 </label>
                 <label class="gender-checkbox">
                     <input type="checkbox" id="gender_not_mentioned_checkbox" name="gender_selected" value="not_mentioned"
-                           {% if rct.gender_not_mentioned > 0 %}checked{% endif %}>
+                           {% if (rct.gender_not_mentioned or 0) > 0 %}checked{% endif %}>
                     Not Mentioned
                 </label>
             </div>

@@ -9,15 +9,42 @@
     </h2>
 
     <form method="POST" id="recommendation-form" action="{{ url_for('recommendations') }}">
-        <!-- Step 1: Select Conditions -->
+        <!-- Step 1: Enter Patient Details -->
         <div id="step-1" class="form-step" style="background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
             <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Step 1: Select Conditions <span style="color: #dc3545;">*</span>
+                Step 1: Enter Patient Age and Gender <span style="color: #dc3545;">*</span>
+            </label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="age">Age (in years)</label>
+                    <input type="number" name="age" id="age" min="0" max="150" 
+                           placeholder="Enter patient age" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                </div>
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select name="gender" id="gender" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                        <option value="Not mentioned">Not mentioned</option>
+                    </select>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                These details will be used to filter modules by age category and gender.
+            </small>
+        </div>
+
+        <!-- Step 2: Select Conditions and Severity -->
+        <div id="step-2" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                Step 2: Select Conditions and Severity <span style="color: #dc3545;">*</span>
             </label>
             
             <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 0.75rem;">
                 <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.5rem; font-style: italic;">
-                    <strong>Note:</strong> You can select multiple conditions. Select conditions in descending order of priority.
+                    <strong>Note:</strong> You can select multiple conditions. Select conditions in descending order of priority, and choose severity for each.
                 </div>
                 <div style="position: relative;">
                     <input type="text" id="disease_input" 
@@ -33,83 +60,26 @@
             </div>
         </div>
 
-        <!-- Step 2: Select Severity -->
-        <div id="step-2" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
-            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Step 2: Select Severity <span style="color: #dc3545;">*</span>
-            </label>
-            <div class="form-group">
-                <select name="severity" id="severity" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                    <option value="">Select Severity</option>
-                    <option value="Mild">Mild</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Severe">Severe</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
-                <small style="color: #666; display: block; margin-top: 0.25rem;">
-                    This will filter available modules based on severity
-                </small>
-            </div>
-        </div>
-
-        <!-- Step 3: Select Age and Gender (Optional) -->
+        <!-- Step 3: Select Modules (per condition via dropdown) -->
         <div id="step-3" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
             <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Step 3: Select Age and Gender (Optional)
+                Step 3: Select Modules <span style="color: #dc3545;">*</span>
             </label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label for="age_min">Age Min</label>
-                    <input type="number" name="age_min" id="age_min" min="0" max="150" 
-                           placeholder="Min age" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                </div>
-                <div class="form-group">
-                    <label for="age_max">Age Max</label>
-                    <input type="number" name="age_max" id="age_max" min="0" max="150" 
-                           placeholder="Max age" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                </div>
-                <div class="form-group">
-                    <label for="gender">Gender</label>
-                    <select name="gender" id="gender" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                        <option value="Not mentioned">Not mentioned</option>
-                    </select>
-                </div>
-            </div>
-            <small style="color: #666; display: block; margin-top: 0.5rem;">
-                These filters will further refine the available modules. Leave empty to include all.
-            </small>
-        </div>
-
-        <!-- Step 4: Select Modules -->
-        <div id="step-4" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
-            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                Step 4: Select Modules <span style="color: #dc3545;">*</span>
-            </label>
-            <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 0.75rem;">
-                <div style="position: relative;">
-                    <input type="text" id="module_input" 
-                           placeholder="Type to search modules..." 
-                           autocomplete="off"
-                           style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; background: white;">
-                    <div id="module-autocomplete-results" style="position: absolute; width: 100%; z-index: 1000; margin-top: 0.25rem;"></div>
-                </div>
+            <div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 0.75rem;">
+                For each condition, choose one or more modules from the dropdown that match the patient's age, gender, and severity.
             </div>
             
-            <div id="modules-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div id="modules-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <!-- Will be populated dynamically -->
             </div>
         </div>
 
-        <!-- Step 5: Weightage -->
-        <div id="step-5" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
+        <!-- Step 4: Weightage -->
+        <div id="step-4" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start;">
                 <div>
                     <div style="font-size: 0.85rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem;">
-                        Step 5: Give weightage (Total = 100)
+                        Step 4: Give weightage (Total = 100)
                     </div>
                     <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.75rem; font-style: italic;">
                         Adjust the sliders to distribute weights among selected modules. Total must equal 100.
@@ -151,10 +121,11 @@
 
 <script>
 // Global state
-let selectedDiseases = []; // Array of {id, name}
+let selectedDiseases = []; // Array of {id, name, severity}
 let selectedModules = []; // Array of {module_id, disease_id, disease_name, module_name, display_name}
 let currentStep = 1;
-let filteredModules = []; // Modules after filtering
+let filteredModules = []; // All modules after filtering (flattened)
+let filteredModulesByDisease = {}; // disease_id -> [modules]
 let weightRows = [];
 let partitionStops = [];
 
@@ -166,43 +137,46 @@ const diseaseInput = document.getElementById('disease_input');
 const diseaseAutocompleteDiv = document.getElementById('disease-autocomplete-results');
 const diseasesListContainer = document.getElementById('diseases-list');
 
-// Module autocomplete
-let moduleAutocompleteTimeout;
-let currentModuleOptions = [];
-let selectedModuleIndex = -1;
-const moduleInput = document.getElementById('module_input');
-const moduleAutocompleteDiv = document.getElementById('module-autocomplete-results');
+// Modules (per-condition dropdowns)
 const modulesListContainer = document.getElementById('modules-list');
 
 // Step navigation
 function nextStep() {
     if (currentStep === 1) {
-        if (selectedDiseases.length === 0) {
-            alert('Please select at least one condition');
+        const age = document.getElementById('age').value;
+        const gender = document.getElementById('gender').value;
+        if (!age || parseInt(age, 10) <= 0) {
+            alert('Please enter a valid age for the patient');
+            return;
+        }
+        if (!gender) {
+            alert('Please select a gender for the patient');
             return;
         }
         currentStep = 2;
         document.getElementById('step-2').style.display = 'block';
     } else if (currentStep === 2) {
-        const severity = document.getElementById('severity').value;
-        if (!severity) {
-            alert('Please select a severity level');
+        if (selectedDiseases.length === 0) {
+            alert('Please select at least one condition');
             return;
+        }
+        // Ensure every condition has a severity selected
+        for (const d of selectedDiseases) {
+            if (!d.severity) {
+                alert('Please select a severity for each condition');
+                return;
+            }
         }
         currentStep = 3;
         document.getElementById('step-3').style.display = 'block';
-    } else if (currentStep === 3) {
-        // Age and gender are optional, so we can proceed
-        currentStep = 4;
-        document.getElementById('step-4').style.display = 'block';
         filterAndLoadModules();
-    } else if (currentStep === 4) {
+    } else if (currentStep === 3) {
         if (selectedModules.length === 0) {
             alert('Please select at least one module');
             return;
         }
-        currentStep = 5;
-        document.getElementById('step-5').style.display = 'block';
+        currentStep = 4;
+        document.getElementById('step-4').style.display = 'block';
         document.getElementById('next-step-btn').style.display = 'none';
         document.getElementById('continue-btn').style.display = 'inline-block';
         initWeights();
@@ -212,9 +186,9 @@ function nextStep() {
 
 function updateStepButtons() {
     const nextBtn = document.getElementById('next-step-btn');
-    if (currentStep < 5) {
+    if (currentStep < 4) {
         nextBtn.style.display = 'inline-block';
-        nextBtn.textContent = currentStep === 4 ? 'Next: Set Weightage' : 'Next Step';
+        nextBtn.textContent = currentStep === 3 ? 'Next: Set Weightage' : 'Next Step';
     } else {
         nextBtn.style.display = 'none';
     }
@@ -301,8 +275,16 @@ function displayDiseaseAutocompleteResults(diseases) {
         '</div>';
 }
 
-function selectDisease(id, name) {
-    selectedDiseases.push({id: id, name: name});
+function selectDisease(diseaseOrId, maybeName) {
+    let id, name;
+    if (typeof diseaseOrId === 'object' && diseaseOrId !== null) {
+        id = diseaseOrId.id;
+        name = diseaseOrId.name;
+    } else {
+        id = diseaseOrId;
+        name = maybeName;
+    }
+    selectedDiseases.push({id: id, name: name, severity: ''});
     diseaseInput.value = '';
     diseaseAutocompleteDiv.innerHTML = '';
     currentDiseases = [];
@@ -319,9 +301,19 @@ function renderDiseasesList() {
     diseasesListContainer.innerHTML = '';
     selectedDiseases.forEach((disease, index) => {
         const item = document.createElement('div');
-        item.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 0.5rem;';
+        item.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 0.5rem; flex-wrap: wrap;';
         item.innerHTML = `
-            <span style="font-size: 0.95rem; font-weight: 600; color: #212529; flex: 1;">${disease.name}</span>
+            <span style="font-size: 0.95rem; font-weight: 600; color: #212529; flex: 1 1 auto;">${disease.name}</span>
+            <div style="flex: 0 0 220px; display:flex; align-items:center; gap:0.4rem;">
+                <label style="font-size:0.8rem; color:#495057;">Severity:</label>
+                <select onchange="updateDiseaseSeverity(${index}, this.value)" style="flex:1; padding:0.35rem 0.5rem; border-radius:4px; border:1px solid #ccc; font-size:0.8rem;">
+                    <option value="">Select</option>
+                    <option value="Mild" ${disease.severity === 'Mild' ? 'selected' : ''}>Mild</option>
+                    <option value="Moderate" ${disease.severity === 'Moderate' ? 'selected' : ''}>Moderate</option>
+                    <option value="Severe" ${disease.severity === 'Severe' ? 'selected' : ''}>Severe</option>
+                    <option value="Not Applicable" ${disease.severity === 'Not Applicable' ? 'selected' : ''}>Not Applicable</option>
+                </select>
+            </div>
             <button type="button" onclick="removeDisease(${index})"
                     style="padding: 0.4rem 0.6rem; border: 1px solid #dc3545; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; color: #dc3545;">
                 ×
@@ -331,165 +323,127 @@ function renderDiseasesList() {
     });
 }
 
-// Module filtering and selection
+function updateDiseaseSeverity(index, severity) {
+    if (selectedDiseases[index]) {
+        selectedDiseases[index].severity = severity;
+        // Clear modules when severity changes
+        selectedModules = [];
+        filteredModules = [];
+        filteredModulesByDisease = {};
+        modulesListContainer.innerHTML = '';
+    }
+}
+window.updateDiseaseSeverity = updateDiseaseSeverity;
+
+// Module filtering and selection (per condition, using age + gender + per-condition severity)
 function filterAndLoadModules() {
-    const severity = document.getElementById('severity').value;
-    const ageMin = document.getElementById('age_min').value;
-    const ageMax = document.getElementById('age_max').value;
+    const age = document.getElementById('age').value;
     const gender = document.getElementById('gender').value;
     
-    const diseaseIds = selectedDiseases.map(d => d.id).join(',');
-    
-    let url = `/api/module/filter?disease_ids=${encodeURIComponent(diseaseIds)}`;
-    if (severity) url += `&severity=${encodeURIComponent(severity)}`;
-    if (ageMin) url += `&age_min=${encodeURIComponent(ageMin)}`;
-    if (ageMax) url += `&age_max=${encodeURIComponent(ageMax)}`;
-    if (gender) url += `&gender=${encodeURIComponent(gender)}`;
-    
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            filteredModules = data;
-            // Update module autocomplete to use filtered modules
-            moduleInput.addEventListener('input', handleModuleInput);
-        });
-}
+    filteredModules = [];
+    filteredModulesByDisease = {};
+    selectedModules = [];
+    modulesListContainer.innerHTML = '';
 
-moduleInput.addEventListener('input', function() {
-    clearTimeout(moduleAutocompleteTimeout);
-    const query = this.value.trim().toLowerCase();
-    selectedModuleIndex = -1;
-
-    if (query.length < 1) {
-        moduleAutocompleteDiv.innerHTML = '';
-        currentModuleOptions = [];
-        return;
-    }
-
-    moduleAutocompleteTimeout = setTimeout(() => {
-        const selectedIds = new Set(selectedModules.map(m => m.module_id));
-        currentModuleOptions = filteredModules.filter(m => {
-            const displayLower = m.display_name.toLowerCase();
-            return displayLower.includes(query) && !selectedIds.has(m.module_id);
-        }).slice(0, 20);
-        displayModuleAutocompleteResults(currentModuleOptions);
-    }, 250);
-});
-
-function handleModuleInput() {
-    const query = this.value.trim().toLowerCase();
-    selectedModuleIndex = -1;
-
-    if (query.length < 1) {
-        moduleAutocompleteDiv.innerHTML = '';
-        currentModuleOptions = [];
-        return;
-    }
-
-    clearTimeout(moduleAutocompleteTimeout);
-    moduleAutocompleteTimeout = setTimeout(() => {
-        const selectedIds = new Set(selectedModules.map(m => m.module_id));
-        currentModuleOptions = filteredModules.filter(m => {
-            const displayLower = m.display_name.toLowerCase();
-            return displayLower.includes(query) && !selectedIds.has(m.module_id);
-        }).slice(0, 20);
-        displayModuleAutocompleteResults(currentModuleOptions);
-    }, 250);
-}
-
-moduleInput.addEventListener('keydown', function(e) {
-    if (moduleAutocompleteDiv.innerHTML === '') return;
-    const items = moduleAutocompleteDiv.querySelectorAll('.autocomplete-item');
-    switch(e.key) {
-        case 'ArrowDown':
-            e.preventDefault();
-            selectedModuleIndex = Math.min(selectedModuleIndex + 1, items.length - 1);
-            updateModuleSelection(items);
-            break;
-        case 'ArrowUp':
-            e.preventDefault();
-            selectedModuleIndex = Math.max(selectedModuleIndex - 1, -1);
-            updateModuleSelection(items);
-            break;
-        case 'Enter':
-            e.preventDefault();
-            if (selectedModuleIndex >= 0 && selectedModuleIndex < items.length) {
-                selectModule(currentModuleOptions[selectedModuleIndex]);
-            }
-            break;
-        case 'Escape':
-            moduleAutocompleteDiv.innerHTML = '';
-            currentModuleOptions = [];
-            selectedModuleIndex = -1;
-            break;
-    }
-});
-
-function updateModuleSelection(items) {
-    items.forEach((item, idx) => {
-        if (idx === selectedModuleIndex) {
-            item.style.backgroundColor = '#e3f2fd';
-            item.style.borderLeft = '3px solid #2196f3';
-        } else {
-            item.style.backgroundColor = '';
-            item.style.borderLeft = '';
-        }
+    const fetchPromises = selectedDiseases.map(d => {
+        let url = `/api/module/filter?disease_ids=${encodeURIComponent(String(d.id))}`;
+        if (d.severity) url += `&severity=${encodeURIComponent(d.severity)}`;
+        if (age) url += `&age=${encodeURIComponent(age)}`;
+        if (gender) url += `&gender=${encodeURIComponent(gender)}`;
+        return fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                filteredModulesByDisease[d.id] = data || [];
+            });
     });
-}
 
-function displayModuleAutocompleteResults(modules) {
-    if (!modules.length) {
-        moduleAutocompleteDiv.innerHTML = '';
-        return;
-    }
-    moduleAutocompleteDiv.innerHTML =
-        '<div style="background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 250px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 0.85rem;">' +
-        modules.map((m, index) => {
-            const escaped = JSON.stringify(m).replace(/"/g, '&quot;');
-            return `
-            <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid #eee;"
-                 onclick="selectModuleFromString('${escaped}')" data-index="${index}">
-                <strong style="color: #333;">${m.display_name}</strong>
-            </div>
-            `;
-        }).join('') +
-        '</div>';
-}
-
-function selectModule(module) {
-    selectedModules.push(module);
-    moduleInput.value = '';
-    moduleAutocompleteDiv.innerHTML = '';
-    currentModuleOptions = [];
-    selectedModuleIndex = -1;
-    renderModulesList();
-}
-
-function selectModuleFromString(moduleStr) {
-    const module = JSON.parse(moduleStr.replace(/&quot;/g, '"'));
-    selectModule(module);
-}
-window.selectModuleFromString = selectModuleFromString;
-
-function removeModule(index) {
-    selectedModules.splice(index, 1);
-    renderModulesList();
+    Promise.all(fetchPromises).then(() => {
+        filteredModules = Object.values(filteredModulesByDisease).flat();
+        renderModuleDropdowns();
+    });
 }
 
 function renderModulesList() {
-    modulesListContainer.innerHTML = '';
-    selectedModules.forEach((module, index) => {
-        const item = document.createElement('div');
-        item.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 0.5rem;';
-        item.innerHTML = `
-            <span style="font-size: 0.95rem; font-weight: 600; color: #212529; flex: 1;">${module.display_name}</span>
-            <button type="button" onclick="removeModule(${index})"
-                    style="padding: 0.4rem 0.6rem; border: 1px solid #dc3545; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; color: #dc3545;">
-                ×
-            </button>
-        `;
-        modulesListContainer.appendChild(item);
+    // Build selectedModules array from all module checkboxes
+    selectedModules = [];
+    const selectedIdsSet = new Set();
+
+    selectedDiseases.forEach(disease => {
+        const checkboxes = document.querySelectorAll(`input[type="checkbox"][data-disease-id="${disease.id}"][data-module-id]`);
+        checkboxes.forEach(cb => {
+            if (!cb.checked) return;
+            const moduleId = parseInt(cb.dataset.moduleId, 10);
+            if (!moduleId || selectedIdsSet.has(moduleId)) return;
+            const moduleData = filteredModulesByDisease[disease.id]?.find(m => m.module_id === moduleId || m.id === moduleId);
+            if (moduleData) {
+                selectedIdsSet.add(moduleId);
+                selectedModules.push(moduleData);
+            }
+        });
     });
+}
+
+function renderModuleDropdowns() {
+    modulesListContainer.innerHTML = '';
+
+    if (selectedDiseases.length === 0) {
+        return;
+    }
+
+    selectedDiseases.forEach((disease, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'padding: 0.9rem; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 6px;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;';
+        header.innerHTML = `
+            <div style="font-size:0.9rem; font-weight:600; color:#212529;">
+                ${index === 0 ? 'Major condition: ' : 'Comorbid condition: '} ${disease.name}
+            </div>
+            <div style="font-size:0.75rem; color:#6c757d;">
+                Severity: <strong>${disease.severity || 'Not selected'}</strong>
+            </div>
+        `;
+        wrapper.appendChild(header);
+
+        const modules = filteredModulesByDisease[disease.id] || [];
+        if (!modules.length) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'font-size:0.8rem; color:#6c757d;';
+            empty.textContent = 'No modules found for this condition with the current filters.';
+            wrapper.appendChild(empty);
+        } else {
+            const list = document.createElement('div');
+            list.style.cssText = 'display:flex; flex-direction:column; gap:0.35rem;';
+
+            modules.forEach(m => {
+                const row = document.createElement('label');
+                row.style.cssText = 'display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; color:#212529; cursor:pointer;';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.diseaseId = String(disease.id);
+                cb.dataset.moduleId = String(m.module_id || m.id);
+                cb.addEventListener('change', () => {
+                    renderModulesList();
+                });
+
+                const txt = document.createElement('span');
+                txt.textContent = m.display_name;
+
+                row.appendChild(cb);
+                row.appendChild(txt);
+                list.appendChild(row);
+            });
+
+            wrapper.appendChild(list);
+        }
+
+        modulesListContainer.appendChild(wrapper);
+    });
+
+    // Rebuild selectedModules based on current selections
+    renderModulesList();
 }
 
 // Weightage system (reuse existing weightage code)
