@@ -1174,21 +1174,260 @@ def _import_contraindications_rows(session, rows):
 
 
 def _import_rcts_rows(session, rows):
+    import json
+    import re
+
+    def _normalize_age_categories_value(raw):
+        """Convert CSV age categories into JSON list string (or None)."""
+        if not raw:
+            return None
+        raw = raw.strip()
+        if not raw:
+            return None
+        # If already a JSON list, keep as-is (normalized)
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return json.dumps(data)
+        except Exception:
+            pass
+        # Otherwise split on common separators
+        parts = re.split(r'\s*\|\s*|;|,', raw.replace('\n', ','))
+        values = [p.strip() for p in parts if p and p.strip()]
+        if not values:
+            return None
+        return json.dumps(values)
+
+    def _parse_intervention_value(raw):
+        """
+        Parse Intervention Practices column into JSON list of
+        {'name': ..., 'category': ...} like the UI uses.
+        Accepts:
+        - JSON list (exported directly from DB)
+        - Pretty text: "Category: Preparatory Practice | Ardha Chakrasana (Yogasana)"
+        - Simple text: "Preparatory Practice" (treated as category-only).
+        """
+        if not raw:
+            return None
+        raw = raw.strip()
+        if not raw:
+            return None
+
+        # If it's already JSON, normalize and return
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return json.dumps(data)
+        except Exception:
+            pass
+
+        items = re.split(r'\s*\|\s*|;|\n', raw)
+        parsed = []
+        for item in items:
+            text = item.strip()
+            if not text:
+                continue
+
+            # "Category: Preparatory Practice"
+            m = re.match(r'^Category:\s*(.+)$', text, re.IGNORECASE)
+            if m:
+                parsed.append({'name': '', 'category': m.group(1).strip()})
+                continue
+
+            # "Ardha Chakrasana (Yogasana)"
+            m = re.match(r'^(?P<name>.+?)\s*\(\s*(?P<cat>.+?)\s*\)\s*$', text)
+            if m:
+                parsed.append({
+                    'name': m.group('name').strip(),
+                    'category': m.group('cat').strip()
+                })
+                continue
+
+            # Fallback: treat entire text as category-only entry
+            parsed.append({'name': '', 'category': text})
+
+        return json.dumps(parsed) if parsed else None
+
+    def _parse_symptom_entries(raw):
+        """
+        Parse Symptoms column into a list of dicts:
+        {'symptom_name', 'p_value_operator', 'p_value', 'is_significant', 'scale'}.
+        Supports:
+        - Export style: "FATIGUE (p<0.05, Significant, Scale: HAM-D)"
+        - Simple CSV style: "Fever, <0.05, Scale = HAM-D"
+        - Multiple entries separated by '|', ';', or newlines.
+        """
+        entries = []
+        if not raw:
+            return entries
+
+        segments = re.split(r'\s*\|\s*|;|\n', raw)
+        for seg in segments:
+            text = seg.strip()
+            if not text:
+                continue
+
+            name = ''
+            op = ''
+            val = None
+            scale = None
+
+            # Try export-style pattern first
+            m = re.match(
+                r'^(?P<name>.+?)\s*\(\s*p?\s*(?P<op>[<>=]+)\s*(?P<val>[0-9.]+).*?scale[:=\s]+(?P<scale>.+?)\s*\)?$',
+                text,
+                re.IGNORECASE,
+            )
+            if m:
+                name = m.group('name').strip()
+                op = m.group('op')
+                try:
+                    val = float(m.group('val'))
+                except ValueError:
+                    val = None
+                scale = m.group('scale').strip()
+            else:
+                # Generic comma-separated style: "Fever, <0.05, Scale = HAM-D"
+                parts = [p.strip() for p in text.split(',') if p.strip()]
+                if parts:
+                    # First chunk is the name; trim any "(symptom/...)" suffix
+                    name = re.sub(r'\(.*\)', '', parts[0]).strip()
+                    for part in parts[1:]:
+                        m_op = re.search(r'([<>=]+)\s*([0-9.]+)', part)
+                        if m_op:
+                            op = m_op.group(1)
+                            try:
+                                val = float(m_op.group(2))
+                            except ValueError:
+                                val = None
+                            continue
+                        m_scale = re.search(r'scale[:=\s]+(.+)', part, re.IGNORECASE)
+                        if m_scale:
+                            scale = m_scale.group(1).strip()
+
+            is_sig = 0
+            if op and val is not None:
+                is_sig = calculate_p_value_significance(op, val)
+
+            entries.append({
+                'symptom_name': name or text,
+                'p_value_operator': op or '',
+                'p_value': val,
+                'is_significant': is_sig,
+                'scale': scale or None,
+            })
+
+        return entries
+
     stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': []}
     for idx, row in enumerate(rows, start=2):
+        # Basic text fields (support multiple header variants – CSV headers are lowercased in _load_tabular_rows)
         title = _normalize_str(row.get('title'))
         doi = _normalize_str(row.get('doi'))
-        citation_full = _normalize_str(row.get('citation_full') or row.get('full_reference'))
-        parenthetical_citation = _normalize_str(row.get('parenthetical_citation') or row.get('citation_text'))
-        database_journal = _normalize_str(row.get('database_journal'))
-        study_type = _normalize_str(row.get('study_type'))
-        participant_type = _normalize_str(row.get('participant_type'))
-        duration_type = _normalize_str(row.get('duration_type'))
-        duration_value = _normalize_str(row.get('duration_value'))
-        frequency_per_duration = _normalize_str(row.get('frequency_per_duration'))
+        citation_full = _normalize_str(
+            row.get('citation_full')
+            or row.get('citation full')
+            or row.get('full_reference')
+        )
+        parenthetical_citation = _normalize_str(
+            row.get('parenthetical_citation')
+            or row.get('citation_text')
+            or row.get('citation')
+        )
+        database_journal = _normalize_str(
+            row.get('database_journal')
+            or row.get('database/journal')
+        )
+        data_enrolled_date = _normalize_str(
+            row.get('data_enrolled_date')
+            or row.get('data enrolled date')
+        )
+        keywords = _normalize_str(row.get('keywords'))
+        review_doi = _normalize_str(
+            row.get('review_doi')
+            or row.get('review doi')
+        )
+        pmic_nmic = _normalize_str(
+            row.get('pmic_nmic')
+            or row.get('pmic/nmic')
+        )
+        citation_link = _normalize_str(
+            row.get('citation_link')
+            or row.get('citation link')
+        )
+        study_type = _normalize_str(
+            row.get('study_type')
+            or row.get('study type')
+        )
+        participant_type = _normalize_str(
+            row.get('participant_type')
+            or row.get('participant type')
+        )
+        severity = _normalize_str(row.get('severity'))
+
+        # Demographics
+        age_mean = _normalize_str(
+            row.get('age_mean')
+            or row.get('age mean')
+        )
+        age_std_dev = _normalize_str(
+            row.get('age_std_dev')
+            or row.get('age std dev')
+        )
+        age_range_calculated = _normalize_str(
+            row.get('age_range_calculated')
+            or row.get('age range calculated')
+        )
+        age_categories_raw = _normalize_str(
+            row.get('age_categories')
+            or row.get('age categories')
+        )
+        age_categories = _normalize_age_categories_value(age_categories_raw)
+
+        gender_male = _normalize_str(
+            row.get('gender_male')
+            or row.get('gender male')
+        )
+        gender_female = _normalize_str(
+            row.get('gender_female')
+            or row.get('gender female')
+        )
+        gender_not_mentioned = _normalize_str(
+            row.get('gender_not_mentioned')
+            or row.get('gender not mentioned')
+        )
+
+        # Intervention & duration/results
+        intervention_raw = _normalize_str(
+            row.get('intervention_practices')
+            or row.get('intervention practices')
+        )
+        intervention_practices = _parse_intervention_value(intervention_raw)
+        duration_type = _normalize_str(
+            row.get('duration_type')
+            or row.get('duration type')
+        )
+        duration_value = _normalize_str(
+            row.get('duration_value')
+            or row.get('duration value')
+        )
+        frequency_per_duration = _normalize_str(
+            row.get('frequency_per_duration')
+            or row.get('frequency per duration')
+        )
+        scales = _normalize_str(row.get('scales'))
         results_text = _normalize_str(row.get('results'))
         conclusion = _normalize_str(row.get('conclusion'))
         remarks = _normalize_str(row.get('remarks'))
+
+        # Symptoms (can contain multiple entries)
+        symptoms_raw = _normalize_str(
+            row.get('symptoms')
+            or row.get('symptom')
+            or row.get('symptoms/disease names with p values')
+            or row.get('symptoms/disease names with p-values')
+        )
+
         disease_names = _parse_name_list(row.get('diseases') or row.get('disease_names') or row.get('disease'))
 
         if not title:
@@ -1203,11 +1442,30 @@ def _import_rcts_rows(session, rows):
 
         if existing:
             changes = 0
+            # Basic info
             if citation_full and existing.citation_full != citation_full:
                 existing.citation_full = citation_full
                 changes += 1
             if parenthetical_citation and existing.parenthetical_citation != parenthetical_citation:
                 existing.parenthetical_citation = parenthetical_citation
+                changes += 1
+            if data_enrolled_date and existing.data_enrolled_date != data_enrolled_date:
+                existing.data_enrolled_date = data_enrolled_date
+                changes += 1
+            if database_journal and existing.database_journal != database_journal:
+                existing.database_journal = database_journal
+                changes += 1
+            if keywords and existing.keywords != keywords:
+                existing.keywords = keywords
+                changes += 1
+            if review_doi and existing.review_doi != review_doi:
+                existing.review_doi = review_doi
+                changes += 1
+            if pmic_nmic and existing.pmic_nmic != pmic_nmic:
+                existing.pmic_nmic = pmic_nmic
+                changes += 1
+            if citation_link and existing.citation_link != citation_link:
+                existing.citation_link = citation_link
                 changes += 1
             if database_journal and existing.database_journal != database_journal:
                 existing.database_journal = database_journal
@@ -1218,19 +1476,73 @@ def _import_rcts_rows(session, rows):
             if participant_type and existing.participant_type != participant_type:
                 existing.participant_type = participant_type
                 changes += 1
+            if severity and existing.severity != severity:
+                existing.severity = severity
+                changes += 1
+
+            # Demographics
+            if age_mean:
+                try:
+                    mean_val = float(age_mean)
+                    if existing.age_mean != mean_val:
+                        existing.age_mean = mean_val
+                        changes += 1
+                except ValueError:
+                    stats['errors'].append(f'Row {idx}: invalid age_mean "{age_mean}".')
+            if age_std_dev:
+                try:
+                    std_val = float(age_std_dev)
+                    if existing.age_std_dev != std_val:
+                        existing.age_std_dev = std_val
+                        changes += 1
+                except ValueError:
+                    stats['errors'].append(f'Row {idx}: invalid age_std_dev "{age_std_dev}".')
+            if age_range_calculated and existing.age_range_calculated != age_range_calculated:
+                existing.age_range_calculated = age_range_calculated
+                changes += 1
+            if age_categories and existing.age_categories != age_categories:
+                existing.age_categories = age_categories
+                changes += 1
+
+            def _parse_int_field(raw_val, field_name):
+                if raw_val is None or raw_val == '':
+                    return None
+                try:
+                    return int(float(raw_val))
+                except ValueError:
+                    stats['errors'].append(f'Row {idx}: invalid {field_name} "{raw_val}".')
+                    return None
+
+            male_val = _parse_int_field(gender_male, 'gender_male')
+            if male_val is not None and existing.gender_male != male_val:
+                existing.gender_male = male_val
+                changes += 1
+            female_val = _parse_int_field(gender_female, 'gender_female')
+            if female_val is not None and existing.gender_female != female_val:
+                existing.gender_female = female_val
+                changes += 1
+            nm_val = _parse_int_field(gender_not_mentioned, 'gender_not_mentioned')
+            if nm_val is not None and existing.gender_not_mentioned != nm_val:
+                existing.gender_not_mentioned = nm_val
+                changes += 1
+
+            # Intervention / duration / outcome text
+            if intervention_practices is not None and existing.intervention_practices != intervention_practices:
+                existing.intervention_practices = intervention_practices
+                changes += 1
             if duration_type and existing.duration_type != duration_type:
                 existing.duration_type = duration_type
                 changes += 1
             if duration_value:
-                try:
-                    value_int = int(float(duration_value))
-                    if existing.duration_value != value_int:
-                        existing.duration_value = value_int
-                        changes += 1
-                except ValueError:
-                    stats['errors'].append(f'Row {idx}: invalid duration_value "{duration_value}".')
+                value_int = _parse_int_field(duration_value, 'duration_value')
+                if value_int is not None and existing.duration_value != value_int:
+                    existing.duration_value = value_int
+                    changes += 1
             if frequency_per_duration and existing.frequency_per_duration != frequency_per_duration:
                 existing.frequency_per_duration = frequency_per_duration
+                changes += 1
+            if scales and existing.scales != scales:
+                existing.scales = scales
                 changes += 1
             if results_text and existing.results != results_text:
                 existing.results = results_text
@@ -1241,6 +1553,30 @@ def _import_rcts_rows(session, rows):
             if remarks and existing.remarks != remarks:
                 existing.remarks = remarks
                 changes += 1
+
+            # Symptoms: if column provided, replace existing symptoms for this RCT
+            if symptoms_raw:
+                # Remove old symptoms
+                for symptom in list(existing.symptoms):
+                    session.delete(symptom)
+                existing.symptoms = []
+
+                # Add new ones
+                symptom_entries = _parse_symptom_entries(symptoms_raw)
+                for s in symptom_entries:
+                    if not s['symptom_name']:
+                        continue
+                    symptom_obj = RCTSymptom(
+                        symptom_name=s['symptom_name'],
+                        p_value_operator=s['p_value_operator'] or None,
+                        p_value=s['p_value'],
+                        is_significant=s['is_significant'],
+                        scale=s['scale'],
+                    )
+                    session.add(symptom_obj)
+                    existing.symptoms.append(symptom_obj)
+                if symptom_entries:
+                    changes += 1
 
             for disease_name in disease_names:
                 disease = _get_or_create_disease_by_name(session, disease_name)
@@ -1254,26 +1590,76 @@ def _import_rcts_rows(session, rows):
                 stats['skipped'] += 1
             continue
 
+        # Helper to safely parse numeric fields for new RCTs
+        def _safe_float(raw_val, field_name):
+            if raw_val is None or raw_val == '':
+                return None
+            try:
+                return float(raw_val)
+            except ValueError:
+                stats['errors'].append(f'Row {idx}: invalid {field_name} "{raw_val}".')
+                return None
+
+        def _safe_int(raw_val, field_name):
+            if raw_val is None or raw_val == '':
+                return None
+            try:
+                return int(float(raw_val))
+            except ValueError:
+                stats['errors'].append(f'Row {idx}: invalid {field_name} "{raw_val}".')
+                return None
+
         rct = RCT(
             title=title,
             doi=doi or None,
             citation_full=citation_full,
             parenthetical_citation=parenthetical_citation,
+            data_enrolled_date=data_enrolled_date,
             database_journal=database_journal,
+            keywords=keywords,
+            review_doi=review_doi,
+            pmic_nmic=pmic_nmic,
+            citation_link=citation_link,
             study_type=study_type,
             participant_type=participant_type,
+            age_mean=_safe_float(age_mean, 'age_mean'),
+            age_std_dev=_safe_float(age_std_dev, 'age_std_dev'),
+            age_range_calculated=age_range_calculated,
+            age_categories=age_categories,
+            gender_male=_safe_int(gender_male, 'gender_male') or 0,
+            gender_female=_safe_int(gender_female, 'gender_female') or 0,
+            gender_not_mentioned=_safe_int(gender_not_mentioned, 'gender_not_mentioned') or 0,
+            intervention_practices=intervention_practices,
             duration_type=duration_type,
-            duration_value=int(float(duration_value)) if duration_value else None,
+            duration_value=_safe_int(duration_value, 'duration_value'),
             frequency_per_duration=frequency_per_duration,
+            scales=scales,
             results=results_text,
             conclusion=conclusion,
-            remarks=remarks
+            remarks=remarks,
+            severity=severity
         )
         for disease_name in disease_names:
             disease = _get_or_create_disease_by_name(session, disease_name)
             if disease:
                 rct.diseases.append(disease)
         session.add(rct)
+        # Attach symptoms for new RCT
+        if symptoms_raw:
+            symptom_entries = _parse_symptom_entries(symptoms_raw)
+            for s in symptom_entries:
+                if not s['symptom_name']:
+                    continue
+                symptom_obj = RCTSymptom(
+                    symptom_name=s['symptom_name'],
+                    p_value_operator=s['p_value_operator'] or None,
+                    p_value=s['p_value'],
+                    is_significant=s['is_significant'],
+                    scale=s['scale'],
+                )
+                session.add(symptom_obj)
+                rct.symptoms.append(symptom_obj)
+
         stats['created'] += 1
 
     return stats
@@ -5817,10 +6203,17 @@ def delete_rct(rct_id):
         disease_ids = [d.id for d in rct.diseases]
         if rct.intervention_practices:
             import json
-            practice_list = json.loads(rct.intervention_practices)
-            # Decrement RCT counts for each practice/category
-            for practice_data in practice_list:
-                decrement_rct_counts(session, practice_data, disease_ids)
+            try:
+                practice_list = json.loads(rct.intervention_practices)
+                # Decrement RCT counts for each practice/category
+                if isinstance(practice_list, list):
+                    for practice_data in practice_list:
+                        if isinstance(practice_data, dict):
+                            decrement_rct_counts(session, practice_data, disease_ids)
+            except Exception:
+                # If intervention_practices is not valid JSON (legacy text),
+                # skip decrementing counts instead of failing the delete.
+                pass
         
         session.delete(rct)
         session.commit()
@@ -6036,8 +6429,9 @@ def export_rcts_csv():
         writer.writerow([
             'Data Enrolled Date', 'Database/Journal', 'Review DOI', 'Keywords', 'DOI', 'PMIC/NMIC',
             'Title', 'Citation', 'Citation Full', 'Citation Link',
-            'Study Type', 'Participant Type', 'Age Mean', 'Age Std Dev', 'Age Range Calculated',
-            'Gender Male', 'Gender Female', 'Gender Not Mentioned',
+            'Study Type', 'Participant Type',
+            'Age Mean', 'Age Std Dev', 'Age Range Calculated', 'Age Categories',
+            'Severity', 'Gender Male', 'Gender Female', 'Gender Not Mentioned',
             'Intervention Practices', 'Duration Type', 'Duration Value', 'Frequency Per Duration',
             'Scales', 'Results', 'Conclusion', 'Remarks', 'Diseases', 'Symptoms'
         ])
@@ -6058,16 +6452,23 @@ def export_rcts_csv():
             # Parse intervention practices
             intervention_str = ''
             if rct.intervention_practices:
+                # Support both plain text and JSON list formats
                 try:
                     practices = json.loads(rct.intervention_practices)
-                    practice_details = []
-                    for p in practices:
-                        if p.get('name'):
-                            practice_details.append(f"{p.get('name')} ({p.get('category')})")
-                        else:
-                            practice_details.append(f"Category: {p.get('category')}")
-                    intervention_str = ' | '.join(practice_details)
-                except:
+                    if isinstance(practices, list):
+                        practice_details = []
+                        for p in practices:
+                            if isinstance(p, dict):
+                                if p.get('name'):
+                                    practice_details.append(f"{p.get('name')} ({p.get('category')})")
+                                else:
+                                    practice_details.append(f"Category: {p.get('category')}")
+                            else:
+                                practice_details.append(str(p))
+                        intervention_str = ' | '.join(practice_details)
+                    else:
+                        intervention_str = str(practices)
+                except Exception:
                     intervention_str = rct.intervention_practices
             
             writer.writerow([
@@ -6086,6 +6487,8 @@ def export_rcts_csv():
                 rct.age_mean if rct.age_mean else '',
                 rct.age_std_dev if rct.age_std_dev else '',
                 rct.age_range_calculated or '',
+                rct.age_categories or '',
+                rct.severity or '',
                 rct.gender_male if rct.gender_male else 0,
                 rct.gender_female if rct.gender_female else 0,
                 rct.gender_not_mentioned if rct.gender_not_mentioned else 0,
