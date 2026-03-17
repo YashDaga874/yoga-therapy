@@ -19,6 +19,12 @@
                     <label for="age">Age (in years)</label>
                     <input type="number" name="age" id="age" min="0" max="150" 
                            placeholder="Enter patient age" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                    <div style="margin-top: 0.5rem;">
+                        <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
+                            <input type="checkbox" id="apply_age_filter" checked style="margin-right: 0.4rem;">
+                            Apply age-based module filtering
+                        </label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="gender">Gender</label>
@@ -29,10 +35,16 @@
                         <option value="Other">Other</option>
                         <option value="Not mentioned">Not mentioned</option>
                     </select>
+                    <div style="margin-top: 0.5rem;">
+                        <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
+                            <input type="checkbox" id="apply_gender_filter" checked style="margin-right: 0.4rem;">
+                            Apply gender-based module filtering
+                        </label>
+                    </div>
                 </div>
             </div>
             <small style="color: #666; display: block; margin-top: 0.5rem;">
-                These details will be used to filter modules by age category and gender.
+                Use the checkboxes to enable/disable filtering based on the entered age and gender.
             </small>
         </div>
 
@@ -145,14 +157,23 @@ function nextStep() {
     if (currentStep === 1) {
         const age = document.getElementById('age').value;
         const gender = document.getElementById('gender').value;
-        if (!age || parseInt(age, 10) <= 0) {
-            alert('Please enter a valid age for the patient');
-            return;
+        const applyAgeFilter = document.getElementById('apply_age_filter').checked;
+        const applyGenderFilter = document.getElementById('apply_gender_filter').checked;
+
+        if (applyAgeFilter) {
+            if (!age || parseInt(age, 10) <= 0) {
+                alert('Please enter a valid age for the patient');
+                return;
+            }
         }
-        if (!gender) {
-            alert('Please select a gender for the patient');
-            return;
+
+        if (applyGenderFilter) {
+            if (!gender) {
+                alert('Please select a gender for the patient');
+                return;
+            }
         }
+
         currentStep = 2;
         document.getElementById('step-2').style.display = 'block';
     } else if (currentStep === 2) {
@@ -337,6 +358,8 @@ window.updateDiseaseSeverity = updateDiseaseSeverity;
 
 // Module filtering and selection (per condition, using age + gender + per-condition severity)
 function filterAndLoadModules() {
+    const applyAgeFilter = document.getElementById('apply_age_filter').checked;
+    const applyGenderFilter = document.getElementById('apply_gender_filter').checked;
     const age = document.getElementById('age').value;
     const gender = document.getElementById('gender').value;
     
@@ -348,8 +371,8 @@ function filterAndLoadModules() {
     const fetchPromises = selectedDiseases.map(d => {
         let url = `/api/module/filter?disease_ids=${encodeURIComponent(String(d.id))}`;
         if (d.severity) url += `&severity=${encodeURIComponent(d.severity)}`;
-        if (age) url += `&age=${encodeURIComponent(age)}`;
-        if (gender) url += `&gender=${encodeURIComponent(gender)}`;
+        if (applyAgeFilter && age) url += `&age=${encodeURIComponent(age)}`;
+        if (applyGenderFilter && gender) url += `&gender=${encodeURIComponent(gender)}`;
         return fetch(url)
             .then(response => response.json())
             .then(data => {
