@@ -14,54 +14,50 @@
             <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                 Step 1: Enter Patient Age and Gender <span style="color: #dc3545;">*</span>
             </label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div class="form-group">
-                    <label for="age">Age (in years)</label>
-                    <input type="number" name="age" id="age" min="0" max="150" 
-                           placeholder="Enter patient age" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                    <div style="margin-top: 0.5rem;">
-                        <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
-                            <input type="checkbox" id="apply_age_filter" checked style="margin-right: 0.4rem;">
-                            Apply age-based module filtering
-                        </label>
+            <div class="panel">
+            <div style="font-weight: 600; margin-bottom: 0.75rem; color: #2f3e50;">Patient demographics + module filter toggles</div>
+            <div class="mini-grid">
+                <div class="option-box">
+                    <label for="age"><strong>Age (years)</strong></label>
+                    <input type="number" name="age" id="age" min="0" max="150" placeholder="e.g., 32" style="width: 100%; padding: 0.6rem; border: 1px solid #cfd8e3; border-radius: 5px; font-size: 0.93rem;">
+                    <div class="inline-control">
+                        <input type="checkbox" id="apply_age_filter" checked>
+                        <label for="apply_age_filter">Apply age-based filtering</label>
                     </div>
+                    <span class="small-hint">Tick to apply age conditions to module results.</span>
                 </div>
-                <div class="form-group">
-                    <label for="gender">Gender</label>
-                    <select name="gender" id="gender" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                        <option value="">Select Gender</option>
+                <div class="option-box">
+                    <label for="gender"><strong>Gender</strong></label>
+                    <select name="gender" id="gender" style="width: 100%; padding: 0.6rem; border: 1px solid #cfd8e3; border-radius: 5px; font-size: 0.93rem;">
+                        <option value="">Any</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                         <option value="Not mentioned">Not mentioned</option>
                     </select>
-                    <div style="margin-top: 0.5rem;">
-                        <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
-                            <input type="checkbox" id="apply_gender_filter" checked style="margin-right: 0.4rem;">
-                            Apply gender-based module filtering
-                        </label>
+                    <div class="inline-control">
+                        <input type="checkbox" id="apply_gender_filter" checked>
+                        <label for="apply_gender_filter">Apply gender-based filtering</label>
                     </div>
+                    <span class="small-hint">Leave gender blank for no gender filtering.</span>
                 </div>
             </div>
-            <small style="color: #666; display: block; margin-top: 0.5rem;">
-                Use the checkboxes to enable/disable filtering based on the entered age and gender.
-            </small>
         </div>
 
         <!-- Step 2: Select Conditions and Severity -->
         <div id="step-2" class="form-step" style="display: none; background: white; border-radius: 6px; padding: 0.9rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #ddd;">
-            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+            <label style="font-size: 0.9rem; font-weight: 600; color: #495057; margin-bottom: 0.7rem; display: block;">
                 Step 2: Select Conditions and Severity <span style="color: #dc3545;">*</span>
             </label>
-            <div style="margin-bottom: 0.75rem;">
-                <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
-                    <input type="checkbox" id="apply_severity_filter" checked style="margin-right: 0.4rem;">
+            <div class="option-box" style="margin-bottom: 0.8rem;">
+                <label class="inline-control" for="apply_severity_filter">
+                    <input type="checkbox" id="apply_severity_filter" checked>
                     Apply severity-based module filtering
                 </label>
+                <span class="small-hint">If unchecked, modules are shown irrespective of condition severity.</span>
             </div>
-            
-            <div style="padding: 0.6rem 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 0.75rem;">
-                <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.5rem; font-style: italic;">
+
+            <div class="panel" style="padding: 0.7rem;">                <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.5rem; font-style: italic;">
                     <strong>Note:</strong> You can select multiple conditions. Select conditions in descending order of priority, and choose severity for each.
                 </div>
                 <div style="position: relative;">
@@ -123,14 +119,14 @@
         </div>
         
         <!-- Action Buttons -->
-        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
-            <button type="button" id="next-step-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;" onclick="nextStep()">
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.75rem;">
+            <button type="button" id="next-step-btn" class="btn" style="min-width: 110px; padding: 0.5rem 1.5rem; font-size: 0.9rem;" onclick="nextStep()">
                 Next Step
             </button>
-            <button type="submit" id="continue-btn" class="btn" style="padding: 0.5rem 1.5rem; font-size: 0.9rem; display: none;">
+            <button type="submit" id="continue-btn" class="btn" style="min-width: 160px; padding: 0.5rem 1.5rem; font-size: 0.9rem; display: none;">
                 Continue to Category Selection
             </button>
-            <button type="button" onclick="clearForm()" class="btn btn-secondary" style="padding: 0.5rem 1.5rem; font-size: 0.9rem;">
+            <button type="button" onclick="clearForm()" class="btn btn-secondary" style="min-width: 90px; padding: 0.5rem 1.5rem; font-size: 0.9rem;">
                 Clear
             </button>
         </div>

@@ -50,88 +50,36 @@
         </small>
     </div>
     
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-        <div class="form-group">
-            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Age Categories</label>
-            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_1" name="age_categories" value="Young children (1–4 years)">
-                    <label for="age_cat_1" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young children (1–4 years)</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_2" name="age_categories" value="Older children (5–9 years)">
-                    <label for="age_cat_2" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older children (5–9 years)</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_3" name="age_categories" value="Young adolescents (10–14 years)">
-                    <label for="age_cat_3" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adolescents (10–14 years)</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_4" name="age_categories" value="Older adolescents (15–19 years)">
-                    <label for="age_cat_4" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adolescents (15–19 years)</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_5" name="age_categories" value="Young adults (20–24 years)">
-                    <label for="age_cat_5" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Young adults (20–24 years)</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <input type="checkbox" id="age_cat_6" name="age_categories" value="Adults (25–59 years)">
-                    <label for="age_cat_6" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Adults (25–59 years)</label>
-                </div>
-                <div style="display: flex; align-items: center;">
-                    <input type="checkbox" id="age_cat_7" name="age_categories" value="Older adults (60–99 years)">
-                    <label for="age_cat_7" style="margin-left: 0.5rem; margin-bottom: 0; cursor: pointer; font-weight: normal;">Older adults (60–99 years)</label>
-                </div>
+    <div class="panel" style="margin-bottom: 1rem;">
+        <div style="font-weight: 600; margin-bottom: 0.6rem; color: #2f3e50;">Selection filters</div>
+        <div class="mini-grid">
+            <div class="option-box">
+                <strong>Age Categories</strong>
+                <label><input type="checkbox" id="age_cat_1" name="age_categories" value="Young children (1–4 years)"> Young children (1–4 years)</label>
+                <label><input type="checkbox" id="age_cat_2" name="age_categories" value="Older children (5–9 years)"> Older children (5–9 years)</label>
+                <label><input type="checkbox" id="age_cat_3" name="age_categories" value="Young adolescents (10–14 years)"> Young adolescents (10–14 years)</label>
+                <label><input type="checkbox" id="age_cat_4" name="age_categories" value="Older adolescents (15–19 years)"> Older adolescents (15–19 years)</label>
+                <label><input type="checkbox" id="age_cat_5" name="age_categories" value="Young adults (20–24 years)"> Young adults (20–24 years)</label>
+                <label><input type="checkbox" id="age_cat_6" name="age_categories" value="Adults (25–59 years)"> Adults (25–59 years)</label>
+                <label><input type="checkbox" id="age_cat_7" name="age_categories" value="Older adults (60–99 years)"> Older adults (60–99 years)</label>
+                <span class="small-hint">Select age groups for this module.</span>
             </div>
-            <small style="color: #666; display: block; margin-top: 0.25rem;">
-                Select one or more age categories
-            </small>
-        </div>
-        
-        <div class="form-group">
-            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Gender</label>
-            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="gender_male" name="gender" value="Male">
-                    <label for="gender_male" style="margin-left: 0.5rem; cursor: pointer;">Male</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="gender_female" name="gender" value="Female">
-                    <label for="gender_female" style="margin-left: 0.5rem; cursor: pointer;">Female</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="gender_other" name="gender" value="Other">
-                    <label for="gender_other" style="margin-left: 0.5rem; cursor: pointer;">Other</label>
-                </div>
-                <div style="display: flex; align-items: center;">
-                    <input type="checkbox" id="gender_not_mentioned" name="gender" value="Not mentioned">
-                    <label for="gender_not_mentioned" style="margin-left: 0.5rem; cursor: pointer;">Not mentioned</label>
-                </div>
+            <div class="option-box">
+                <strong>Gender</strong>
+                <label><input type="checkbox" id="gender_male" name="gender" value="Male"> Male</label>
+                <label><input type="checkbox" id="gender_female" name="gender" value="Female"> Female</label>
+                <label><input type="checkbox" id="gender_other" name="gender" value="Other"> Other</label>
+                <label><input type="checkbox" id="gender_not_mentioned" name="gender" value="Not mentioned"> Not mentioned</label>
+                <span class="small-hint">Leave unchecked to not enforce gender restrictions.</span>
             </div>
-            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any matching gender tags. Leave unchecked for no gender-specific information.</small>
-        </div>
-        
-        <div class="form-group">
-            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Severity</label>
-            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="severity_mild" name="severity" value="Mild">
-                    <label for="severity_mild" style="margin-left: 0.5rem; cursor: pointer;">Mild</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="severity_moderate" name="severity" value="Moderate">
-                    <label for="severity_moderate" style="margin-left: 0.5rem; cursor: pointer;">Moderate</label>
-                </div>
-                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
-                    <input type="checkbox" id="severity_severe" name="severity" value="Severe">
-                    <label for="severity_severe" style="margin-left: 0.5rem; cursor: pointer;">Severe</label>
-                </div>
-                <div style="display: flex; align-items: center;">
-                    <input type="checkbox" id="severity_not_applicable" name="severity" value="Not Applicable">
-                    <label for="severity_not_applicable" style="margin-left: 0.5rem; cursor: pointer;">Not Applicable</label>
-                </div>
+            <div class="option-box">
+                <strong>Severity</strong>
+                <label><input type="checkbox" id="severity_mild" name="severity" value="Mild"> Mild</label>
+                <label><input type="checkbox" id="severity_moderate" name="severity" value="Moderate"> Moderate</label>
+                <label><input type="checkbox" id="severity_severe" name="severity" value="Severe"> Severe</label>
+                <label><input type="checkbox" id="severity_not_applicable" name="severity" value="Not Applicable"> Not Applicable</label>
+                <span class="small-hint">Select severity tags for module suitability.</span>
             </div>
-            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any applicable severity levels. Leave unchecked to indicate non-condition severity or unspecified.</small>
         </div>
     </div>
     

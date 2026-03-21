@@ -13,29 +13,24 @@
 </div>
 
 <!-- Filter Section for Disease + Practice RCT Count -->
-<div class="filter-section" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-    <h3 style="margin-top: 0; margin-bottom: 1rem; color: #495057;">Check RCT Count for Disease + Practice</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+<div class="panel" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+        <h3 style="margin: 0; color: #2f3e50;">Check RCT Count for Disease + Practice</h3>
+        <button type="button" class="btn" onclick="checkRctOrFilter()" style="padding: 0.65rem 1.35rem; white-space: nowrap;">Check / Filter</button>
+    </div>
+    <div class="mini-grid" style="grid-template-columns: repeat(2, minmax(200px, 1fr)); gap: 1rem; align-items: start;">
         <div class="form-group" style="margin-bottom: 0; position: relative;">
-            <label for="filter_disease" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Disease</label>
-            <input type="text" id="filter_disease" name="filter_disease" 
-                   placeholder="Type or select disease" style="width: 100%; padding: 0.75rem;" autocomplete="off"
-                   value="{{ filter_disease or '' }}">
+            <label for="filter_disease" style="display: block; margin-bottom: 0.35rem; color: #495057; font-weight: 600;">Select Disease</label>
+            <input type="text" id="filter_disease" name="filter_disease" placeholder="Type or select disease" autocomplete="off" value="{{ filter_disease or '' }}" style="width: 100%;">
             <div id="disease-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
         </div>
-        
         <div class="form-group" style="margin-bottom: 0; position: relative;">
-            <label for="filter_practice" style="display: block; margin-bottom: 0.5rem; color: #495057; font-weight: 500;">Select Practice</label>
-            <input type="text" id="filter_practice" name="filter_practice" 
-                   placeholder="Type or select practice" style="width: 100%; padding: 0.75rem;" autocomplete="off"
-                   value="{{ filter_practice or '' }}">
+            <label for="filter_practice" style="display: block; margin-bottom: 0.35rem; color: #495057; font-weight: 600;">Select Practice</label>
+            <input type="text" id="filter_practice" name="filter_practice" placeholder="Type or select practice" autocomplete="off" value="{{ filter_practice or '' }}" style="width: 100%;">
             <div id="practice-autocomplete" style="position: absolute; width: 100%; z-index: 1000;"></div>
         </div>
-        
-        <button type="button" class="btn" onclick="checkRctOrFilter()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Check / Filter</button>
     </div>
-    
-    <div id="rct_count_result" style="margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none;"></div>
+    <div id="rct_count_result" style="margin-top: 1rem; padding: 0.9rem; border-radius: 6px; display: none; background: #e9ecef;"></div>
 </div>
 
 {% if filter_practice %}
@@ -44,20 +39,21 @@
         RCTs for "{{ filter_practice }}"
     </h3>
     {% if grouped_practice_rcts %}
-    <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
-        <thead>
-            <tr>
-                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left;">Condition</th>
-                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left; width: 120px;">RCT NO</th>
-                <th style="border: 1px solid #333; padding: 0.6rem; text-align: left;">Parenthetical Citations</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in grouped_practice_rcts %}
-            <tr>
-                <td style="border: 1px solid #333; padding: 0.6rem;">{{ row.condition }}</td>
-                <td style="border: 1px solid #333; padding: 0.6rem;">{{ row.rct_count }}</td>
-                <td style="border: 1px solid #333; padding: 0.6rem;">
+    <div class="table-responsive" style="margin-top: 0.5rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Condition</th>
+                    <th style="width: 120px;">RCT NO</th>
+                    <th>Parenthetical Citations</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in grouped_practice_rcts %}
+                <tr>
+                    <td>{{ row.condition }}</td>
+                    <td>{{ row.rct_count }}</td>
+                    <td>
                     {% for cite in row.citations %}
                         {% if cite.link %}
                             <a href="{{ cite.link }}" target="_blank" style="color: #1a73e8;">{{ cite.text }}</a>
