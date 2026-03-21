@@ -43,6 +43,12 @@
                     </div>
                 </div>
             </div>
+            <div style="margin-top: 0.75rem;">
+                <label style="font-size: 0.85rem; color: #495057; cursor: pointer;">
+                    <input type="checkbox" id="apply_severity_filter" checked style="margin-right: 0.4rem;">
+                    Apply severity-based module filtering
+                </label>
+            </div>
             <small style="color: #666; display: block; margin-top: 0.5rem;">
                 Use the checkboxes to enable/disable filtering based on the entered age and gender.
             </small>
@@ -138,6 +144,7 @@ let selectedModules = []; // Array of {module_id, disease_id, disease_name, modu
 let currentStep = 1;
 let filteredModules = []; // All modules after filtering (flattened)
 let filteredModulesByDisease = {}; // disease_id -> [modules]
+let severityEnabledDiseases = {}; // disease_id -> boolean (has modules with severity)
 let weightRows = [];
 let partitionStops = [];
 
@@ -159,6 +166,7 @@ function nextStep() {
         const gender = document.getElementById('gender').value;
         const applyAgeFilter = document.getElementById('apply_age_filter').checked;
         const applyGenderFilter = document.getElementById('apply_gender_filter').checked;
+        const applySeverityFilter = document.getElementById('apply_severity_filter').checked;
 
         if (applyAgeFilter) {
             if (!age || parseInt(age, 10) <= 0) {
@@ -181,11 +189,14 @@ function nextStep() {
             alert('Please select at least one condition');
             return;
         }
-        // Ensure every condition has a severity selected
-        for (const d of selectedDiseases) {
-            if (!d.severity) {
-                alert('Please select a severity for each condition');
-                return;
+        // Check severity selection only if severity filter is enabled and disease has severity options
+        const applySeverityFilter = document.getElementById('apply_severity_filter').checked;
+        if (applySeverityFilter) {
+            for (const d of selectedDiseases) {
+                if (severityEnabledDiseases[d.id] && !d.severity) {
+                    alert('Please select a severity for each condition that has severity options');
+                    return;
+                }
             }
         }
         currentStep = 3;
@@ -310,12 +321,35 @@ function selectDisease(diseaseOrId, maybeName) {
     diseaseAutocompleteDiv.innerHTML = '';
     currentDiseases = [];
     selectedDiseaseIndex = -1;
-    renderDiseasesList();
+    
+    // Check severity enabled status for all selected diseases
+    checkSeverityEnabled();
+}
+
+function checkSeverityEnabled() {
+    if (selectedDiseases.length === 0) {
+        severityEnabledDiseases = {};
+        renderDiseasesList();
+        return;
+    }
+    
+    const diseaseIds = selectedDiseases.map(d => d.id).join(',');
+    fetch(`/api/disease/severity-enabled?disease_ids=${diseaseIds}`)
+        .then(response => response.json())
+        .then(data => {
+            severityEnabledDiseases = data;
+            renderDiseasesList();
+        })
+        .catch(error => {
+            console.error('Error checking severity enabled:', error);
+            severityEnabledDiseases = {};
+            renderDiseasesList();
+        });
 }
 
 function removeDisease(index) {
     selectedDiseases.splice(index, 1);
-    renderDiseasesList();
+    checkSeverityEnabled();
 }
 
 function renderDiseasesList() {
@@ -323,18 +357,26 @@ function renderDiseasesList() {
     selectedDiseases.forEach((disease, index) => {
         const item = document.createElement('div');
         item.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 0.5rem; flex-wrap: wrap;';
+        
+        let severityHtml = '';
+        if (severityEnabledDiseases[disease.id]) {
+            severityHtml = `
+                <div style="flex: 0 0 220px; display:flex; align-items:center; gap:0.4rem;">
+                    <label style="font-size:0.8rem; color:#495057;">Severity:</label>
+                    <select onchange="updateDiseaseSeverity(${index}, this.value)" style="flex:1; padding:0.35rem 0.5rem; border-radius:4px; border:1px solid #ccc; font-size:0.8rem;">
+                        <option value="">Select</option>
+                        <option value="Mild" ${disease.severity === 'Mild' ? 'selected' : ''}>Mild</option>
+                        <option value="Moderate" ${disease.severity === 'Moderate' ? 'selected' : ''}>Moderate</option>
+                        <option value="Severe" ${disease.severity === 'Severe' ? 'selected' : ''}>Severe</option>
+                        <option value="Not Applicable" ${disease.severity === 'Not Applicable' ? 'selected' : ''}>Not Applicable</option>
+                    </select>
+                </div>
+            `;
+        }
+        
         item.innerHTML = `
             <span style="font-size: 0.95rem; font-weight: 600; color: #212529; flex: 1 1 auto;">${disease.name}</span>
-            <div style="flex: 0 0 220px; display:flex; align-items:center; gap:0.4rem;">
-                <label style="font-size:0.8rem; color:#495057;">Severity:</label>
-                <select onchange="updateDiseaseSeverity(${index}, this.value)" style="flex:1; padding:0.35rem 0.5rem; border-radius:4px; border:1px solid #ccc; font-size:0.8rem;">
-                    <option value="">Select</option>
-                    <option value="Mild" ${disease.severity === 'Mild' ? 'selected' : ''}>Mild</option>
-                    <option value="Moderate" ${disease.severity === 'Moderate' ? 'selected' : ''}>Moderate</option>
-                    <option value="Severe" ${disease.severity === 'Severe' ? 'selected' : ''}>Severe</option>
-                    <option value="Not Applicable" ${disease.severity === 'Not Applicable' ? 'selected' : ''}>Not Applicable</option>
-                </select>
-            </div>
+            ${severityHtml}
             <button type="button" onclick="removeDisease(${index})"
                     style="padding: 0.4rem 0.6rem; border: 1px solid #dc3545; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; color: #dc3545;">
                 ×
@@ -360,6 +402,7 @@ window.updateDiseaseSeverity = updateDiseaseSeverity;
 function filterAndLoadModules() {
     const applyAgeFilter = document.getElementById('apply_age_filter').checked;
     const applyGenderFilter = document.getElementById('apply_gender_filter').checked;
+    const applySeverityFilter = document.getElementById('apply_severity_filter').checked;
     const age = document.getElementById('age').value;
     const gender = document.getElementById('gender').value;
     
@@ -370,7 +413,7 @@ function filterAndLoadModules() {
 
     const fetchPromises = selectedDiseases.map(d => {
         let url = `/api/module/filter?disease_ids=${encodeURIComponent(String(d.id))}`;
-        if (d.severity) url += `&severity=${encodeURIComponent(d.severity)}`;
+        if (applySeverityFilter && d.severity) url += `&severity=${encodeURIComponent(d.severity)}`;
         if (applyAgeFilter && age) url += `&age=${encodeURIComponent(age)}`;
         if (applyGenderFilter && gender) url += `&gender=${encodeURIComponent(gender)}`;
         return fetch(url)

@@ -4392,6 +4392,41 @@ def api_search_modules_for_recommendation():
         session.close()
 
 
+@app.route('/api/disease/severity-enabled', methods=['GET'])
+def api_check_disease_severity_enabled():
+    """
+    API endpoint to check which diseases have modules with severity options enabled
+    Query parameters:
+    - disease_ids: comma-separated list of disease IDs
+    Returns: {disease_id: true/false}
+    """
+    session = get_db_session()
+    
+    try:
+        disease_ids_str = request.args.get('disease_ids', '').strip()
+        if not disease_ids_str:
+            return jsonify({}), 400
+            
+        disease_ids = [int(did) for did in disease_ids_str.split(',') if did.strip().isdigit()]
+        if not disease_ids:
+            return jsonify({}), 400
+            
+        # Query modules for these diseases that have severity set
+        modules_with_severity = session.query(Module.disease_id).filter(
+            Module.disease_id.in_(disease_ids),
+            Module.severity.isnot(None),
+            Module.severity != ''
+        ).distinct().all()
+        
+        severity_enabled = {did: False for did in disease_ids}
+        for (disease_id,) in modules_with_severity:
+            severity_enabled[disease_id] = True
+            
+        return jsonify(severity_enabled)
+    finally:
+        session.close()
+
+
 @app.route('/api/module/filter', methods=['GET'])
 def api_filter_modules():
     """
