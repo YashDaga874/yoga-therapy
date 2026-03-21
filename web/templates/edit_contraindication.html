@@ -60,14 +60,26 @@
     {% if selected_disease %}
     <p style="margin: 0 0 0.4rem 0; color: #495057;"><strong>Disease:</strong> {{ selected_disease.name }}</p>
     {% endif %}
-    <p style="margin: 0; color: #495057;">
-        <strong>Practice:</strong>
-        {% if contraindication.practice_sanskrit %}
-            {{ contraindication.practice_sanskrit }}
-            <span style="color: #666; font-weight: normal;">({{ contraindication.practice_english }})</span>
+    
+    <p style="margin: 0 0 0.4rem 0; color: #495057;">
+        <strong>Type:</strong>
+        {% if contraindication.contraindication_type == 'practice' %}
+            <span style="background: #e3f2fd; color: #1976d2; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Specific Practice</span>
+        {% elif contraindication.contraindication_type == 'category' %}
+            <span style="background: #f3e5f5; color: #7b1fa2; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Entire Category</span>
+        {% elif contraindication.contraindication_type == 'kosha' %}
+            <span style="background: #e8f5e9; color: #388e3c; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Entire Kosha</span>
         {% else %}
-            {{ contraindication.practice_english }}
+            <span>{{ contraindication.contraindication_type }}</span>
         {% endif %}
+    </p>
+    
+    <p style="margin: 0; color: #495057;">
+        <strong>{% if contraindication.contraindication_type == 'practice' %}Practice{% elif contraindication.contraindication_type == 'category' %}Category{% else %}Kosha{% endif %}:</strong>
+        <div style="margin-top: 0.5rem;">
+            <div><strong style="font-size: 1.05rem;">{{ contraindication.practice_sanskrit or contraindication.kosha or '-' }}</strong></div>
+            <div style="color: #666; font-size: 0.95rem; margin-top: 0.25rem;">{{ contraindication.practice_english or '-' }}</div>
+        </div>
     </p>
 </div>
 
@@ -139,28 +151,54 @@
             </small>
         </div>
         
+        {% set selected_genders = (contraindication.gender or '').split(',') | map('trim') | list %}
+        {% set selected_severities = (contraindication.severity or '').split(',') | map('trim') | list %}
+
         <div class="form-group">
-            <label for="gender">Gender</label>
-            <select name="gender" id="gender">
-                <option value="">Select Gender</option>
-                <option value="Male" {% if contraindication.gender == 'Male' %}selected{% endif %}>Male</option>
-                <option value="Female" {% if contraindication.gender == 'Female' %}selected{% endif %}>Female</option>
-                <option value="Other" {% if contraindication.gender == 'Other' %}selected{% endif %}>Other</option>
-                <option value="Not mentioned" {% if contraindication.gender == 'Not mentioned' %}selected{% endif %}>Not mentioned</option>
-            </select>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Gender</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_male" name="gender" value="Male" {% if 'Male' in selected_genders %}checked{% endif %}>
+                    <label for="gender_male" style="margin-left: 0.5rem; cursor: pointer;">Male</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_female" name="gender" value="Female" {% if 'Female' in selected_genders %}checked{% endif %}>
+                    <label for="gender_female" style="margin-left: 0.5rem; cursor: pointer;">Female</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_other" name="gender" value="Other" {% if 'Other' in selected_genders %}checked{% endif %}>
+                    <label for="gender_other" style="margin-left: 0.5rem; cursor: pointer;">Other</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="gender_not_mentioned" name="gender" value="Not mentioned" {% if 'Not mentioned' in selected_genders %}checked{% endif %}>
+                    <label for="gender_not_mentioned" style="margin-left: 0.5rem; cursor: pointer;">Not mentioned</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any matching gender tags. Leave unchecked for no gender-specific information.</small>
         </div>
-        
+
         <div class="form-group">
-            <label for="severity">Severity</label>
-            <select name="severity" id="severity">
-                <option value="">Select Severity</option>
-                <option value="Mild" {% if contraindication.severity == 'Mild' %}selected{% endif %}>Mild</option>
-                <option value="Moderate" {% if contraindication.severity == 'Moderate' %}selected{% endif %}>Moderate</option>
-                <option value="Severe" {% if contraindication.severity == 'Severe' %}selected{% endif %}>Severe</option>
-                <option value="Not Applicable" {% if contraindication.severity == 'Not Applicable' %}selected{% endif %}>Not Applicable</option>
-            </select>
-        </div>
-    </div>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Severity</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_mild" name="severity" value="Mild" {% if 'Mild' in selected_severities %}checked{% endif %}>
+                    <label for="severity_mild" style="margin-left: 0.5rem; cursor: pointer;">Mild</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_moderate" name="severity" value="Moderate" {% if 'Moderate' in selected_severities %}checked{% endif %}>
+                    <label for="severity_moderate" style="margin-left: 0.5rem; cursor: pointer;">Moderate</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_severe" name="severity" value="Severe" {% if 'Severe' in selected_severities %}checked{% endif %}>
+                    <label for="severity_severe" style="margin-left: 0.5rem; cursor: pointer;">Severe</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="severity_not_applicable" name="severity" value="Not Applicable" {% if 'Not Applicable' in selected_severities %}checked{% endif %}>
+                    <label for="severity_not_applicable" style="margin-left: 0.5rem; cursor: pointer;">Not Applicable</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any applicable severity levels. Leave unchecked to indicate non-condition severity or unspecified.</small>
+        </div>    </div>
 
     <div class="compact-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
         <div class="form-group">

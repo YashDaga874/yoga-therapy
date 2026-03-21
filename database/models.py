@@ -41,6 +41,7 @@ class Disease(Base):
     name = Column(String(200), unique=True, nullable=False)
     description = Column(Text)
     code = Column(String(50), unique=True)  # Short unique identifier
+    icd_dsm_code = Column(String(100))  # ICD/DSM diagnostic code (optional)
     
     # Relationships
     practices = relationship(
@@ -175,26 +176,34 @@ class DiseaseCombination(Base):
 
 class Contraindication(Base):
     """
-    Stores contraindications for specific diseases and practices
-    A contraindication means: "For disease X, do NOT include practice Y"
+    Stores contraindications for specific diseases and practices/categories/koshas
+    A contraindication means: "For disease X, do NOT include practice Y" (or category/kosha)
+    
+    Three types supported:
+    1. 'practice': Blocks a specific practice
+    2. 'category': Blocks all practices in a category/segment
+    3. 'kosha': Blocks all practices in a kosha
     """
     __tablename__ = 'contraindications'
     
     id = Column(Integer, primary_key=True)
     
-    # The practice that should be avoided
-    practice_sanskrit = Column(String(200))
-    practice_english = Column(String(200), nullable=False)
+    # Type of contraindication
+    contraindication_type = Column(String(50), default='practice')  # 'practice', 'category', or 'kosha'
+    
+    # The practice that should be avoided (used when type='practice')
+    practice_sanskrit = Column(String(200), nullable=True)
+    practice_english = Column(String(200), nullable=True)
     
     # Which practice segment does this contraindication apply to
-    practice_segment = Column(String(50), nullable=False)
-    sub_category = Column(String(100))
-    kosha = Column(String(50))  # Annamaya Kosha, Pranamaya Kosha, etc.
+    practice_segment = Column(String(50), nullable=True)  # Single category name when type='category'
+    sub_category = Column(String(100), nullable=True)
+    kosha = Column(String(50), nullable=True)  # Single kosha name when type='kosha', or specific kosha when type='practice'
     
     # Demographics and severity
     age_categories = Column(Text)  # JSON array of selected age categories
-    gender = Column(String(50))  # Male, Female, Other, Not mentioned
-    severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned
+    gender = Column(String(50))  # Male, Female, Other, Not mentioned (comma-separated for multi-select)
+    severity = Column(String(50))  # Mild, Moderate, Severe, Not mentioned (comma-separated for multi-select)
     
     # Reason for contraindication
     reason = Column(Text)
@@ -213,7 +222,12 @@ class Contraindication(Base):
     )
     
     def __repr__(self):
-        return f"<Contraindication(practice='{self.practice_english}', segment='{self.practice_segment}')>"
+        if self.contraindication_type == 'category':
+            return f"<Contraindication(type='category', segment='{self.practice_segment}')>"
+        elif self.contraindication_type == 'kosha':
+            return f"<Contraindication(type='kosha', kosha='{self.kosha}')>"
+        else:
+            return f"<Contraindication(type='practice', practice='{self.practice_english}')>"
 
 
 # Indexes for Contraindication table

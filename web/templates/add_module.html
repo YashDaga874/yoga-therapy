@@ -18,11 +18,8 @@
     </div>
 
     <div class="form-group">
-        <label for="disease_code">Condition Code (optional)</label>
-        <input type="text" id="disease_code" name="disease_code"
-               placeholder="Auto-generates if left empty" maxlength="50">
         <small style="color: #666; display: block; margin-top: 0.5rem;">
-            Unique short code for the condition (used when creating a new condition from here).
+            Condition code is generated automatically and is now managed from the condition edit page.
         </small>
     </div>
     
@@ -92,26 +89,49 @@
         </div>
         
         <div class="form-group">
-            <label for="gender">Gender</label>
-            <select name="gender" id="gender">
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Male and Female">Male and Female</option>
-                <option value="Other">Other</option>
-                <option value="Not mentioned">Not mentioned</option>
-            </select>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Gender</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_male" name="gender" value="Male">
+                    <label for="gender_male" style="margin-left: 0.5rem; cursor: pointer;">Male</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_female" name="gender" value="Female">
+                    <label for="gender_female" style="margin-left: 0.5rem; cursor: pointer;">Female</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_other" name="gender" value="Other">
+                    <label for="gender_other" style="margin-left: 0.5rem; cursor: pointer;">Other</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="gender_not_mentioned" name="gender" value="Not mentioned">
+                    <label for="gender_not_mentioned" style="margin-left: 0.5rem; cursor: pointer;">Not mentioned</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any matching gender tags. Leave unchecked for no gender-specific information.</small>
         </div>
         
         <div class="form-group">
-            <label for="severity">Severity</label>
-            <select name="severity" id="severity">
-                <option value="">Select Severity</option>
-                <option value="Mild">Mild</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Severe">Severe</option>
-                <option value="Not Applicable">Not Applicable</option>
-            </select>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Severity</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_mild" name="severity" value="Mild">
+                    <label for="severity_mild" style="margin-left: 0.5rem; cursor: pointer;">Mild</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_moderate" name="severity" value="Moderate">
+                    <label for="severity_moderate" style="margin-left: 0.5rem; cursor: pointer;">Moderate</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_severe" name="severity" value="Severe">
+                    <label for="severity_severe" style="margin-left: 0.5rem; cursor: pointer;">Severe</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="severity_not_applicable" name="severity" value="Not Applicable">
+                    <label for="severity_not_applicable" style="margin-left: 0.5rem; cursor: pointer;">Not Applicable</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any applicable severity levels. Leave unchecked to indicate non-condition severity or unspecified.</small>
         </div>
     </div>
     

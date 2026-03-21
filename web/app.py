@@ -101,6 +101,9 @@ KOSHA_LEGACY = [
 
 ALLOWED_KOSHAS = KOSHA_CANONICAL + KOSHA_LEGACY
 
+GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Not mentioned']
+SEVERITY_OPTIONS = ['Mild', 'Moderate', 'Severe', 'Not Applicable']
+
 # Database path (respects DATABASE_URL / DB_* env vars; defaults to SQLite)
 DB_PATH = get_database_url()
 
@@ -173,6 +176,38 @@ def _normalize_str(value) -> str:
     elif not isinstance(value, str):
         value = str(value)
     return value.strip()
+
+
+def _normalize_multi_value(values, allowed_values):
+    """Normalize a multi-select form field and return comma-separated canonical values."""
+    if not values:
+        return None
+    if isinstance(values, str):
+        values = [values]
+
+    normalized = []
+    seen = set()
+    for v in values:
+        item = _normalize_str(v)
+        if not item:
+            continue
+        # Standardize values (case-insensitive matching)
+        canonical = None
+        for allowed in allowed_values:
+            if item.lower() == allowed.lower():
+                canonical = allowed
+                break
+        if not canonical:
+            # Keep raw normalized value when not in allowed set
+            canonical = item
+        if canonical.lower() in seen:
+            continue
+        seen.add(canonical.lower())
+        normalized.append(canonical)
+
+    if not normalized:
+        return None
+    return ", ".join(normalized)
 
 
 def _match_allowed_category(category: str) -> str:
@@ -351,11 +386,11 @@ def _generate_generic_code(name, session, model_cls):
     if not name or not name.strip():
         return None
 
-    # Pull existing codes for uniqueness
+    # Pull existing codes for uniqueness (case-insensitive)
     existing_codes = set()
     try:
         all_rows = session.query(model_cls).filter(model_cls.code.isnot(None)).all()
-        existing_codes = {row.code for row in all_rows if row.code}
+        existing_codes = {row.code.lower() for row in all_rows if row.code}
     except Exception:
         existing_codes = set()
 
@@ -449,11 +484,51 @@ def ensure_module_code_column():
     except Exception as exc:
         print(f"Warning: failed to ensure modules.code column: {exc}")
 
+
+def ensure_disease_icd_dsm_code_column():
+    """Ensure diseases.icd_dsm_code column exists for older databases."""
+    try:
+        engine = get_engine()
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('diseases')]
+        if 'icd_dsm_code' in columns:
+            return
+
+        dialect = engine.dialect.name
+        alter_sql = "ALTER TABLE diseases ADD COLUMN icd_dsm_code VARCHAR(100)"
+        if dialect.startswith('postgres'):
+            alter_sql = "ALTER TABLE IF NOT EXISTS diseases ADD COLUMN icd_dsm_code VARCHAR(100)"
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
+    except Exception as exc:
+        print(f"Warning: failed to ensure diseases.icd_dsm_code column: {exc}")
+
+
+def ensure_contraindication_type_column():
+    """Ensure contraindications.contraindication_type column exists for older databases."""
+    try:
+        engine = get_engine()
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('contraindications')]
+        if 'contraindication_type' in columns:
+            return
+
+        dialect = engine.dialect.name
+        alter_sql = "ALTER TABLE contraindications ADD COLUMN contraindication_type VARCHAR(50) DEFAULT 'practice'"
+        if dialect.startswith('postgres'):
+            alter_sql = "ALTER TABLE IF NOT EXISTS contraindications ADD COLUMN contraindication_type VARCHAR(50) DEFAULT 'practice'"
+        with engine.begin() as conn:
+            conn.execute(text(alter_sql))
+    except Exception as exc:
+        print(f"Warning: failed to ensure contraindications.contraindication_type column: {exc}")
+
 # Initialize database on startup
 create_database(DB_PATH)
 ensure_practice_code_column()
 ensure_disease_code_column()
 ensure_module_code_column()
+ensure_disease_icd_dsm_code_column()
+ensure_contraindication_type_column()
 
 
 def get_db_session():
@@ -1699,7 +1774,7 @@ def list_diseases():
         query = session.query(Disease).options(
             selectinload(Disease.practices),
             selectinload(Disease.modules)
-        ).filter(Disease.modules.any())  # only diseases that have modules
+        )
         
         # Paginate results
         pagination = paginate_query(query, page, per_page)
@@ -1824,55 +1899,38 @@ def import_module_practices_csv(module_id):
 
 @app.route('/disease/add', methods=['GET', 'POST'])
 def add_disease():
-    """Add a new disease"""
+    """Add a new disease/condition"""
     if request.method == 'POST':
         session = get_db_session()
         
         try:
-            disease_code_input = _normalize_str(request.form.get('disease_code'))
-            name_input = request.form['name']
+            disease_code_input = request.form['disease_code'].strip()
+            name_input = request.form['name'].strip()
 
-            # Check if disease already exists by name or code
+            # Check if disease already exists by name (case-insensitive)
             existing_disease = session.query(Disease).filter(
                 func.lower(Disease.name) == name_input.lower()
             ).first()
             if existing_disease:
-                flash(f'Disease "{name_input}" already exists!', 'error')
+                flash(f'Condition "{name_input}" already exists!', 'error')
                 session.close()
                 return render_template('add_disease.html')
-            if disease_code_input:
-                conflict = session.query(Disease).filter(func.lower(Disease.code) == disease_code_input.lower()).first()
-                if conflict:
-                    flash(f'Disease code "{disease_code_input}" already exists!', 'error')
-                    session.close()
-                    return render_template('add_disease.html')
+            
+            # Check if disease code already exists
+            conflict = session.query(Disease).filter(func.lower(Disease.code) == disease_code_input.lower()).first()
+            if conflict:
+                flash(f'Condition code "{disease_code_input}" already exists!', 'error')
+                session.close()
+                return render_template('add_disease.html')
             
             disease = Disease(
                 name=name_input,
-                code=disease_code_input or generate_disease_code(name_input, session),
-                description=request.form.get('description', '')
+                code=disease_code_input,
+                description=request.form.get('description', '').strip(),
+                icd_dsm_code=request.form.get('icd_dsm_code', '').strip() or None
             )
             
             session.add(disease)
-            
-            # Add module information if provided
-            if request.form.get('developed_by'):
-                module_code_input = _normalize_str(request.form.get('module_code'))
-                if module_code_input:
-                    conflict = session.query(Module).filter(func.lower(Module.code) == module_code_input.lower()).first()
-                    if conflict:
-                        flash(f'Module code "{module_code_input}" already exists.', 'error')
-                        session.rollback()
-                        session.close()
-                        return render_template('add_disease.html')
-
-                module = Module(
-                    disease=disease,
-                    code=module_code_input or generate_module_code(name_input, session),
-                    developed_by=request.form['developed_by'],
-                    module_description=request.form.get('module_description', '')
-                )
-                session.add(module)
             
             # Store the disease name before closing the session
             disease_name = disease.name
@@ -1880,12 +1938,12 @@ def add_disease():
             session.commit()
             session.close()
             
-            flash(f'Disease "{disease_name}" added successfully!', 'success')
+            flash(f'Condition "{disease_name}" added successfully!', 'success')
             return redirect(url_for('list_diseases'))
         except Exception as e:
             session.rollback()
             session.close()
-            flash(f'Error adding disease: {str(e)}', 'error')
+            flash(f'Error adding condition: {str(e)}', 'error')
             return render_template('add_disease.html')
     
     return render_template('add_disease.html')
@@ -1951,10 +2009,19 @@ def edit_disease(disease_id):
             flash('Disease not found', 'error')
             return redirect(url_for('list_diseases'))
         
-        module = session.query(Module).filter_by(disease_id=disease_id).first()
-        
         if request.method == 'POST':
-            disease.name = request.form['name']
+            new_name = request.form['name'].strip()
+            # enforce case-insensitive distinct disease name
+            name_conflict = session.query(Disease).filter(
+                func.lower(Disease.name) == new_name.lower(),
+                Disease.id != disease_id
+            ).first()
+            if name_conflict:
+                flash(f'Disease name "{new_name}" already exists.', 'error')
+                session.close()
+                return render_template('edit_disease.html', disease=disease)
+
+            disease.name = new_name
             disease.description = request.form.get('description', '')
 
             # Disease code handling
@@ -1967,44 +2034,14 @@ def edit_disease(disease_id):
                 if conflict:
                     flash(f'Disease code "{disease_code_input}" already exists.', 'error')
                     session.close()
-                    return render_template('edit_disease.html', disease=disease, module=module)
+                    return render_template('edit_disease.html', disease=disease)
                 disease.code = disease_code_input
             elif not disease.code:
                 disease.code = generate_disease_code(disease.name, session)
             
-            # Update module information
-            if request.form.get('developed_by'):
-                module_code_input = _normalize_str(request.form.get('module_code'))
-                if module:
-                    if module_code_input and module.code != module_code_input:
-                        conflict = session.query(Module).filter(
-                            func.lower(Module.code) == module_code_input.lower(),
-                            Module.id != module.id
-                        ).first()
-                        if conflict:
-                            flash(f'Module code "{module_code_input}" already exists.', 'error')
-                            session.close()
-                            return render_template('edit_disease.html', disease=disease, module=module)
-                        module.code = module_code_input
-                    elif not module.code:
-                        module.code = generate_module_code(module.developed_by or disease.name, session)
-                    module.developed_by = request.form['developed_by']
-                    module.module_description = request.form.get('module_description', '')
-                else:
-                    # Create new module
-                    if module_code_input:
-                        conflict = session.query(Module).filter(func.lower(Module.code) == module_code_input.lower()).first()
-                        if conflict:
-                            flash(f'Module code "{module_code_input}" already exists.', 'error')
-                            session.close()
-                            return render_template('edit_disease.html', disease=disease, module=module)
-                    module = Module(
-                        disease_id=disease.id,
-                        code=module_code_input or generate_module_code(disease.name, session),
-                        developed_by=request.form['developed_by'],
-                        module_description=request.form.get('module_description', '')
-                    )
-                    session.add(module)
+            # Update ICD/DSM code
+            disease.icd_dsm_code = request.form.get('icd_dsm_code', '').strip() or None
+            
             # Store name before commit
             disease_name = disease.name
             session.commit()
@@ -2013,7 +2050,7 @@ def edit_disease(disease_id):
             flash(f'Disease "{disease_name}" updated successfully!', 'success')
             return redirect(url_for('view_disease', disease_id=disease_id))
         
-        return render_template('edit_disease.html', disease=disease, module=module)
+        return render_template('edit_disease.html', disease=disease)
     finally:
         session.close()
 
@@ -2145,9 +2182,8 @@ def list_practices():
             data['diseases'] = sorted(data['diseases'])
             grouped_list.append(data)
         
-        # Get all unique segments for filter dropdown
-        all_segments = session.query(Practice.practice_segment).distinct().all()
-        segments = [s[0] for s in all_segments]
+        # Get all unique segments for filter dropdown - use canonical categories only
+        segments = sorted(CANONICAL_CATEGORIES)
         
         return render_template('practices.html',
                              practices=grouped_list,
@@ -3022,13 +3058,13 @@ def list_contraindications():
 
 @app.route('/contraindication/add', methods=['GET', 'POST'])
 def add_contraindication():
-    """Add a new contraindication for a disease"""
+    """Add a new contraindication for a disease (practice, category, or kosha)"""
     session = get_db_session()
     
     try:
         if request.method == 'POST':
             disease_id = request.form.get('disease_id')
-            practice_id = request.form.get('practice_id')
+            contraindication_type = request.form.get('contraindication_type', 'practice')
             reason_html = request.form.get('reason', '')
             reference_full_html = request.form.get('reference_full', '')
 
@@ -3041,50 +3077,99 @@ def add_contraindication():
                 flash('Selected disease could not be found.', 'error')
                 return redirect(url_for('add_contraindication'))
 
-            if not practice_id:
-                flash('Please select a practice to add as a contraindication.', 'error')
+            # Handle different contraindication types
+            if contraindication_type == 'practice':
+                practice_id = request.form.get('practice_id')
+                if not practice_id:
+                    flash('Please select a practice to add as a contraindication.', 'error')
+                    return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+                practice = session.get(Practice, int(practice_id))
+                if not practice:
+                    flash('Selected practice could not be found.', 'error')
+                    return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+                practice_sanskrit_input = (request.form.get('practice_sanskrit') or '').strip()
+                practice_english_input = (request.form.get('practice_english') or '').strip()
+                practice_segment_input = (request.form.get('practice_segment') or '').strip()
+                sub_category_input = (request.form.get('sub_category') or '').strip()
+                kosha_input = (request.form.get('kosha') or '').strip()
+
+                practice_sanskrit_value = practice_sanskrit_input or (practice.practice_sanskrit or '')
+                practice_english_value = practice_english_input or practice.practice_english
+                practice_segment_value = practice_segment_input or practice.practice_segment
+                sub_category_value = sub_category_input or (practice.sub_category or '')
+                kosha_value = kosha_input or (practice.kosha or '')
+
+                if not practice_english_value:
+                    flash('Practice English name is required.', 'error')
+                    return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+                contraindication = Contraindication(
+                    contraindication_type='practice',
+                    practice_sanskrit=practice_sanskrit_value,
+                    practice_english=practice_english_value,
+                    practice_segment=practice_segment_value,
+                    sub_category=sub_category_value,
+                    kosha=kosha_value or None,
+                    age_categories=json.dumps(request.form.getlist('age_categories')) if request.form.getlist('age_categories') else None,
+                    gender=_normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS),
+                    severity=_normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS),
+                    reason=reason_html,
+                    source_type=request.form.get('parenthetical_citation', ''),
+                    source_name=request.form.get('reference_link', ''),
+                    page_number='',
+                    apa_citation=reference_full_html
+                )
+
+            elif contraindication_type == 'category':
+                category_select = request.form.get('category_select', '').strip()
+                if not category_select:
+                    flash('Please select a category to contraindicate.', 'error')
+                    return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+                contraindication = Contraindication(
+                    contraindication_type='category',
+                    practice_english=category_select,  # Store category name in practice_english for reference
+                    practice_segment=category_select,  # Store category in segment field
+                    practice_sanskrit=None,
+                    sub_category=None,
+                    kosha=None,
+                    age_categories=json.dumps(request.form.getlist('age_categories')) if request.form.getlist('age_categories') else None,
+                    gender=_normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS),
+                    severity=_normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS),
+                    reason=reason_html,
+                    source_type=request.form.get('parenthetical_citation', ''),
+                    source_name=request.form.get('reference_link', ''),
+                    page_number='',
+                    apa_citation=reference_full_html
+                )
+
+            elif contraindication_type == 'kosha':
+                kosha_select = request.form.get('kosha_select', '').strip()
+                if not kosha_select:
+                    flash('Please select a kosha to contraindicate.', 'error')
+                    return redirect(url_for('add_contraindication', disease_id=disease.id))
+
+                contraindication = Contraindication(
+                    contraindication_type='kosha',
+                    practice_english=kosha_select,  # Store kosha name in practice_english for reference
+                    kosha=kosha_select,  # Store kosha in kosha field
+                    practice_sanskrit=None,
+                    practice_segment=None,
+                    sub_category=None,
+                    age_categories=json.dumps(request.form.getlist('age_categories')) if request.form.getlist('age_categories') else None,
+                    gender=_normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS),
+                    severity=_normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS),
+                    reason=reason_html,
+                    source_type=request.form.get('parenthetical_citation', ''),
+                    source_name=request.form.get('reference_link', ''),
+                    page_number='',
+                    apa_citation=reference_full_html
+                )
+            else:
+                flash('Invalid contraindication type.', 'error')
                 return redirect(url_for('add_contraindication', disease_id=disease.id))
-
-            practice = session.get(Practice, int(practice_id))
-            if not practice:
-                flash('Selected practice could not be found.', 'error')
-                return redirect(url_for('add_contraindication', disease_id=disease.id))
-
-            practice_sanskrit_input = (request.form.get('practice_sanskrit') or '').strip()
-            practice_english_input = (request.form.get('practice_english') or '').strip()
-            practice_segment_input = (request.form.get('practice_segment') or '').strip()
-            sub_category_input = (request.form.get('sub_category') or '').strip()
-            kosha_input = (request.form.get('kosha') or '').strip()
-
-            practice_sanskrit_value = practice_sanskrit_input or (practice.practice_sanskrit or '')
-            practice_english_value = practice_english_input or practice.practice_english
-            practice_segment_value = practice_segment_input or practice.practice_segment
-            sub_category_value = sub_category_input or (practice.sub_category or '')
-            kosha_value = kosha_input or (practice.kosha or '')
-
-            if not practice_english_value:
-                flash('Practice English name is required.', 'error')
-                return redirect(url_for('add_contraindication', disease_id=disease.id))
-
-            # Handle age categories from checkboxes
-            age_categories = request.form.getlist('age_categories')
-            age_categories_json = json.dumps(age_categories) if age_categories else None
-
-            contraindication = Contraindication(
-                practice_sanskrit=practice_sanskrit_value,
-                practice_english=practice_english_value,
-                practice_segment=practice_segment_value,
-                sub_category=sub_category_value,
-                kosha=kosha_value or None,
-                age_categories=age_categories_json,
-                gender=request.form.get('gender', '').strip() or None,
-                severity=request.form.get('severity', '').strip() or None,
-                reason=reason_html,
-                source_type=request.form.get('parenthetical_citation', ''),
-                source_name=request.form.get('reference_link', ''),
-                page_number='',
-                apa_citation=reference_full_html
-            )
 
             session.add(contraindication)
             contraindication.diseases.append(disease)
@@ -3139,8 +3224,8 @@ def edit_contraindication(contraindication_id):
             # Handle age categories from checkboxes
             age_categories = request.form.getlist('age_categories')
             contraindication.age_categories = json.dumps(age_categories) if age_categories else None
-            contraindication.gender = request.form.get('gender', '').strip() or None
-            contraindication.severity = request.form.get('severity', '').strip() or None
+            contraindication.gender = _normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS)
+            contraindication.severity = _normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS)
             
             session.commit()
             flash('Contraindication updated successfully!', 'success')
@@ -3308,15 +3393,15 @@ def add_module():
                     return render_template('add_module.html', diseases=diseases)
             # If disease_name is provided but no disease_id, create new disease
             elif disease_name:
-                # Check if disease already exists
-                disease = session.query(Disease).filter_by(name=disease_name).first()
+                # Check if disease already exists (case-insensitive)
+                disease = session.query(Disease).filter(func.lower(Disease.name) == disease_name.lower()).first()
                 if not disease:
-                    # Create new disease
+                    # Create new disease with generated condition code
                     disease = Disease(
                         name=disease_name,
-                        code=_normalize_str(request.form.get('disease_code')) or generate_disease_code(disease_name, session)
+                        code=generate_disease_code(disease_name, session)
                     )
-                    # Validate disease code uniqueness
+                    # Validate disease code uniqueness (case-insensitive)
                     if disease.code:
                         conflict = session.query(Disease).filter(func.lower(Disease.code) == disease.code.lower()).first()
                         if conflict:
@@ -3354,8 +3439,8 @@ def add_module():
                 developed_by=request.form.get('developed_by', ''),
                 paper_link=request.form.get('paper_link', ''),
                 age_categories=age_categories_json,
-                gender=request.form.get('gender', '').strip() or None,
-                severity=request.form.get('severity', '').strip() or None,
+                gender=_normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS),
+                severity=_normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS),
                 module_description=request.form.get('module_description', '')
             )
             
@@ -3496,8 +3581,8 @@ def edit_module(module_id):
                 # Handle age categories from checkboxes
                 age_categories = request.form.getlist('age_categories')
                 module.age_categories = json.dumps(age_categories) if age_categories else None
-                module.gender = request.form.get('gender', '').strip() or None
-                module.severity = request.form.get('severity', '').strip() or None
+                module.gender = _normalize_multi_value(request.form.getlist('gender'), GENDER_OPTIONS)
+                module.severity = _normalize_multi_value(request.form.getlist('severity'), SEVERITY_OPTIONS)
                 module.module_description = request.form.get('module_description', '')
                 
                 session.commit()
@@ -4342,15 +4427,8 @@ def api_filter_modules():
             if disease_ids:
                 query = query.filter(Module.disease_id.in_(disease_ids))
         
-        # Filter by severity
-        if severity:
-            query = query.filter(
-                or_(
-                    Module.severity == severity,
-                    Module.severity == None,
-                    Module.severity == 'Not mentioned'
-                )
-            )
+        # Filter by severity (post-processing) – keep all here and apply later for multi-values
+        # (This allows storing comma-separated multi values in Module.severity)
         
         # Helper: check if a given age (int) falls into any of the module's age categories
         def _age_matches_categories(age_value: int, age_categories_json: str) -> bool:
@@ -4436,17 +4514,43 @@ def api_filter_modules():
                     )
                 ]
         
-        # Helper: gender match (supports general "Male and Female" modules)
+        def _split_multi_field(field_value):
+            if not field_value:
+                return []
+            if isinstance(field_value, (list, tuple)):
+                return [str(v).strip() for v in field_value if str(v).strip()]
+            if isinstance(field_value, str):
+                return [p.strip() for p in field_value.split(',') if p.strip()]
+            return []
+
+        # Helper: gender match (supports modules with multiple gender values)
         def _gender_matches(patient_gender: str, module_gender: str) -> bool:
             if not patient_gender:
                 return True
-            if not module_gender or module_gender in ('', 'Not mentioned'):
+            module_genders = [g.lower() for g in _split_multi_field(module_gender)]
+            if not module_genders:
                 return True
-            if module_gender == patient_gender:
+            if 'not mentioned' in module_genders:
                 return True
-            if module_gender == 'Male and Female' and patient_gender in ('Male', 'Female'):
+            patient_gender_lower = patient_gender.lower()
+            if patient_gender_lower in module_genders:
+                return True
+            if 'male and female' in module_genders and patient_gender_lower in ('male', 'female'):
                 return True
             return False
+
+        # Filter by severity
+        if severity:
+            requested = severity.lower()
+            def _severity_matches(module_severity):
+                module_sevs = [s.lower() for s in _split_multi_field(module_severity)]
+                if not module_sevs:
+                    return True
+                if 'not applicable' in module_sevs or 'not mentioned' in module_sevs:
+                    return True
+                return requested in module_sevs
+
+            modules = [m for m in modules if _severity_matches(getattr(m, 'severity', None))]
 
         # Filter by gender
         if gender:

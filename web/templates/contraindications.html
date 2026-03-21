@@ -92,20 +92,33 @@ table td:nth-child(5) {
             <table>
                 <thead>
                     <tr>
-                        <th>Practice (Sanskrit)</th>
-                        <th>Practice (English)</th>
+                        <th>Type</th>
+                        <th>Practice / Category / Kosha</th>
                         <th>Segment</th>
-                        <th>Sub-Category</th>
+                        <th>Kosha</th>
                         <th>Reason</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for contra in contraindications %}
                     <tr class="clickable-row" onclick="window.location.href='/contraindication/{{ contra.id }}/edit'">
-                        <td>{{ contra.practice_sanskrit or '-' }}</td>
-                        <td><strong>{{ contra.practice_english }}</strong></td>
-                        <td>{{ contra.practice_segment }}</td>
-                        <td>{{ contra.sub_category or '-' }}</td>
+                        <td>
+                            {% if contra.contraindication_type == 'practice' %}
+                                <span style="background: #e3f2fd; color: #1976d2; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Practice</span>
+                            {% elif contra.contraindication_type == 'category' %}
+                                <span style="background: #f3e5f5; color: #7b1fa2; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Category</span>
+                            {% elif contra.contraindication_type == 'kosha' %}
+                                <span style="background: #e8f5e9; color: #388e3c; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500;">Kosha</span>
+                            {% else %}
+                                <span style="background: #f5f5f5; color: #666; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.85rem;">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div><strong>{{ contra.practice_sanskrit or contra.kosha or '-' }}</strong></div>
+                            <div style="color: #666; font-size: 0.9rem; margin-top: 0.25rem;">{{ contra.practice_english or '-' }}</div>
+                        </td>
+                        <td>{{ contra.practice_segment or '-' }}</td>
+                        <td>{{ contra.kosha or '-' }}</td>
                         <td>
                             {% if contra.reason %}
                                 {% set reason_text = contra.reason|striptags|truncate(150) %}

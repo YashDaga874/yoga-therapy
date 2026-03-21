@@ -130,47 +130,108 @@
         <small style="color: #666; display: block; margin-top: 0.4rem;">Search shows diseases once, regardless of module count.</small>
     </div>
 
-    <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
-        <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
-        <input type="text" id="practice_sanskrit" name="practice_sanskrit" placeholder="Start typing practice name" autocomplete="off" disabled>
-        <div id="practice-autocomplete" class="autocomplete-list" style="display: none;"></div>
-        <small style="color: #666; display: block; margin-top: 0.4rem;">Suggestions come from your practices library. You can adjust the fields after selecting.</small>
-    </div>
-
-    <div class="form-group" style="margin-bottom: 1rem;">
-        <label for="practice_code">Practice Code</label>
-        <input type="text" id="practice_code" name="practice_code" placeholder="Type or auto-filled when a practice is selected">
-        <small style="color: #666; display: block; margin-top: 0.25rem;">Type a code to auto-fill the practice, or select a practice to auto-fill the code.</small>
-    </div>
-
-    <div class="compact-grid" style="margin-bottom: 1rem;">
-        <div class="form-group">
-            <label for="practice_english">Practice Name (English)</label>
-            <input type="text" id="practice_english" name="practice_english">
+    <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Type of Contraindication *</label>
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 1rem; background: #f9f9f9;">
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                <input type="radio" id="type_practice" name="contraindication_type" value="practice" checked>
+                <label for="type_practice" style="margin-left: 0.5rem; cursor: pointer; font-weight: normal;">
+                    <strong>Specific Practice</strong> - Block a single practice (e.g., Kapalabhati)
+                </label>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                <input type="radio" id="type_category" name="contraindication_type" value="category">
+                <label for="type_category" style="margin-left: 0.5rem; cursor: pointer; font-weight: normal;">
+                    <strong>Entire Category</strong> - Block all practices in a category (e.g., all Breathing practices)
+                </label>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <input type="radio" id="type_kosha" name="contraindication_type" value="kosha">
+                <label for="type_kosha" style="margin-left: 0.5rem; cursor: pointer; font-weight: normal;">
+                    <strong>Entire Kosha</strong> - Block all practices in a kosha (e.g., all Pranamaya Kosha practices)
+                </label>
+            </div>
         </div>
+    </div>
+
+    <!-- Practice-specific fields (shown when type='practice') -->
+    <div id="practice-section" style="margin-bottom: 1.5rem;">
+        <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+            <label for="practice_sanskrit">Practice Name (Sanskrit)</label>
+            <input type="text" id="practice_sanskrit" name="practice_sanskrit" placeholder="Start typing practice name" autocomplete="off" disabled>
+            <div id="practice-autocomplete" class="autocomplete-list" style="display: none;"></div>
+            <small style="color: #666; display: block; margin-top: 0.4rem;">Suggestions come from your practices library. You can adjust the fields after selecting.</small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="practice_code">Practice Code</label>
+            <input type="text" id="practice_code" name="practice_code" placeholder="Type or auto-filled when a practice is selected">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Type a code to auto-fill the practice, or select a practice to auto-fill the code.</small>
+        </div>
+
+        <div class="compact-grid" style="margin-bottom: 1rem;">
+            <div class="form-group">
+                <label for="practice_english">Practice Name (English)</label>
+                <input type="text" id="practice_english" name="practice_english">
+            </div>
+            <div class="form-group">
+                <label for="practice_segment">Category</label>
+                <select id="practice_segment" name="practice_segment">
+                    <option value="">Select Category</option>
+                    {% for segment in practice_segments %}
+                    <option value="{{ segment }}">{{ segment }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sub_category">Sub-Category</label>
+                <input type="text" id="sub_category" name="sub_category">
+            </div>
+            <div class="form-group">
+                <label for="kosha">Kosha</label>
+                <select id="kosha" name="kosha">
+                    <option value="">Select Kosha</option>
+                    <option value="Annamaya Kosha">Annamaya Kosha</option>
+                    <option value="Pranamaya Kosha">Pranamaya Kosha</option>
+                    <option value="Manomaya Kosha">Manomaya Kosha</option>
+                    <option value="Vijnanamaya Kosha">Vijnanamaya Kosha</option>
+                    <option value="Anandamaya Kosha">Anandamaya Kosha</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category-specific fields (shown when type='category') -->
+    <div id="category-section" style="display: none; margin-bottom: 1.5rem;">
         <div class="form-group">
-            <label for="practice_segment">Category</label>
-            <select id="practice_segment" name="practice_segment">
-                <option value="">Select Category</option>
+            <label for="category_select">Select Category to Block *</label>
+            <select id="category_select" name="category_select" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                <option value="">-- Select a Category --</option>
                 {% for segment in practice_segments %}
                 <option value="{{ segment }}">{{ segment }}</option>
                 {% endfor %}
             </select>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                All practices in this category will be contraindicated for the selected disease.
+            </small>
         </div>
+    </div>
+
+    <!-- Kosha-specific fields (shown when type='kosha') -->
+    <div id="kosha-section" style="display: none; margin-bottom: 1.5rem;">
         <div class="form-group">
-            <label for="sub_category">Sub-Category</label>
-            <input type="text" id="sub_category" name="sub_category">
-        </div>
-        <div class="form-group">
-            <label for="kosha">Kosha</label>
-            <select id="kosha" name="kosha">
-                <option value="">Select Kosha</option>
+            <label for="kosha_select">Select Kosha to Block *</label>
+            <select id="kosha_select" name="kosha_select" style="width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                <option value="">-- Select a Kosha --</option>
                 <option value="Annamaya Kosha">Annamaya Kosha</option>
                 <option value="Pranamaya Kosha">Pranamaya Kosha</option>
                 <option value="Manomaya Kosha">Manomaya Kosha</option>
                 <option value="Vijnanamaya Kosha">Vijnanamaya Kosha</option>
                 <option value="Anandamaya Kosha">Anandamaya Kosha</option>
             </select>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                All practices in this kosha will be contraindicated for the selected disease.
+            </small>
         </div>
     </div>
 
@@ -213,25 +274,49 @@
         </div>
         
         <div class="form-group">
-            <label for="gender">Gender</label>
-            <select name="gender" id="gender">
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-                <option value="Not mentioned">Not mentioned</option>
-            </select>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Gender</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_male" name="gender" value="Male">
+                    <label for="gender_male" style="margin-left: 0.5rem; cursor: pointer;">Male</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_female" name="gender" value="Female">
+                    <label for="gender_female" style="margin-left: 0.5rem; cursor: pointer;">Female</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="gender_other" name="gender" value="Other">
+                    <label for="gender_other" style="margin-left: 0.5rem; cursor: pointer;">Other</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="gender_not_mentioned" name="gender" value="Not mentioned">
+                    <label for="gender_not_mentioned" style="margin-left: 0.5rem; cursor: pointer;">Not mentioned</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any matching gender tags. Leave unchecked for no gender-specific information.</small>
         </div>
         
         <div class="form-group">
-            <label for="severity">Severity</label>
-            <select name="severity" id="severity">
-                <option value="">Select Severity</option>
-                <option value="Mild">Mild</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Severe">Severe</option>
-                <option value="Not Applicable">Not Applicable</option>
-            </select>
+            <label style="display: block; margin-bottom: 0.75rem; font-weight: 500;">Severity</label>
+            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.75rem; background: #f9f9f9;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_mild" name="severity" value="Mild">
+                    <label for="severity_mild" style="margin-left: 0.5rem; cursor: pointer;">Mild</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_moderate" name="severity" value="Moderate">
+                    <label for="severity_moderate" style="margin-left: 0.5rem; cursor: pointer;">Moderate</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 0.35rem;">
+                    <input type="checkbox" id="severity_severe" name="severity" value="Severe">
+                    <label for="severity_severe" style="margin-left: 0.5rem; cursor: pointer;">Severe</label>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="severity_not_applicable" name="severity" value="Not Applicable">
+                    <label for="severity_not_applicable" style="margin-left: 0.5rem; cursor: pointer;">Not Applicable</label>
+                </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Tick any applicable severity levels. Leave unchecked to indicate non-condition severity or unspecified.</small>
         </div>
     </div>
 
@@ -272,7 +357,7 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem;">
-        <button type="submit" name="add_another" value="yes" class="btn btn-secondary">Add Another Practice</button>
+        <button type="submit" name="add_another" value="yes" class="btn btn-secondary">Add Another</button>
         <div style="display: flex; gap: 0.75rem;">
             <button type="submit" class="btn">Finish</button>
             <a href="/contraindications" class="btn btn-secondary">Cancel</a>
@@ -764,5 +849,51 @@ if (diseaseIdInput.value) {
         reasonEditor.innerHTML = reasonHidden.value;
     }
 }
+
+// ============ Type switching logic ============
+const practiceSection = document.getElementById('practice-section');
+const categorySection = document.getElementById('category-section');
+const koshaSection = document.getElementById('kosha-section');
+const typeRadios = document.querySelectorAll('input[name="contraindication_type"]');
+const categorySelect = document.getElementById('category_select');
+const koshaSelect = document.getElementById('kosha_select');
+
+function updateSectionVisibility() {
+    const selectedType = document.querySelector('input[name="contraindication_type"]:checked').value;
+    
+    practiceSection.style.display = selectedType === 'practice' ? 'block' : 'none';
+    categorySection.style.display = selectedType === 'category' ? 'block' : 'none';
+    koshaSection.style.display = selectedType === 'kosha' ? 'block' : 'none';
+}
+
+typeRadios.forEach(radio => {
+    radio.addEventListener('change', updateSectionVisibility);
+});
+
+// Override form submission to validate based on type
+const contraForm = document.getElementById('contra-form');
+contraForm.addEventListener('submit', function(e) {
+    const selectedType = document.querySelector('input[name="contraindication_type"]:checked').value;
+    
+    if (selectedType === 'practice') {
+        if (!practiceIdInput.value) {
+            e.preventDefault();
+            alert('Please select a practice to contraindicate.');
+            return false;
+        }
+    } else if (selectedType === 'category') {
+        if (!categorySelect.value) {
+            e.preventDefault();
+            alert('Please select a category to contraindicate.');
+            return false;
+        }
+    } else if (selectedType === 'kosha') {
+        if (!koshaSelect.value) {
+            e.preventDefault();
+            alert('Please select a kosha to contraindicate.');
+            return false;
+        }
+    }
+});
 </script>
 {% endblock %}

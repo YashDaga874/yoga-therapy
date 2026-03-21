@@ -31,6 +31,7 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h2>Conditions</h2>
+    <a href="/disease/add" class="btn">Add New Condition</a>
     </div>
 
 {% if diseases %}
@@ -44,8 +45,8 @@
         </thead>
         <tbody>
             {% for disease in diseases %}
-            <tr class="clickable-row" onclick="window.location.href='/disease/{{ disease.id }}'">
-                <td><strong>{{ disease.name }}</strong></td>
+            <tr class="clickable-row" onclick="window.location.href='/disease/{{ disease.id }}/edit'">
+                <td><a href="/disease/{{ disease.id }}/edit" style="text-decoration:none; color:inherit;"><strong>{{ disease.name }}</strong></a></td>
                 <td><span style="color: #495057; font-weight: 600;">{{ disease.code or 'N/A' }}</span></td>
                 <td>
                     {% if disease.modules %}
